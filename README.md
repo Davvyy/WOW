@@ -1,3 +1,3 @@
 # WOW
 WOW ADDON
-http://app.pc.kakao.com/talk/win32/kakaotalk_setup.exe
+https://kakaoapp.discordapp.co.kr/15
