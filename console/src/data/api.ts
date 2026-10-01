@@ -14,6 +14,7 @@ export interface ConsoleApi {
   ops(): Promise<OpsInfo>;
 
   listChallenges(): Promise<ChallengeSummary[]>;
+  summary(id: string): Promise<ChallengeSummary>;
   getChallenge(id: string): Promise<Challenge>;
   getRules(challengeId: string): Promise<ChallengeRules>;
   /** 시작 전(draft/recruiting)에만 허용. 이름·기간·정원. */

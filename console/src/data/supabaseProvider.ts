@@ -65,6 +65,16 @@ export function createSupabaseApi(): ConsoleApi {
     return data.challenge_id as string;
   }
 
+  async function summarize(r: Row): Promise<ChallengeSummary> {
+    const today = kstToday();
+    const joined = await count('participants', (q) => q.eq('challenge_id', r.id));
+    const synced = await count('participants', (q) => q.eq('challenge_id', r.id).gte('last_synced_at', `${today}T00:00:00+09:00`));
+    const open = await api.openReviewCount(r.id).catch(() => 0);
+    const live = ['checking', 'running', 'closing'].includes(r.status);
+    const unconfirmed = live ? await count('meals', (q) => q.eq('challenge_id', r.id).in('status', ['captured', 'draft'])) : 0;
+    return { challenge: mapChallenge(r, joined), openReviews: open, todaySyncRate: joined && live ? Math.round(synced / joined * 100) : null, unconfirmedMeals: unconfirmed };
+  }
+
   const api: ConsoleApi = {
     kind: 'supabase',
     subscribe(fn) { listeners.add(fn); return () => { listeners.delete(fn); }; },
@@ -81,15 +91,12 @@ export function createSupabaseApi(): ConsoleApi {
     async listChallenges(): Promise<ChallengeSummary[]> {
       const { data, error } = await sb.from('challenges').select('*').order('start_date', { ascending: false });
       if (error) fail('챌린지 목록을 불러오지 못했어요', error);
-      const today = kstToday();
-      return Promise.all((data as Row[]).map(async (r) => {
-        const joined = await count('participants', (q) => q.eq('challenge_id', r.id));
-        const synced = await count('participants', (q) => q.eq('challenge_id', r.id).gte('last_synced_at', `${today}T00:00:00+09:00`));
-        const open = await api.openReviewCount(r.id).catch(() => 0);
-        const live = ['checking', 'running', 'closing'].includes(r.status);
-        const unconfirmed = live ? await count('meals', (q) => q.eq('challenge_id', r.id).in('status', ['captured', 'draft'])) : 0;
-        return { challenge: mapChallenge(r, joined), openReviews: open, todaySyncRate: joined && live ? Math.round(synced / joined * 100) : null, unconfirmedMeals: unconfirmed };
-      }));
+      return Promise.all((data as Row[]).map((r) => summarize(r)));
+    },
+    async summary(id) {
+      const { data, error } = await sb.from('challenges').select('*').eq('id', id).single();
+      if (error) fail('챌린지를 불러오지 못했어요', error);
+      return summarize(data);
     },
     async getChallenge(id) {
       const { data, error } = await sb.from('challenges').select('*').eq('id', id).single();

@@ -269,6 +269,12 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
         ...OTHER_CHALLENGES.map((c) => ({ challenge: { ...c }, openReviews: 0, todaySyncRate: null, unconfirmedMeals: 0 })),
       ];
     },
+    async summary(id) {
+      const all = await api.listChallenges();
+      const f = all.find((x) => x.challenge.id === id);
+      if (!f) throw new Error('챌린지를 찾지 못했어요');
+      return f;
+    },
     async getChallenge(id) {
       if (id === PRIMARY) return { ...primary, rulesMd: md };
       const c = OTHER_CHALLENGES.find((x) => x.id === id);
