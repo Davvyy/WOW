@@ -463,6 +463,7 @@ const chip = (text, kind = 'neutral', icon = '') => `<span class="chip ${kind}">
 const go = (target, label, cls = 'link') => `<button class="${cls}" data-go="${target}">${label}</button>`;
 const kcal = (n) => `${fmt.kcal(n)} kcal`;
 
+const weekday = (md) => { const [m, d] = md.split('.').map(Number); return ['일', '월', '화', '수', '목', '금', '토'][new Date(2026, m - 1, d).getDay()]; }; // 실제 2026년 달력
 const SLOT_LABEL = { breakfast: '아침', lunch: '점심', dinner: '저녁', snack: '간식' };
 const SLOT_TIME = { breakfast: '04~10:30', lunch: '~15:00', dinner: '~22:00', snack: '그 외' };
 const SLOT_TOKEN = { breakfast: 'b', lunch: '', dinner: 'd', snack: 's' };
@@ -707,7 +708,7 @@ def('p5', '홈(오늘)', {
   if (v === 'offline') statusChip = chip(`오프라인 · ${ch.syncTime} 기준`, 'neutral', 'cloud_off');
   if (v === 'notice') banners += `<div class="banner neutral" role="status">${ms('campaign')}<div class="grow"><b>[공지]</b> ${esc(ch.notice.title)}</div><span class="badge-dot" style="background:var(--critical)" aria-label="읽지 않음"></span><button class="x" aria-label="닫기">${ms('close', 'sm')}</button></div>`;
   if (v === 'health') extraCards += `<div class="card outline" style="border-color:var(--border-strong);gap:6px" role="status"><div style="display:flex;gap:8px;align-items:flex-start">${ms('spa')}<div><p class="body" style="font-weight:600">오늘 섭취 기록이 적어요</p><p class="cap">점수와 무관하게 충분히 드세요 · 추정치예요 · 이 안내는 순위·점수에 영향이 없어요</p></div></div></div>`;
-  if (v === 'before') lifecycle = { title: `${ch.name}`, chip: chip('시작 전 · D−3', 'neutral', 'event'), ringLabel: '—', ringSub: '10월 6일에 시작해요', card: `<div class="card brand"><p class="title">10월 6일 월요일에 시작해요</p><p class="cap">첫 3일은 점검 기간이라 누적에 들어가지 않아요. 지금 연결 상태를 확인해 두면 첫날부터 걸음이 반영돼요.</p>${go('p4-ok', `연결 상태 확인 ${ms('chevron_right')}`)}</div>` };
+  if (v === 'before') lifecycle = { title: `${ch.name}`, chip: chip('시작 전 · D−3', 'neutral', 'event'), ringLabel: '—', ringSub: '10월 6일에 시작해요', card: `<div class="card brand"><p class="title">10월 6일 ${weekday('10.6')}요일에 시작해요</p><p class="cap">첫 3일은 점검 기간이라 누적에 들어가지 않아요. 지금 연결 상태를 확인해 두면 첫날부터 걸음이 반영돼요.</p>${go('p4-ok', `연결 상태 확인 ${ms('chevron_right')}`)}</div>` };
   if (v === 'closing') lifecycle = { title: ch.name, chip: chip('최종 집계 중', 'review', 'hourglass_top'), ringLabel: `<span style="font-size:.6em">잠금</span>`, ringSub: '운영자 확인 후 발표돼요', card: `<div class="card" style="background:var(--review-soft)"><p class="title" style="color:var(--review)">최종 집계 중 · 운영자 확인 후 발표돼요</p><p class="cap">마지막 날 기록은 11.3 09:00에 확정됐어요. 미결 검토가 끝나면 결과가 발표되고 7일 이의 기간이 시작돼요.</p></div>` };
   if (v === 'published') lifecycle = { title: ch.name, chip: chip('결과 확정', 'good', 'verified'), ringLabel: `<span class="num">${fmt.k1(FINAL.me.score)}</span><small>점</small>`, ringSub: `28일 누적 · 최종 ${FINAL.me.rank}위`, card: `<div class="card brand"><p class="title">최종 결과 · 이의 기간 ~${ch.objectionUntil}</p><p class="cap">최종 ${FINAL.me.rank}위 · 누적 ${fmt.k1(FINAL.me.score)}점. 결과에 이의가 있으면 점수 장부에서 1회 남길 수 있어요.</p>${go('p9-published', `최종 순위 보기 ${ms('chevron_right')}`)}</div>` };
 
@@ -724,7 +725,7 @@ def('p5', '홈(오늘)', {
   return `${appbar({ title: lifecycle ? lifecycle.title : ch.name, meta: lifecycle ? '' : dday, actions: `<button class="iconbtn" data-go="p12" aria-label="설정">${ms('settings')}</button>` })}
   <div class="scroll has-tab" style="gap:12px">
     ${banners}
-    ${lifecycle ? `<div>${lifecycle.chip}</div>` : `<div class="dates" role="tablist" aria-label="날짜">${dates.map(d => `<button role="tab" ${d === date ? 'aria-current="date"' : ''} class="${['10.14', '10.15'].includes(d) ? 'future' : ''}"><span class="d">${d.split('.')[1]}</span><span>${['목', '금', '토', '일', '월', '화', '수'][dates.indexOf(d)]}</span>${!['10.14', '10.15'].includes(d) && d !== date ? '<span class="m" aria-label="확정"></span>' : '<span style="height:5px"></span>'}</button>`).join('')}</div>`}
+    ${lifecycle ? `<div>${lifecycle.chip}</div>` : `<div class="dates" role="tablist" aria-label="날짜">${dates.map(d => `<button role="tab" ${d === date ? 'aria-current="date"' : ''} class="${['10.14', '10.15'].includes(d) ? 'future' : ''}"><span class="d">${d.split('.')[1]}</span><span>${weekday(d)}</span>${!['10.14', '10.15'].includes(d) && d !== date ? '<span class="m" aria-label="확정"></span>' : '<span style="height:5px"></span>'}</button>`).join('')}</div>`}
     <div class="card ringcard tappable" data-go="p10">
       ${ringHtml}
       ${lifecycle ? lifecycle.card : `<div class="three">
