@@ -71,6 +71,27 @@ class MockChalloryApi implements ChalloryApi {
     return ChallengeSession.mock;
   }
 
+  /// 프로토타입 공지 3건(최신이 안 읽음)
+  final notices = <Notice>[
+    Notice(id: 'n3', title: mockChallenge.noticeTitle, body: mockChallenge.noticeBody, at: DateTime(2026, 10, 12, 18)),
+    Notice(id: 'n2', title: '점검 기간이 끝났어요 · 10.9부터 누적 반영', body: '첫 3일 점검 기간이 끝났어요. 10.9부터 점수가 누적에 들어가요.', at: DateTime(2026, 10, 9, 9, 30), read: true),
+    Notice(id: 'n1', title: '가을 걷기 챌린지가 시작됐어요', body: '오늘부터 28일 동안 진행돼요. 첫 3일은 점검 기간이에요.', at: DateTime(2026, 10, 6, 9), read: true),
+  ];
+
+  @override
+  Future<List<Notice>> fetchNotices() async {
+    calls.add('notices');
+    return List.of(notices);
+  }
+
+  @override
+  Future<void> markNoticesRead(List<String> ids) async {
+    calls.add('notices-read');
+    for (var i = 0; i < notices.length; i++) {
+      if (ids.contains(notices[i].id)) notices[i] = notices[i].markRead();
+    }
+  }
+
   @override
   Future<Leaderboard> fetchLeaderboard() async {
     calls.add('leaderboard');

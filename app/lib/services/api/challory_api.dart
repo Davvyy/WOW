@@ -23,6 +23,12 @@ abstract class ChalloryApi {
   /// API #33 내 챌린지 세션(요약·규칙 상수·잠긴 프로필·최근 공지). 참가 중이 아니면 null.
   Future<ChallengeSession?> fetchSession();
 
+  /// 공지 목록(N-03, 최신순). 예약 발송 시각이 지난 것만.
+  Future<List<Notice>> fetchNotices();
+
+  /// 공지 읽음 표시(notifications.read_at, 본인 행)
+  Future<void> markNoticesRead(List<String> ids);
+
   /// API #17 리더보드: 최신 스냅샷(오늘·누적) + 내 행(본인 점수는 내 장부에서)
   Future<Leaderboard> fetchLeaderboard();
 

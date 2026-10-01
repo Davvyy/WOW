@@ -91,13 +91,13 @@
             "new_s_d": 12.7,
             "prev_s_d": 41.2,
             "review_id": "0b296258-ab4c-48da-a3df-304c3ecbf46f",
-            "daily_score_id": "214478b6-7a5b-43b2-ba76-e88be5dec1cb"
+            "daily_score_id": "e6722fef-ca03-44d6-b5a7-183106eb7cfa"
         }
     ],
     "start_date": "2026-10-06",
     "daily_scores": [
         {
-            "id": "05da03cb-537a-4328-88b7-2c5f01bbba2b",
+            "id": "822fef8e-b014-417b-8948-91bd4ffddaca",
             "a_d": 309.7,
             "bmr": 1650,
             "d_d": 199.7,
@@ -180,7 +180,7 @@
             "under_review": false
         },
         {
-            "id": "74705216-5b0d-4e84-8035-9eaab7aad2d2",
+            "id": "425c39f8-e601-4ff1-9e9c-cd87bb7f0b1d",
             "a_d": 365.9,
             "bmr": 1650,
             "d_d": 215.9,
@@ -263,7 +263,7 @@
             "under_review": false
         },
         {
-            "id": "13392f21-cf28-432b-94b8-04bc25f0a82f",
+            "id": "428f63ae-0992-4810-956e-df16b265c788",
             "a_d": 300.5,
             "bmr": 1650,
             "d_d": -222.0,
@@ -341,7 +341,7 @@
             "under_review": false
         },
         {
-            "id": "3f775f1a-b683-40c3-8704-3a0b11a323ad",
+            "id": "d9546b4d-6b0f-4bbe-8c96-44d05afde291",
             "a_d": 353.0,
             "bmr": 1650,
             "d_d": 443.0,
@@ -424,7 +424,7 @@
             "under_review": false
         },
         {
-            "id": "b0b5250b-394e-4eed-9cab-4ba1e48afa74",
+            "id": "dab98404-15f5-4447-9f66-942cefa86029",
             "a_d": 402.5,
             "bmr": 1650,
             "d_d": 432.5,
@@ -507,7 +507,7 @@
             "under_review": false
         },
         {
-            "id": "84f659b5-e5f9-4404-9138-d70ba1cdf85f",
+            "id": "7ac9c1e6-0a6f-4c89-a79f-41d71e93fd09",
             "a_d": 294.0,
             "bmr": 1650,
             "d_d": 624.0,
@@ -590,7 +590,7 @@
             "under_review": false
         },
         {
-            "id": "214478b6-7a5b-43b2-ba76-e88be5dec1cb",
+            "id": "e6722fef-ca03-44d6-b5a7-183106eb7cfa",
             "a_d": 356.0,
             "bmr": 1650,
             "d_d": 63.5,
@@ -674,7 +674,7 @@
             "under_review": false
         },
         {
-            "id": "fbe4204c-526e-4dd1-8dc6-2ae8d525bdfd",
+            "id": "52d189ee-b1bc-4b7c-a689-baaf4c3a7737",
             "a_d": 294.0,
             "bmr": 1650,
             "d_d": 144.0,

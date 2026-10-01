@@ -296,3 +296,17 @@ class LeaderRow {
   /// 본인 행만: 검토 중(잠정 유지, 타인에게는 '집계 중')
   final bool underReview;
 }
+
+/// 운영자 공지(N-03). 서버 notifications(type N-03, 본인 행) 한 건.
+class Notice {
+  const Notice({required this.id, required this.title, required this.body, required this.at, this.read = false});
+  final String id;
+  final String title;
+  final String body;
+
+  /// 발송(예약) 시각 — KST 벽시계 기준
+  final DateTime at;
+  final bool read;
+
+  Notice markRead() => Notice(id: id, title: title, body: body, at: at, read: true);
+}

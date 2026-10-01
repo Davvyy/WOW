@@ -324,18 +324,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ], gap: 6)),
           );
 
+    // 최신 공지(N-03) 1건. 읽지 않았으면 빨간 점, 누르면 전문 + 읽음 처리
+    final latestNotice = ref.watch(noticesProvider).value?.firstOrNull;
     final body = <Widget>[
-      if (_noticeOpen && !lifecycle && ch.noticeTitle.isNotEmpty)
+      if (_noticeOpen && !lifecycle && latestNotice != null)
         InfoBanner(
           tone: Tone.neutral,
           icon: Icons.campaign_rounded,
           onClose: () => setState(() => _noticeOpen = false),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => showChSheet(context, builder: (_) => _NoticeSheet(title: ch.noticeTitle, body: ch.noticeBody, date: ch.noticeDate)),
+            onTap: () {
+              ref.read(noticesProvider.notifier).markRead([latestNotice.id]);
+              showChSheet(context, builder: (_) => _NoticeSheet(title: latestNotice.title, body: latestNotice.body, date: fmtMd(latestNotice.at)));
+            },
             child: Row(children: [
-              Expanded(child: boldThen(context, '[공지] ', ch.noticeTitle, color: c.fg2)),
-              Container(width: 8, height: 8, decoration: BoxDecoration(color: c.critical, shape: BoxShape.circle), margin: const EdgeInsets.only(left: 6)),
+              Expanded(child: boldThen(context, '[공지] ', latestNotice.title, color: c.fg2)),
+              if (!latestNotice.read)
+                Semantics(
+                  label: '읽지 않음',
+                  child: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.critical, shape: BoxShape.circle), margin: const EdgeInsets.only(left: 6)),
+                ),
             ]),
           ),
         ),

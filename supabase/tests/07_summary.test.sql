@@ -36,3 +36,30 @@ do $$ begin
 end $$;
 reset role;
 rollback;
+
+-- 공지 보관함(N-03): 본인 행만 읽고, read_at 만 바꿀 수 있다
+begin;
+do $$
+declare ch uuid := (select challenge_id from participants where id = tests.pid('지수'));
+begin
+  perform enqueue_notification(tests.uid('지수'), ch, 'N-03', '공지 1', '본문 1', '{}', '2026-10-06 09:00+09');
+  perform enqueue_notification(tests.uid('지수'), ch, 'N-03', '공지 2', '본문 2', '{}', '2026-10-12 18:00+09');
+  perform enqueue_notification(tests.uid('밤산책'), ch, 'N-03', '공지 2', '본문 2', '{}', '2026-10-12 18:00+09');
+end $$;
+select tests.login(tests.uid('지수'));
+set local role authenticated;
+do $$
+declare n int;
+begin
+  perform tests.eq((select count(*)::int from notifications where type = 'N-03'), 2, '공지: 본인 행 2건만');
+  update notifications set read_at = now() where type = 'N-03' and title = '공지 2';
+  get diagnostics n = row_count;
+  perform tests.eq(n, 1, '공지: 읽음 표시(read_at) 가능');
+  perform tests.throws('update notifications set body = ''x'' where type = ''N-03''', '42501', '공지: 본문 수정 불가');
+  perform tests.throws('delete from notifications', '42501', '공지: 삭제 불가');
+end $$;
+reset role;
+do $$ begin
+  perform tests.ok((select read_at is null from notifications where user_id = tests.uid('밤산책') and title = '공지 2'), '공지: 다른 사람 읽음 상태는 그대로');
+end $$;
+rollback;

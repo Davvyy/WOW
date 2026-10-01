@@ -95,6 +95,30 @@ class SupabaseChalloryApi implements ChalloryApi {
   }
 
   @override
+  Future<List<Notice>> fetchNotices() async {
+    try {
+      final rows = await _client.from('notifications').select('id, title, body, scheduled_at, read_at')
+          .eq('type', 'N-03').lte('scheduled_at', DateTime.now().toUtc().toIso8601String())
+          .order('scheduled_at', ascending: false).limit(50);
+      return [for (final r in rows) noticeFromServer(r)];
+    } catch (e) {
+      throw ApiException(0, e.toString());
+    }
+  }
+
+  @override
+  Future<void> markNoticesRead(List<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      // RLS: 본인 행만, 컬럼 권한: read_at 만
+      await _client.from('notifications').update({'read_at': DateTime.now().toUtc().toIso8601String()})
+          .inFilter('id', ids).isFilter('read_at', null);
+    } catch (e) {
+      throw ApiException(0, e.toString());
+    }
+  }
+
+  @override
   Future<Leaderboard> fetchLeaderboard() async {
     try {
       final me = await _me();

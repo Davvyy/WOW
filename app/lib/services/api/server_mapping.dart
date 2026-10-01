@@ -227,3 +227,12 @@ String _sourceLabel(String? origin) => switch (origin) {
       'com.fitbit.FitbitMobile' => 'Fitbit',
       _ => origin,
     };
+
+/// notifications 행(N-03) → 공지
+Notice noticeFromServer(Map<String, dynamic> r) => Notice(
+      id: r['id'] as String,
+      title: (r['title'] as String?) ?? '공지',
+      body: (r['body'] as String?) ?? '',
+      at: DateTime.parse((r['scheduled_at'] ?? r['created_at']) as String).toUtc().add(const Duration(hours: 9)),
+      read: r['read_at'] != null,
+    );

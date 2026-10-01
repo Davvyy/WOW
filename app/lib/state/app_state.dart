@@ -123,6 +123,34 @@ Leaderboard? watchLeaderboard(WidgetRef ref) =>
     ref.watch(leaderboardProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLeaderboard);
 List<LedgerRow>? watchLedger(WidgetRef ref) => ref.watch(ledgerProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLedger);
 
+/// 공지 목록(N-03). 열면 [markAllRead] 로 읽음 처리(서버 read_at).
+class NoticesNotifier extends AsyncNotifier<List<Notice>> {
+  @override
+  Future<List<Notice>> build() {
+    ref.watch(authChangesProvider);
+    return ref.watch(apiProvider).fetchNotices();
+  }
+
+  int get unread => (state.value ?? const []).where((n) => !n.read).length;
+
+  Future<void> markRead(Iterable<String> ids) async {
+    final list = state.value;
+    if (list == null) return;
+    final targets = {for (final n in list) if (!n.read && ids.contains(n.id)) n.id};
+    if (targets.isEmpty) return;
+    state = AsyncData([for (final n in list) targets.contains(n.id) ? n.markRead() : n]); // 화면 먼저
+    try {
+      await ref.read(apiProvider).markNoticesRead(targets.toList());
+    } on ApiException {
+      // 읽음 표시는 다음에 다시 시도해도 되는 부가 정보 — 화면 상태는 유지
+    }
+  }
+
+  Future<void> markAllRead() => markRead([for (final n in state.value ?? const <Notice>[]) n.id]);
+}
+
+final noticesProvider = AsyncNotifierProvider<NoticesNotifier, List<Notice>>(NoticesNotifier.new);
+
 /// 최종 결과(Published): 서버는 발표 때 만든 확정 누적 스냅샷(transition_challenge), 모의는 프로토타입 최종 순위
 List<LeaderRow> watchFinalRows(WidgetRef ref) =>
     ref.read(apiProvider).isRemote ? (watchLeaderboard(ref)?.cumulative ?? const []) : mockFinal;
