@@ -157,18 +157,24 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       if (go != true) return;
     }
     if (!mounted) return;
-    ref.read(mealsProvider.notifier).confirm(widget.slot, _items, total, aiKcal: _aiTotal > 0 ? _aiTotal : null);
-    final snack = widget.slot != MealSlot.snack && total < engine.rules.snackKcal;
     final messenger = ScaffoldMessenger.of(context);
+    final snack = widget.slot != MealSlot.snack && total < engine.rules.snackKcal;
+    // 화면은 바로 홈으로(낙관적 반영), 서버 확정(meal-confirm / meal-manual)이 안 되면 되돌리고 알린다
+    final pending = ref.read(mealsProvider.notifier).confirm(widget.slot, _items, total, aiKcal: _aiTotal > 0 ? _aiTotal : null);
     context.go(R.home);
     if (snack) {
       messenger.showSnackBar(const SnackBar(content: Text('150 kcal 미만은 간식으로 기록돼요 · 끼니 슬롯은 채우지 않아요')));
     }
+    final err = await pending;
+    if (err != null) messenger.showSnackBar(SnackBar(content: Text(err)));
   }
 
-  void _skip() {
-    ref.read(mealsProvider.notifier).skip(widget.slot);
+  Future<void> _skip() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final pending = ref.read(mealsProvider.notifier).skip(widget.slot);
     context.go(R.home);
+    final err = await pending;
+    if (err != null) messenger.showSnackBar(SnackBar(content: Text(err)));
   }
 
   @override

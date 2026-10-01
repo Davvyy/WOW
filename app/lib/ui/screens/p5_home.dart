@@ -29,8 +29,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     // 앱 실행 시 3일 재조회(모의 원천은 변화 없음)
-    Future.microtask(() {
-      if (mounted) ref.read(activityProvider.notifier).refresh();
+    Future.microtask(() async {
+      if (!mounted) return;
+      ref.read(activityProvider.notifier).refresh();
+      final err = await ref.read(mealsProvider.notifier).loadToday(); // 서버 연결 시 오늘 끼니
+      if (err != null && mounted) showToast(context, err);
     });
   }
 
@@ -407,7 +410,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => ref.read(activityProvider.notifier).refresh(),
+              onRefresh: () async {
+                final meals = ref.read(mealsProvider.notifier);
+                await Future.wait([ref.read(activityProvider.notifier).refresh(), meals.retryPendingUploads()]);
+                await meals.loadToday();
+              },
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),

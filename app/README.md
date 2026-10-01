@@ -1,6 +1,6 @@
 # 챌로리(Challory) 참가자 앱
 
-다이어트 챌린지 앱 "챌로리"의 참가자용 Flutter 앱입니다. 화면 명세는 `docs/06-화면-설계.md`, 클릭 프로토타입은 `prototype/index.html`, 점수 산식은 `docs/04-칼로리-엔진-및-순위-규칙.md`를 따릅니다. 현재는 **모의 데이터로 끝까지 동작하는 UI 단계**이며, 서버 연동은 점수 시뮬레이터 RPC 한 곳만 연결돼 있습니다(아래 "모의/미구현" 참고).
+다이어트 챌린지 앱 "챌로리"의 참가자용 Flutter 앱입니다. 화면 명세는 `docs/06-화면-설계.md`, 클릭 프로토타입은 `prototype/index.html`, 점수 산식은 `docs/04-칼로리-엔진-및-순위-규칙.md`를 따릅니다. 서버 쓰기 경로(사진 업로드·끼니 생성·확정·건너뜀·직접 입력·신고·계정 삭제·활동 동기화)는 `ChalloryApi` 로 Edge Functions 에 연결돼 있고, `SUPABASE_URL` 이 없으면 같은 흐름을 모의 구현이 대신합니다. 리더보드·장부·로그인은 아직 모의입니다(아래 "서버 연결"·"모의/미구현").
 
 ## 실행
 
@@ -22,7 +22,7 @@ flutter run \
 
 | 상수 | 설명 |
 |---|---|
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | 둘 다 있으면 `Supabase.initialize` 후 P11 시뮬레이터가 RPC `score_simulate_from_inputs`(`{p: <json>}`)를 호출합니다. 호출이 안 되면 로컬 엔진으로 계산합니다. 없으면 로컬 엔진만 씁니다. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | 둘 다 있으면 `Supabase.initialize` 후 `SupabaseChalloryApi`(Edge Functions) 와 P11 RPC `score_simulate_from_inputs` 를 씁니다. 없으면 `MockChalloryApi`·로컬 엔진. |
 | `MOCK_HEALTH=true` | 실기기에서도 건강 데이터를 모의 값으로 강제합니다. |
 | `SCREEN_LIST=true` | 릴리스 빌드에서도 검수용 화면 목록(`/debug`)을 켭니다. 디버그 빌드에서는 항상 켜져 있습니다. |
 
@@ -70,6 +70,8 @@ lib/
     mock/mock_data.dart                prototype/data.js 포팅(모든 값은 엔진으로 계산)
   services/
     score_simulator.dart               ScoreSimulator 인터페이스 + 로컬/Supabase RPC 구현
+    api/                               ChalloryApi(서버 호출 계약) · Supabase 구현 · 모의 구현 · P7 항목↔서버 변환
+    photo/                             사진 전처리(리사이즈·EXIF 제거·SHA-256) · 업로드 파이프라인·재시도 큐
     health/                            HealthSource, 패키지 구현, 모의 구현, 동기화 배치
   state/app_state.dart                 Riverpod 단순 Provider(끼니·활동·날짜·생명주기)
   ui/screens/                          p1_start … p12_settings, debug_screens
@@ -87,7 +89,7 @@ lib/
 - `HealthSource` : 일 집계만 돌려줍니다(`steps_total`, `steps_manual`, `floors`, 세션, 출처). KST 기준 D·D−1·D−2 3일 윈도.
 - `HealthPackageSource` : `health` 13.x. 걸음은 `getTotalStepsInInterval` 집계 쿼리로 읽고, 수동 입력은 제외합니다. iOS는 `steps_manual`을 분리해 보내고, Android(Health Connect)는 집계로 수동분을 분리할 수 없어 수동 제외 집계 + `has_manual_source` 플래그를 보냅니다. 플랫폼 활동 칼로리는 `platformActiveKcal` 참고값으로만 보관하며 점수·순위에 쓰지 않습니다.
 - `MockHealthSource` : 실기기가 아니면(데스크톱·테스트) 자동 사용.
-- `buildSyncBatch(...)` : docs/05 §5 배치 JSON(`client_batch_id`, `tz`, `days[...]`). 서버 업로드 호출은 아직 없습니다.
+- `buildSyncBatch(...)` : docs/05 §5 배치 JSON(`client_batch_id`, `tz`, `days[...]`). P5·P8 새로고침 때 `sync-activity` 로 올립니다(`client_batch_id` = Idempotency-Key).
 - 갤러리/`image_picker` 사용 없음, 걸음 수동 입력 UI 없음.
 
 ## 플랫폼 설정
@@ -111,16 +113,32 @@ lib/
 
 두 서체 모두 앱에 번들했고 라이선스 전문을 `assets/fonts/`에 함께 두었습니다. 프로토타입은 IBM Plex Sans KR을 대신 쓰지만 docs/06 §5.2의 지정(Pretendard)을 따랐습니다. Pretendard OTF가 약 1.5 MB × 4라 앱 용량이 늘어나므로, 필요하면 가변 폰트나 서브셋으로 줄일 수 있습니다. 아이콘은 Flutter 기본 번들의 Material Icons(`*_rounded`)를 씁니다(프로토타입의 Material Symbols Rounded와 모양이 약간 다릅니다).
 
+## 서버 연결 (`lib/services/api/`)
+
+| 화면·동작 | 호출 | 비고 |
+|---|---|---|
+| P6 촬영 | `photo-upload-url` → 서명 URL PUT → `meals` | 기기에서 긴 변 ≤1,568 px·EXIF 제거·SHA-256(`photo_prep.dart`, isolate). 업로드는 기다리지 않고 홈으로(3초 복귀). 슬롯은 서버가 서버 시각으로 정하고 앱은 응답 슬롯으로 옮김 |
+| 분석 완료 | `meals` 행 조회(PostgREST, 본인 RLS) | 1.5초 간격 최대 10회 확인 → 초안 항목(후보 칩 kcal·국물 여부 포함) 반영. N-04 푸시 수신 처리는 남은 일 |
+| P7 확정 | `meal-confirm` (If-Match: version, Idempotency-Key) | 화면은 바로 반영, 서버가 거절하면 되돌리고 안내(412: "다른 기기에서 먼저 바뀌었어요") |
+| P7 직접 입력·검색(사진 없음) | `meal-manual` | 빈 슬롯·분석 없음 끼니 |
+| P7 건너뜀 | `meal-skip` | 한도 초과면 "대체값으로 계산돼요" 안내 |
+| P5 시작·당겨서 새로고침 | `meals` 조회 · `sync-activity` · 재시도 큐 | 서버 모드는 빈 슬롯에서 시작해 오늘 끼니를 서버에서 채움 |
+| P9 신고 | `reports` | 신고 대상 participant_id 가 필요 — 리더보드가 아직 모의라 서버 모드에서는 "신고 대상을 찾지 못했어요"가 나옴 |
+| P12 계정 삭제 | `account` (확인 문구 "삭제") → 로그아웃 | |
+
+- 모든 쓰기 호출에 `Idempotency-Key`(UUID). 오프라인·5xx 는 `MealUploader.pending` 큐에 넣고 같은 키로 재시도하며, 재시도는 `queued=true` 로 보내 서버가 촬영 시각 기준 지연 업로드 규칙을 적용합니다. 큐는 메모리에만 있어 앱을 종료하면 사라집니다.
+- 모의 모드(`MockChalloryApi`)는 같은 호출 순서·응답 모양을 흉내 냅니다: 서버 시각 슬롯, 2초 뒤 초안, 확정마다 버전 증가.
+
 ## 모의/미구현
 
 모의로 동작하는 것
 - 모든 화면 데이터(챌린지·내 정보·끼니·장부·리더보드·최종 결과): `lib/data/mock/mock_data.dart`. 초대코드는 `K7Q2MD` 유효, `FULL00` 마감, `BLOCK0` 참가 불가, 그 외 오류.
 - 로그인(카카오/Apple)은 버튼만 있고 인증은 하지 않습니다.
-- 촬영 후 AI 초안(2초 뒤 `draft`)과 식약처 DB 검색(P7)은 모의 목록입니다.
-- 응원·신고·소명·이의 전송은 화면 안에서만 동작하고 서버로 보내지 않습니다.
+- 모의 모드의 AI 초안(2초 뒤 `draft`)과 식약처 DB 검색(P7) 목록. 서버 모드에서도 P7 검색 시트는 아직 모의 목록입니다(`food_search` RPC 연결은 남은 일).
+- 응원·소명·이의 전송은 화면 안에서만 동작합니다.
 
 알려진 공백
-- Supabase 연동은 P11 시뮬레이터 RPC만. 인증(Kakao/Apple), 끼니·사진 업로드(리사이즈·EXIF 제거·SHA-256·서명 URL), 리더보드·장부 조회, 동기화 배치 업로드, 오프라인 큐·재시도가 남아 있습니다.
+- 서버 연동 남은 것: 인증(Kakao/Apple — 로그인 없이는 Edge Function 이 401), 리더보드·장부·규칙 조회, 응원·소명 전송, P7 음식 검색, 재시도 큐 디스크 보관, N-04 푸시로 초안 갱신.
 - 푸시 알림(FCM)과 OS 알림 권한 요청: P6 프리퍼미션 카드는 화면만 있고 실제 권한 요청은 없습니다.
 - "설정 열기"·"삼성헬스 열기"·약관 링크처럼 외부 앱/URL을 여는 동작(`url_launcher`, `permission_handler` 미포함).
 - 볼륨 키 촬영(네이티브 구현), 백그라운드 동기화(WorkManager, `HKObserverQuery`), 딥링크·클립보드 초대코드 감지(P1 배너는 모의).

@@ -27,9 +27,17 @@ class MealItem {
     this.mult = 1,
     this.brothOff = false,
     this.count = 1,
+    this.foodCodes = const [],
+    this.fromSearch = false,
   });
 
   final String id;
+
+  /// 후보별 식약처 food_code(서버 초안·검색 결과). 없으면 serving kcal 만 보낸다.
+  final List<String?> foodCodes;
+
+  /// 검색으로 추가한 항목(input_type=search)
+  final bool fromSearch;
   final List<String> candidates;
   final List<int> candKcal;
   final String portion;
@@ -74,6 +82,8 @@ class MealItem {
         mult: mult ?? this.mult,
         brothOff: brothOff ?? this.brothOff,
         count: count ?? this.count,
+        foodCodes: foodCodes,
+        fromSearch: fromSearch,
       );
 }
 
@@ -90,9 +100,23 @@ class MealRecord {
     this.items = const [],
     this.noAnalysis = false,
     this.corrected = false,
+    this.serverId,
+    this.version = 1,
+    this.lateUpload = false,
+    this.pendingUpload = false,
   });
 
   final MealSlot slot;
+
+  /// 서버 meals.id / meals.version(확정 If-Match). 모의 시드 끼니는 null.
+  final String? serverId;
+  final int version;
+
+  /// 지연 업로드 배지(05 §6)
+  final bool lateUpload;
+
+  /// 오프라인 등으로 업로드 대기 중(재시도 큐)
+  final bool pendingUpload;
   final MealStatus status;
   final double kcal;
   final double? aiKcal;
@@ -113,6 +137,10 @@ class MealRecord {
     List<MealItem>? items,
     bool? noAnalysis,
     bool? corrected,
+    String? serverId,
+    int? version,
+    bool? lateUpload,
+    bool? pendingUpload,
   }) =>
       MealRecord(
         slot: slot,
@@ -124,6 +152,10 @@ class MealRecord {
         items: items ?? this.items,
         noAnalysis: noAnalysis ?? this.noAnalysis,
         corrected: corrected ?? this.corrected,
+        serverId: serverId ?? this.serverId,
+        version: version ?? this.version,
+        lateUpload: lateUpload ?? this.lateUpload,
+        pendingUpload: pendingUpload ?? this.pendingUpload,
       );
 }
 
@@ -244,6 +276,7 @@ class LeaderRow {
     this.tie = false,
     this.aggregating = false,
     this.gapToPrev,
+    this.participantId,
   });
   final int rank;
   final String name;
@@ -255,4 +288,7 @@ class LeaderRow {
   final bool tie;
   final bool aggregating;
   final double? gapToPrev;
+
+  /// 서버 스냅샷 행의 participant_id(신고 대상). 모의 행·집계 중 행은 null.
+  final String? participantId;
 }

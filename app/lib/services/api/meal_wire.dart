@@ -1,0 +1,47 @@
+import '../../core/engine/engine.dart';
+import '../../data/models.dart';
+import 'challory_api.dart';
+
+/// P7 항목 → 서버 confirm_meal 항목 형식.
+/// 서버 kcal = serving_kcal × portion_multiplier × count × (broth_off ? 0.6 : 1) — 앱 [MealItem.rawKcal] 과 같은 값이 되게 보낸다.
+Map<String, dynamic> mealItemToWire(MealItem it) {
+  final isCount = it.kind == ItemKind.count;
+  final isSide = it.kind == ItemKind.side;
+  // 반찬 젓가락 수는 정수 개수로, 밥 분량은 배수로(서버 portion_multiplier 0.25~2.0)
+  final count = isCount ? it.count : (isSide ? it.mult.round().clamp(1, 20) : 1);
+  final mult = isCount || isSide ? 1.0 : it.mult;
+  final code = it.foodCodes.length > it.cand ? it.foodCodes[it.cand] : null;
+  return {
+    'chosen_name': it.name,
+    'food_code': ?code,
+    'serving_kcal': it.candKcal[it.cand],
+    'name_candidates': it.candidates,
+    'count': count,
+    'portion_multiplier': mult,
+    'broth_off': it.kind == ItemKind.soup && it.brothOff,
+    'eaten': it.checked,
+    'input_type': switch (it.confidence) { Confidence.manual => 'manual', _ => it.fromSearch ? 'search' : 'ai' },
+  };
+}
+
+/// 서버 초안 항목 → P7 편집 항목
+MealItem mealItemFromServer(ServerMealItem s, int index) {
+  final name = s.candidates.first;
+  final kind = s.hasBroth
+      ? ItemKind.soup
+      : (name.endsWith('밥') ? ItemKind.rice : (s.count > 1 ? ItemKind.count : ItemKind.side));
+  return MealItem(
+    id: 's$index',
+    candidates: s.candidates,
+    candKcal: [for (final k in s.candidateKcal) k.round()],
+    foodCodes: s.candidateFoodCodes,
+    portion: kind == ItemKind.rice ? '1공기' : (kind == ItemKind.count ? '개' : '1인분'),
+    kind: kind,
+    baseCount: s.count,
+    count: s.count,
+    mult: kind == ItemKind.count || kind == ItemKind.side ? 1 : s.portionMultiplier,
+    confidence: s.needsCheck ? Confidence.check : Confidence.sure,
+  );
+}
+
+String slotWire(MealSlot s) => s.name;

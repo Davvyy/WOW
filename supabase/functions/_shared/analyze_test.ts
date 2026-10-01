@@ -38,6 +38,9 @@ Deno.test('P7 점심 초안: 6항목 합계 850 (김 포함)', async () => {
     assertEquals(out.items.length, 6);
     assertEquals(out.items.find((i) => i.chosen_name === '계란말이')?.ai_kcal, 180);
     assertEquals(out.items.find((i) => i.chosen_name === '김치찌개')?.has_broth, true);
+    const rice = out.items[0];
+    assertEquals(rice.candidates[0], '흰쌀밥'); // 선택 이름이 첫 칩
+    assertEquals(rice.candidate_kcal.length, rice.candidates.length);
   }
   assertEquals(notified, ['done']);
 });

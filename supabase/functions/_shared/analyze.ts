@@ -25,6 +25,9 @@ export interface DraftItem {
   needs_check: boolean;
   serving_kcal: number;
   ai_kcal: number;
+  candidates: string[]; // [선택된 이름, …나머지 후보] — P7 후보 칩
+  candidate_kcal: number[]; // 후보별 1인분 kcal(매칭 실패 후보는 선택 항목 값)
+  candidate_food_codes: (string | null)[];
 }
 
 export interface AnalyzeDeps {
@@ -91,7 +94,23 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
       needsCheck = true;
     }
     const mult = PORTION_MULTIPLIER[it.portion_bucket];
+    // 후보 칩: 선택 이름을 맨 앞에, 나머지 LLM 후보는 각자 DB 매칭 kcal(실패 시 선택 항목 값)
+    const candidates = [chosen];
+    const candidate_kcal = [serving];
+    const candidate_food_codes: (string | null)[] = [food_code];
+    for (const name of it.name_candidates as string[]) {
+      if (candidates.includes(name) || candidates.length >= 3) continue;
+      const cm = await deps.mapFood([name]);
+      const hit = cm.match === 'auto' ? { code: cm.food_code, kcal: cm.kcal } : cm.chips[0] ? { code: cm.chips[0].food_code, kcal: cm.chips[0].kcal } : null;
+      if (hit && hit.code && candidate_food_codes.includes(hit.code)) continue;
+      candidates.push(name);
+      candidate_kcal.push(hit?.kcal ?? serving);
+      candidate_food_codes.push(hit?.code ?? null);
+    }
     out.push({
+      candidates,
+      candidate_kcal,
+      candidate_food_codes,
       name_candidates: it.name_candidates as string[],
       chosen_name: chosen,
       food_code,

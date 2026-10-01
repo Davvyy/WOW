@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
@@ -71,9 +73,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     setState(() => _busy = true);
     try {
       final ctrl = _controller;
+      Uint8List? photo;
+      final capturedAt = DateTime.now();
       if (ctrl != null && ctrl.value.isInitialized) {
         final file = await ctrl.takePicture();
-        // 업로드(리사이즈·EXIF 제거·SHA-256)는 서버 연동 단계에서 처리한다. 모의 모드에서는 바로 폐기.
+        // 원본은 메모리로만 읽고 임시 파일은 바로 지운다(사진첩 저장 없음). 리사이즈·EXIF 제거·SHA-256 은 업로드 파이프라인이 한다.
+        photo = await File(file.path).readAsBytes();
         try {
           await File(file.path).delete();
         } catch (_) {}
@@ -86,7 +91,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         context.pushReplacement(R.meal(_slot));
         return;
       }
-      meals.capture(_slot, _timeNow(), aiConsent: consent);
+      // 업로드는 기다리지 않는다(3초 내 홈 복귀). 결과 문구는 홈에서 토스트로.
+      final messenger = ScaffoldMessenger.of(context);
+      unawaited(meals.capture(_slot, _timeNow(), aiConsent: consent, photo: photo, capturedAt: capturedAt).then((err) {
+        if (err != null) messenger.showSnackBar(SnackBar(content: Text(err)));
+      }));
       final firstTime = !ref.read(notifAskedProvider);
       if (firstTime) {
         ref.read(notifAskedProvider.notifier).done();

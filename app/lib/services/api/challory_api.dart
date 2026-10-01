@@ -1,0 +1,189 @@
+import 'dart:typed_data';
+
+import '../../core/engine/engine.dart';
+
+/// 서버 호출 계약(supabase/functions/* · docs/05 API). 화면·상태는 이 인터페이스만 쓴다.
+/// [SupabaseChalloryApi] 는 Edge Function·PostgREST, [MockChalloryApi] 는 서버 없이 같은 응답 모양을 흉내 낸다.
+/// 모든 쓰기 호출은 Idempotency-Key 를 붙이고, 재시도 때 같은 키를 다시 쓴다(05 §4 멱등 규약).
+abstract class ChalloryApi {
+  bool get isRemote;
+
+  /// API #8 사진 행 + 서명 업로드 URL
+  Future<PhotoUploadTicket> requestPhotoUpload(PreparedPhoto photo, {required String idempotencyKey});
+
+  /// 서명 URL 로 이미지 PUT
+  Future<void> uploadPhoto(PhotoUploadTicket ticket, Uint8List bytes);
+
+  /// API #9 끼니 생성(서버 재검증 · 슬롯 태그 · 지연 업로드 규칙)
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey});
+
+  /// 끼니 1건 + 초안 항목(분석 완료 확인용)
+  Future<ServerMeal?> fetchMeal(String mealId);
+
+  /// 본인 끼니(해당 KST 날짜, RLS 본인 행) — P5 시작 시 서버 상태로 맞춘다
+  Future<List<ServerMeal>> fetchMealsOn(String localDate);
+
+  /// API #12 확정(If-Match: version)
+  Future<ConfirmResult> confirmMeal(String mealId, int version, List<Map<String, dynamic>> items, {required String idempotencyKey});
+
+  /// API #13 건너뜀
+  Future<SkipResult> skipMeal(String localDate, MealSlot slot, {required String idempotencyKey});
+
+  /// API #10 사진 없는 직접 입력·검색 확정
+  Future<ConfirmResult> createManualMeal(MealSlot slot, List<Map<String, dynamic>> items, {String? localDate, required String idempotencyKey});
+
+  /// API #6 활동 배치(client_batch_id = Idempotency-Key)
+  Future<Map<String, dynamic>> syncActivity(Map<String, dynamic> batch);
+
+  /// API #19 익명 신고
+  Future<void> report({String? participantId, String? mealId, required String reason, required String idempotencyKey});
+
+  /// API #22 계정 삭제(확인 문구 "삭제")
+  Future<void> deleteAccount(String confirm);
+}
+
+class ApiException implements Exception {
+  const ApiException(this.status, this.message);
+  final int status;
+  final String message;
+
+  /// 네트워크 단절·5xx → 오프라인 큐로 재시도할 대상
+  bool get retryable => status == 0 || status >= 500 || status == 408 || status == 429;
+  @override
+  String toString() => 'ApiException($status, $message)';
+}
+
+/// 기기에서 리사이즈(긴 변 ≤1,568 px)·EXIF 제거·SHA-256 계산을 마친 사진
+class PreparedPhoto {
+  const PreparedPhoto({required this.bytes, required this.sha256, required this.width, required this.height, required this.capturedAt});
+  final Uint8List bytes;
+  final String sha256;
+  final int width;
+  final int height;
+  final DateTime capturedAt;
+}
+
+class PhotoUploadTicket {
+  const PhotoUploadTicket({required this.photoId, required this.storagePath, required this.token, this.signedUrl});
+  final String photoId;
+  final String storagePath;
+  final String token;
+  final String? signedUrl;
+}
+
+class CreatedMeal {
+  const CreatedMeal({required this.mealId, required this.slot, required this.localDate, required this.analyze,
+      this.lateUpload = false, this.counted = true, this.dupPhoto = false});
+  final String mealId;
+  final MealSlot slot;
+  final String localDate;
+  final bool analyze;
+  final bool lateUpload;
+  final bool counted;
+  final bool dupPhoto;
+
+  factory CreatedMeal.fromJson(Map<String, dynamic> j) => CreatedMeal(
+        mealId: j['meal_id'] as String,
+        slot: MealSlot.values.byName(j['slot'] as String),
+        localDate: j['local_date'] as String,
+        analyze: j['analyze'] as bool? ?? false,
+        lateUpload: j['late_upload'] as bool? ?? false,
+        counted: j['counted'] as bool? ?? true,
+        dupPhoto: j['dup_photo'] as bool? ?? false,
+      );
+}
+
+/// 서버 초안 항목(meal_items)
+class ServerMealItem {
+  const ServerMealItem({required this.candidates, required this.candidateKcal, required this.candidateFoodCodes, required this.count,
+      required this.portionMultiplier, required this.hasBroth, required this.needsCheck, required this.aiKcal});
+  final List<String> candidates;
+  final List<double> candidateKcal;
+  final List<String?> candidateFoodCodes;
+  final int count;
+  final double portionMultiplier;
+  final bool hasBroth;
+  final bool needsCheck;
+  final double aiKcal;
+
+  factory ServerMealItem.fromJson(Map<String, dynamic> j) {
+    final ai = (j['ai_kcal'] as num?)?.toDouble() ?? 0;
+    final chosen = (j['chosen_name'] as String?) ?? ((j['name_candidates'] as List?)?.firstOrNull as String? ?? '음식');
+    var cands = [for (final c in (j['name_candidates'] as List? ?? const [])) c as String];
+    var kcals = [for (final k in (j['candidate_kcal'] as List? ?? const [])) (k as num).toDouble()];
+    var codes = [for (final c in (j['candidate_food_codes'] as List? ?? const [])) c as String?];
+    if (kcals.length != cands.length || cands.isEmpty) {
+      // 후보 kcal 이 없는 행(구버전·직접 입력): 선택 이름 하나만
+      final serving = (j['serving_kcal'] as num?)?.toDouble() ?? ai;
+      cands = [chosen];
+      kcals = [serving];
+      codes = [j['food_code'] as String?];
+    }
+    return ServerMealItem(
+      candidates: cands,
+      candidateKcal: kcals,
+      candidateFoodCodes: codes.length == cands.length ? codes : List.filled(cands.length, null),
+      count: (j['count'] as num?)?.toInt() ?? 1,
+      portionMultiplier: (j['portion_multiplier'] as num?)?.toDouble() ?? 1,
+      hasBroth: j['has_broth'] as bool? ?? false,
+      needsCheck: j['needs_check'] as bool? ?? false,
+      aiKcal: ai,
+    );
+  }
+}
+
+class ServerMeal {
+  const ServerMeal({required this.id, required this.status, required this.version, this.aiKcal, this.confirmedKcal, this.items = const [],
+      this.slot, this.capturedAt, this.lateUpload = false, this.engine});
+  final String id;
+  final MealSlot? slot;
+  final DateTime? capturedAt;
+  final bool lateUpload;
+  final String? engine;
+  final MealStatus status;
+  final int version;
+  final double? aiKcal;
+  final double? confirmedKcal;
+  final List<ServerMealItem> items;
+
+  factory ServerMeal.fromJson(Map<String, dynamic> j) => ServerMeal(
+        id: j['id'] as String,
+        status: j['status'] == 'void' ? MealStatus.voided : MealStatus.values.byName(j['status'] as String),
+        version: (j['version'] as num?)?.toInt() ?? 1,
+        aiKcal: (j['ai_kcal'] as num?)?.toDouble(),
+        confirmedKcal: (j['confirmed_kcal'] as num?)?.toDouble(),
+        items: [for (final it in (j['meal_items'] as List? ?? const [])) ServerMealItem.fromJson(Map<String, dynamic>.from(it as Map))],
+        slot: j['slot'] == null ? null : MealSlot.values.byName(j['slot'] as String),
+        capturedAt: j['captured_at'] == null ? null : DateTime.parse(j['captured_at'] as String),
+        lateUpload: j['late_upload'] as bool? ?? false,
+        engine: j['engine'] as String?,
+      );
+}
+
+class ConfirmResult {
+  const ConfirmResult({required this.mealId, required this.confirmedKcal, required this.version, this.status = 'confirmed',
+      this.flags = const [], this.sD, this.unchanged = false});
+  final String mealId;
+  final double confirmedKcal;
+  final int version;
+  final String status;
+  final List<String> flags;
+  final double? sD;
+  final bool unchanged;
+
+  factory ConfirmResult.fromJson(Map<String, dynamic> j) => ConfirmResult(
+        mealId: j['meal_id'] as String,
+        confirmedKcal: (j['confirmed_kcal'] as num).toDouble(),
+        version: (j['version'] as num?)?.toInt() ?? 1,
+        status: j['status'] as String? ?? 'confirmed',
+        flags: [for (final f in (j['flags'] as List? ?? const [])) f as String],
+        sD: (j['s_d'] as num?)?.toDouble(),
+        unchanged: j['unchanged'] as bool? ?? false,
+      );
+}
+
+class SkipResult {
+  const SkipResult({required this.remainingWeek, required this.overLimit});
+  final int remainingWeek;
+  final bool overLimit;
+}

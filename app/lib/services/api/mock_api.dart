@@ -1,0 +1,146 @@
+import 'dart:typed_data';
+
+import '../../core/engine/engine.dart';
+import '../../data/mock/mock_data.dart';
+import 'challory_api.dart';
+
+/// 서버 없이 같은 흐름을 돌리는 모의 구현(SUPABASE_URL 미설정 · 테스트).
+/// 서버 규칙 중 화면에 보이는 것만 흉내 낸다: 서버 시각 슬롯 태그, 분석 2초 뒤 초안, 버전 증가, 확인 문구.
+class MockChalloryApi implements ChalloryApi {
+  MockChalloryApi({this.analysisDelay = const Duration(seconds: 2), DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+
+  final Duration analysisDelay;
+  final DateTime Function() _clock;
+  final calls = <String>[];
+  final _meals = <String, _MockMeal>{};
+  var _seq = 0;
+
+  /// 다음 호출을 에 이 오류를 던진다(테스트용: 오프라인 등)
+  ApiException? failNext;
+
+  @override
+  bool get isRemote => false;
+
+  void _maybeFail(String name) {
+    calls.add(name);
+    final f = failNext;
+    if (f != null) {
+      failNext = null;
+      throw f;
+    }
+  }
+
+  @override
+  Future<PhotoUploadTicket> requestPhotoUpload(PreparedPhoto p, {required String idempotencyKey}) async {
+    _maybeFail('photo-upload-url');
+    final id = 'photo-${++_seq}';
+    return PhotoUploadTicket(photoId: id, storagePath: 'mock/$id.jpg', token: 'mock');
+  }
+
+  @override
+  Future<void> uploadPhoto(PhotoUploadTicket t, Uint8List bytes) async => _maybeFail('upload');
+
+  @override
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey}) async {
+    _maybeFail('meals');
+    final id = 'meal-${++_seq}';
+    final now = _clock();
+    final slot = slotForKst(now);
+    _meals[id] = _MockMeal(slot, now);
+    return CreatedMeal(mealId: id, slot: slot, localDate: '${now.year}-${now.month}-${now.day}', analyze: true);
+  }
+
+  @override
+  Future<ServerMeal?> fetchMeal(String mealId) async {
+    calls.add('fetchMeal');
+    final m = _meals[mealId];
+    if (m == null) return null;
+    if (_clock().difference(m.createdAt) < analysisDelay) {
+      return ServerMeal(id: mealId, status: MealStatus.captured, version: m.version);
+    }
+    final items = mockDraftItems(m.slot);
+    return ServerMeal(
+      id: mealId,
+      status: MealStatus.draft,
+      version: m.version,
+      aiKcal: mockAiTotal(m.slot),
+      items: [
+        for (final it in items)
+          ServerMealItem(candidates: it.candidates, candidateKcal: [for (final k in it.candKcal) k.toDouble()],
+              candidateFoodCodes: List.filled(it.candidates.length, null), count: it.count, portionMultiplier: it.mult,
+              hasBroth: false, needsCheck: false, aiKcal: it.rawKcal),
+      ],
+    );
+  }
+
+  @override
+  Future<List<ServerMeal>> fetchMealsOn(String localDate) async => const []; // 모의 모드는 시드 끼니를 그대로 쓴다
+
+  @override
+  Future<ConfirmResult> confirmMeal(String mealId, int version, List<Map<String, dynamic>> items, {required String idempotencyKey}) async {
+    _maybeFail('meal-confirm');
+    final m = _meals.putIfAbsent(mealId, () => _MockMeal(MealSlot.lunch, _clock()));
+    if (m.version != version) throw const ApiException(412, 'version mismatch');
+    m.version++;
+    return ConfirmResult(mealId: mealId, confirmedKcal: wireTotal(items), version: m.version);
+  }
+
+  @override
+  Future<SkipResult> skipMeal(String localDate, MealSlot slot, {required String idempotencyKey}) async {
+    _maybeFail('meal-skip');
+    return const SkipResult(remainingWeek: 1, overLimit: false);
+  }
+
+  @override
+  Future<ConfirmResult> createManualMeal(MealSlot slot, List<Map<String, dynamic>> items, {String? localDate, required String idempotencyKey}) async {
+    _maybeFail('meal-manual');
+    final id = 'meal-${++_seq}';
+    _meals[id] = _MockMeal(slot, _clock())..version = 2;
+    return ConfirmResult(mealId: id, confirmedKcal: wireTotal(items), version: 2);
+  }
+
+  @override
+  Future<Map<String, dynamic>> syncActivity(Map<String, dynamic> batch) async {
+    _maybeFail('sync-activity');
+    return {'days': const []};
+  }
+
+  @override
+  Future<void> report({String? participantId, String? mealId, required String reason, required String idempotencyKey}) async =>
+      _maybeFail('reports');
+
+  @override
+  Future<void> deleteAccount(String confirm) async {
+    _maybeFail('account');
+    if (confirm != '삭제') throw const ApiException(422, '확인을 위해 "삭제"를 입력해 주세요');
+  }
+}
+
+class _MockMeal {
+  _MockMeal(this.slot, this.createdAt);
+  final MealSlot slot;
+  final DateTime createdAt;
+  int version = 1;
+}
+
+/// 서버 confirm_meal 과 같은 합계(국물 ×0.6, 먹은 것만)
+double wireTotal(List<Map<String, dynamic>> items) {
+  var t = 0.0;
+  for (final i in items) {
+    if (i['eaten'] == false) continue;
+    var k = (i['serving_kcal'] as num).toDouble() * (i['portion_multiplier'] as num? ?? 1).toDouble() * (i['count'] as num? ?? 1).toDouble();
+    if (i['broth_off'] == true) k *= EngineRules.defaults.brothFactor;
+    t += k;
+  }
+  return (t * 10 + 0.5).floorToDouble() / 10;
+}
+
+/// 서버 slot_for 와 같은 KST 경계(04:00 / 10:30 / 15:00 / 22:00)
+MealSlot slotForKst(DateTime t) {
+  final k = t.toUtc().add(const Duration(hours: 9));
+  final m = k.hour * 60 + k.minute;
+  if (m >= 4 * 60 && m < 10 * 60 + 30) return MealSlot.breakfast;
+  if (m >= 10 * 60 + 30 && m < 15 * 60) return MealSlot.lunch;
+  if (m >= 15 * 60 && m < 22 * 60) return MealSlot.dinner;
+  return MealSlot.snack;
+}

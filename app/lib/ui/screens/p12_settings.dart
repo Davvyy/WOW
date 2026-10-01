@@ -129,8 +129,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     ctrl.dispose();
     if (ok == true && mounted) {
-      showToast(context, '삭제 요청을 접수했어요');
-      context.go(R.p1);
+      try {
+        // 서버: 기록 즉시 삭제 · 일별 점수만 익명 보존 · 로그인 차단(05 API #22)
+        await ref.read(apiProvider).deleteAccount('삭제');
+        if (!mounted) return;
+        showToast(context, '계정을 삭제했어요');
+        context.go(R.p1);
+      } catch (e) {
+        if (mounted) showToast(context, apiErrorText(e));
+      }
     }
   }
 

@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
+import '../../services/health/health_source.dart' show newUuidV4;
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
 
@@ -49,8 +50,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     }
   }
 
-  void _report(String target) {
-    showChSheet<void>(context, builder: (_) => _ReportSheet(target: target));
+  void _report(LeaderRow target) {
+    showChSheet<void>(context, builder: (_) => _ReportSheet(target: target.name, participantId: target.participantId));
   }
 
   @override
@@ -100,7 +101,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: mine ? () => context.push(R.ledger) : null,
-          onLongPress: mine ? null : () => _report(r.name),
+          onLongPress: mine ? null : () => _report(r),
           child: Container(
             constraints: const BoxConstraints(minHeight: 56),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -254,7 +255,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 PopupMenuButton<String>(
                   tooltip: '더보기',
                   icon: Icon(Icons.more_vert_rounded, color: c.fg),
-                  onSelected: (_) => _report(list.firstWhere((r) => !r.me && !r.aggregating).name),
+                  onSelected: (_) => _report(list.firstWhere((r) => !r.me && !r.aggregating)),
                   itemBuilder: (_) => const [PopupMenuItem(value: 'report', child: Text('익명으로 신고'))],
                 ),
             ],
@@ -281,14 +282,19 @@ class _PinnedRow extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_PinnedRow old) => true;
 }
 
-class _ReportSheet extends StatefulWidget {
-  const _ReportSheet({required this.target});
+class _ReportSheet extends ConsumerStatefulWidget {
+  const _ReportSheet({required this.target, this.participantId});
   final String target;
+  final String? participantId;
   @override
-  State<_ReportSheet> createState() => _ReportSheetState();
+  ConsumerState<_ReportSheet> createState() => _ReportSheetState();
 }
 
-class _ReportSheetState extends State<_ReportSheet> {
+class _ReportSheetState extends ConsumerState<_ReportSheet> {
+  bool _sending = false;
+  // 같은 시트에서 다시 눌러도 같은 신고(멱등)
+  final _key = newUuidV4();
+
   int _reason = 0;
   static const _reasons = ['사진 재사용', '음식 아님', '걸음 비정상', '기타'];
 
@@ -339,11 +345,19 @@ class _ReportSheetState extends State<_ReportSheet> {
         Expanded(child: ChButton('취소', kind: BtnKind.quiet, onPressed: () => Navigator.of(context).pop())),
         const SizedBox(width: 8),
         Expanded(
-          child: ChButton('신고하기', onPressed: () {
+          child: ChButton('신고하기', onPressed: _sending ? null : () async {
             final nav = Navigator.of(context);
             final messenger = ScaffoldMessenger.of(context);
-            nav.pop();
-            messenger.showSnackBar(const SnackBar(content: Text('신고했어요. 운영자가 확인해요')));
+            setState(() => _sending = true);
+            try {
+              // 서버: 신고자는 운영자 전용 기록에만, 대상에게는 '확인 중' 안내만 간다(05 API #19)
+              await ref.read(apiProvider).report(participantId: widget.participantId, reason: _reasons[_reason], idempotencyKey: _key);
+              nav.pop();
+              messenger.showSnackBar(const SnackBar(content: Text('신고했어요. 운영자가 확인해요')));
+            } catch (e) {
+              if (mounted) setState(() => _sending = false);
+              messenger.showSnackBar(SnackBar(content: Text(apiErrorText(e))));
+            }
           }),
         ),
       ]),
