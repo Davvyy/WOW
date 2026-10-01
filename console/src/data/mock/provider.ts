@@ -197,7 +197,7 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
     const mp = mOf(p.bmr);
     const base: VerdictImpact = {
       local_date: rv.localDate, s_before: before.s_d, s_after: before.s_d, cumulative_before: cumBefore, cumulative_after: cumBefore,
-      m_p: Math.round(mp), substitution: null, warning_count: p.warns, rank_before: rankBefore, rank_after: rankBefore,
+      m_p: mp, substitution: null, warning_count: p.warns, rank_before: rankBefore, rank_after: rankBefore,
     };
     let impact = base;
     let mutate: () => void = () => undefined;
@@ -209,11 +209,11 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
       impact = { ...base, warning_count: 3 };
       mutate = () => { p.warns = 3; p.excluded = true; };
     } else if (verdict === 'void') {
-      let after = before; let substitution = 'm_p'; let newDay: MockDayInput = day; let detail = '';
+      let after = before; let substitution = `대체값 ${fmt.int(Math.ceil(mp))}`; let newDay: MockDayInput = day; let detail = '';
       if (rv.type === 'steps_spike') {
         const baseline = median(p.days.slice(0, RULES.CHECK_DAYS).map((d) => d.steps));
         newDay = { ...day, steps: baseline };
-        after = dayScore(p, newDay); substitution = 'baseline_steps';
+        after = dayScore(p, newDay); substitution = '평소 걸음 기준';
         detail = `걸음 ${fmt.int(day.steps)} → 기준선 중앙값 ${fmt.int(baseline)} · A ${fmt.int(before.activity.a_d)} → ${fmt.int(after.activity.a_d)}`;
       } else {
         const label = { breakfast: '아침', lunch: '점심', dinner: '저녁', snack: '간식' }[rv.slot ?? 'dinner'];

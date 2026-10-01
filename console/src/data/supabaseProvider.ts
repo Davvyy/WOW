@@ -22,6 +22,19 @@ function fail(what: string, error: { message?: string } | null): never {
   throw new Error(`${what}: ${error?.message ?? '알 수 없는 오류'}`);
 }
 
+const SLOT_KO: Record<Slot, string> = { breakfast: '아침', lunch: '점심', dinner: '저녁', snack: '간식' };
+const RECORD_REASON: Record<string, string> = {
+  minor: '미성년 안전 체크 · 기록 모드', bmi: 'BMI 안전 체크 · 기록 모드', pregnancy: '임신·수유 안전 체크 · 기록 모드', eating_disorder: '섭식 관련 안전 체크 · 기록 모드',
+};
+function sourceLabel(origin: string | null | undefined): string {
+  if (!origin) return '-';
+  if (/shealth/i.test(origin)) return '삼성헬스';
+  if (/apple/i.test(origin)) return 'Apple 건강';
+  if (/garmin/i.test(origin)) return 'Garmin';
+  if (/fitbit/i.test(origin)) return 'Fitbit';
+  if (/google|healthdata/i.test(origin)) return 'Health Connect';
+  return origin;
+}
 const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 const num = (v: unknown, d = 0) => (v == null || Number.isNaN(Number(v)) ? d : Number(v));
 
@@ -54,9 +67,12 @@ export function createSupabaseApi(): ConsoleApi {
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((f) => f());
 
-  async function audit(challengeId: string, action: string, detail: Record<string, unknown>) {
-    // audit_logs는 서버(RPC·Edge Function)가 기록하는 것이 원칙. 화면에서 직접 남기는 조치만 최선으로 추가한다.
-    try { await sb.from('audit_logs').insert({ challenge_id: challengeId, action, detail }); } catch { /* 계약 확정 전 */ }
+  async function audit(challengeId: string, action: string, target: Record<string, unknown>) {
+    // audit_logs는 append-only이고 RPC·Edge Function이 기록하는 것이 원칙이다. 화면에서 직접 하는 조치만 최선으로 남긴다.
+    try {
+      const { data } = await sb.auth.getUser();
+      await sb.from('audit_logs').insert({ challenge_id: challengeId, actor_id: data.user?.id ?? null, actor_role: 'operator', action, target });
+    } catch { /* RLS가 막으면 서버 쪽 기록만 남는다 */ }
   }
 
   async function challengeOfParticipant(pid: string) {
@@ -126,8 +142,13 @@ export function createSupabaseApi(): ConsoleApi {
       notify();
     },
     async transition(id, to: ChallengeStatus) {
-      const { error } = await sb.rpc('transition_challenge', { p_challenge_id: id, p_to: to });
-      if (error) fail('상태를 바꾸지 못했어요', error);
+      const { data: u } = await sb.auth.getUser();
+      const { error } = await sb.rpc('transition_challenge', { p_challenge_id: id, p_to: to, p_actor: u.user?.id ?? null });
+      if (error) {
+        const m = /미결\s*(\d+)\s*건/.exec(error.message);
+        if (m) throw new Error(`미결 ${m[1]}건이 있어 최종 확정을 할 수 없어요`);
+        fail('상태를 바꾸지 못했어요', error);
+      }
       notify();
     },
     async openReviewCount(id) {
@@ -143,66 +164,84 @@ export function createSupabaseApi(): ConsoleApi {
     },
 
     async listParticipants(challengeId): Promise<Participant[]> {
-      const { data, error } = await sb.from('participants').select('*').eq('challenge_id', challengeId).order('nickname');
+      const [{ data, error }, { data: chRow }] = await Promise.all([
+        sb.from('participants').select('*, participant_notes(operator_note)').eq('challenge_id', challengeId).neq('status', 'left').order('nickname'),
+        sb.from('challenges').select('status').eq('id', challengeId).single(),
+      ]);
       if (error) fail('참가자를 불러오지 못했어요', error);
+      const rows = data as Row[];
+      const ids = rows.map((p) => p.id);
+      const userIds = rows.map((p) => p.user_id).filter(Boolean);
       const today = kstToday();
-      const [{ data: openRows }, { data: acts }, { data: scores }] = await Promise.all([
-        sb.from('reviews').select('participant_id, type, status').eq('challenge_id', challengeId).neq('status', 'decided'),
-        sb.from('daily_activity').select('*').eq('local_date', today).in('participant_id', (data as Row[]).map((p) => p.id)),
-        sb.from('daily_scores').select('participant_id, main_meal_count').eq('local_date', today).in('participant_id', (data as Row[]).map((p) => p.id)),
+      const live = ['checking', 'running', 'closing'].includes(chRow?.status);
+      const [{ data: openRows }, { data: acts }, { data: scores }, { data: devs }, { data: profs }] = await Promise.all([
+        sb.from('reviews').select('participant_id, type, status').eq('challenge_id', challengeId).in('status', ['open', 'appealed']),
+        sb.from('daily_activity').select('participant_id, steps_total, sources').eq('local_date', today).in('participant_id', ids),
+        sb.from('daily_scores').select('participant_id, main_meal_count').eq('local_date', today).in('participant_id', ids),
+        sb.from('devices').select('user_id, platform').in('user_id', userIds),
+        // 기록 모드 사유는 profiles에 있고 운영자만 볼 수 있다(RLS). 표·CSV에는 쓰지 않는다.
+        sb.from('profiles').select('user_id, record_mode_reason').in('user_id', userIds).not('record_mode_reason', 'is', null),
       ]);
       const opens = (openRows ?? []) as Row[];
       const actBy = new Map<string, Row>(((acts ?? []) as Row[]).map((a) => [a.participant_id, a]));
       const scBy = new Map<string, Row>(((scores ?? []) as Row[]).map((a) => [a.participant_id, a]));
-      return (data as Row[]).map((p): Participant => {
+      const devBy = new Map<string, string>(((devs ?? []) as Row[]).map((d) => [d.user_id, d.platform]));
+      const reasonBy = new Map<string, string>(((profs ?? []) as Row[]).map((d) => [d.user_id, d.record_mode_reason]));
+      return rows.map((p): Participant => {
         const flagged = opens.some((o) => o.participant_id === p.id && o.type !== 'report');
-        const synced = p.last_synced_at ? new Date(p.last_synced_at).getTime() >= Date.parse(`${today}T00:00:00+09:00`) : false;
+        const synced = p.last_synced_at ? Date.parse(p.last_synced_at) >= Date.parse(`${today}T00:00:00+09:00`) : false;
         const kicked = p.status === 'kicked';
-        const excluded = p.rank_eligible === false;
-        const recordReason = p.record_mode_reason ?? null;
-        const state: ParticipantState = kicked ? 'kicked' : excluded ? 'excluded' : !synced ? 'unsynced' : flagged ? 'review' : recordReason ? 'record' : 'normal';
+        const excluded = p.status === 'excluded' || p.rank_eligible === false;
+        const state: ParticipantState = kicked ? 'kicked' : excluded ? 'excluded' : live && !synced ? 'unsynced' : flagged ? 'review' : p.status === 'record_mode' ? 'record' : 'normal';
         const act = actBy.get(p.id) ?? {};
+        const platform = devBy.get(p.user_id);
+        const note = Array.isArray(p.participant_notes) ? p.participant_notes[0] : p.participant_notes;
         return {
           id: p.id, nickname: p.nickname, sex: p.sex, birthYear: p.birth_year ?? null, heightCm: num(p.height_cm), weightKg: num(p.weight_locked), bmr: num(p.bmr_locked),
-          state, rankEligible: p.rank_eligible !== false, warningCount: num(p.warning_count), blockRejoin: Boolean(p.block_rejoin), operatorNote: p.operator_note ?? '',
+          state, rankEligible: p.rank_eligible !== false, warningCount: num(p.warning_count), blockRejoin: Boolean(p.block_rejoin), operatorNote: note?.operator_note ?? '',
           lastSyncedAt: p.last_synced_at ? mdTime(p.last_synced_at) : null, syncedToday: synced,
-          source: act.source ?? p.source ?? '-', device: p.device ?? '-', platform: p.platform ?? '-', watch: Boolean(act.has_watch ?? p.has_watch),
-          todaySteps: num(act.steps_total ?? act.steps), mealsToday: num(scBy.get(p.id)?.main_meal_count), flagged,
-          recordModeReason: recordReason,
+          source: sourceLabel(p.last_sync_source), device: platform === 'ios' ? 'iPhone' : platform === 'android' ? 'Android' : '-',
+          platform: platform === 'ios' ? 'HealthKit' : platform === 'android' ? 'Health Connect' : '-',
+          watch: /watch/i.test(JSON.stringify(act.sources ?? [])),
+          todaySteps: num(act.steps_total), mealsToday: num(scBy.get(p.id)?.main_meal_count), flagged,
+          recordModeReason: reasonBy.has(p.user_id) ? RECORD_REASON[reasonBy.get(p.user_id)!] ?? reasonBy.get(p.user_id)! : null,
         };
       });
     },
     async participantDays(pid): Promise<DayRow[]> {
-      const cid = await challengeOfParticipant(pid);
-      const [{ data: sc, error }, { data: acts }, { data: ch }, { data: rl }] = await Promise.all([
+      const [{ data: sc, error }, { data: acts }] = await Promise.all([
         sb.from('daily_scores').select('*').eq('participant_id', pid).order('local_date'),
-        sb.from('daily_activity').select('*').eq('participant_id', pid),
-        sb.from('challenges').select('start_date').eq('id', cid).single(),
-        sb.from('challenge_rules').select('check_days').eq('challenge_id', cid).single(),
+        sb.from('daily_activity').select('local_date, steps_total').eq('participant_id', pid),
       ]);
       if (error) fail('일별 장부를 불러오지 못했어요', error);
-      const stepsBy = new Map<string, number>(((acts ?? []) as Row[]).map((a) => [a.local_date, num(a.steps_total ?? a.steps)]));
-      const checkDays = num(rl?.check_days, 3);
-      return (sc as Row[]).map((r): DayRow => {
-        const idx = ch ? Math.round((Date.parse(r.local_date) - Date.parse(ch.start_date)) / 86400e3) : 99;
-        const bd = (r.breakdown ?? {}) as Row;
-        return {
-          date: r.local_date, label: mdDate(r.local_date), steps: stepsBy.get(r.local_date) ?? 0,
-          a: num(r.a_d), i: num(r.i_d), d: num(r.d_d), s: num(r.s_d), sBefore: bd.s_before != null ? num(bd.s_before) : null,
-          check: idx < checkDays, provisional: r.is_final === false, revised: bd.s_before != null,
-          floorApplied: Boolean(bd.floor_applied), underReview: Boolean(r.under_review),
-        };
-      });
+      const scores = sc as Row[];
+      const { data: revs } = scores.length
+        ? await sb.from('score_revisions').select('daily_score_id, prev_s_d, reason, created_at').in('daily_score_id', scores.map((r) => r.id)).eq('reason', 'verdict').order('created_at')
+        : { data: [] };
+      const prevBy = new Map<string, number>();
+      for (const r of (revs ?? []) as Row[]) if (!prevBy.has(r.daily_score_id)) prevBy.set(r.daily_score_id, num(r.prev_s_d)); // 가장 처음 값
+      const stepsBy = new Map<string, number>(((acts ?? []) as Row[]).map((a) => [a.local_date, num(a.steps_total)]));
+      return scores.map((r): DayRow => ({
+        date: r.local_date, label: mdDate(r.local_date), steps: stepsBy.get(r.local_date) ?? 0,
+        a: num(r.a_d), i: num(r.i_d), d: num(r.d_d), s: num(r.s_d), sBefore: prevBy.get(r.id) ?? null,
+        check: !r.is_counted, provisional: !r.is_final, revised: prevBy.has(r.id),
+        floorApplied: r.i_d != null && r.f_p != null && Number(r.i_d) < Number(r.f_p), underReview: Boolean(r.under_review),
+      }));
     },
     async participantAction(pid, action: ParticipantAction, memo) {
-      const patch: Row =
-        action === 'exclude' ? { rank_eligible: false }
-        : action === 'kick' ? { status: 'kicked', rank_eligible: false, block_rejoin: true }
-        : action === 'block' ? { block_rejoin: true }
-        : { operator_note: memo };
-      const { error } = await sb.from('participants').update(patch).eq('id', pid);
-      if (error) fail('조치를 저장하지 못했어요', error);
-      await audit(await challengeOfParticipant(pid), `participant_${action}`, { participant_id: pid, memo: action === 'memo' ? undefined : memo });
+      const cid = await challengeOfParticipant(pid);
+      if (action === 'memo') {
+        const { error } = await sb.from('participant_notes').upsert({ participant_id: pid, challenge_id: cid, operator_note: memo });
+        if (error) fail('메모를 저장하지 못했어요', error);
+      } else {
+        const patch: Row =
+          action === 'exclude' ? { status: 'excluded', rank_eligible: false }
+          : action === 'kick' ? { status: 'kicked', rank_eligible: false, block_rejoin: true }
+          : { block_rejoin: true };
+        const { error } = await sb.from('participants').update(patch).eq('id', pid);
+        if (error) fail('조치를 저장하지 못했어요', error);
+      }
+      await audit(cid, `participant_${action}`, { participant_id: pid, memo: action === 'memo' ? undefined : memo });
       notify();
     },
     async listHealthAlerts(challengeId): Promise<HealthAlert[]> {
@@ -216,56 +255,85 @@ export function createSupabaseApi(): ConsoleApi {
     },
 
     async listReviews(challengeId): Promise<ReviewItem[]> {
-      const { data, error } = await sb.from('reviews').select('*, participants(nickname, warning_count), appeals(text, created_at)').eq('challenge_id', challengeId).order('sla_due_at');
+      const { data, error } = await sb.from('reviews')
+        .select('*, participants(nickname, warning_count, baseline_median_steps, last_sync_source), appeals(text, created_at), review_reporters(reason)')
+        .eq('challenge_id', challengeId).order('sla_due_at', { ascending: true, nullsFirst: false });
       if (error) fail('검토 큐를 불러오지 못했어요', error);
-      return Promise.all((data as Row[]).map(async (r, i): Promise<ReviewItem> => {
+      const rows = data as Row[];
+      const mealIds = rows.map((r) => r.target?.meal_id).filter(Boolean) as string[];
+      const meals = new Map<string, Row>();
+      if (mealIds.length) {
+        const { data: ms } = await sb.from('meals').select('id, slot, local_date, title, ai_kcal, confirmed_kcal, photo_id').in('id', mealIds);
+        for (const m of (ms ?? []) as Row[]) meals.set(m.id, m);
+      }
+      return Promise.all(rows.map(async (r): Promise<ReviewItem> => {
         const target = (r.target ?? {}) as Row;
-        const localDate: string = target.local_date ?? String(r.created_at).slice(0, 10);
+        const meal = target.meal_id ? meals.get(target.meal_id) : undefined;
+        const localDate: string = r.local_date ?? meal?.local_date ?? String(r.created_at).slice(0, 10);
         const appeal = Array.isArray(r.appeals) ? r.appeals[0] : r.appeals;
-        const evidence = await evidenceFor(r.participant_id, r.type, localDate, target);
+        const reporter = Array.isArray(r.review_reporters) ? r.review_reporters[0] : r.review_reporters;
         const type = r.type as ReviewType;
+        const due = r.sla_due_at ?? new Date(Date.parse(r.created_at) + 72 * 3600e3).toISOString();
         return {
-          id: r.id, shortId: `R-${String(i + 1).padStart(4, '0')}`, type, label: REASON_LABEL_BY_TYPE[type] ?? type,
+          id: r.id, shortId: `R-${String(r.id).slice(0, 4).toUpperCase()}`, type, label: REASON_LABEL_BY_TYPE[type] ?? type,
           participantId: r.participant_id, nickname: r.participants?.nickname ?? '-', localDate, dateLabel: mdDate(localDate),
-          slot: (target.slot as Slot | undefined) ?? null, status: r.status, verdict: r.verdict ?? null, reasonTemplate: r.reason_template ?? null,
-          slaDueAt: r.sla_due_at, createdAt: r.created_at, appealText: appeal?.text ?? null, appealAt: appeal?.created_at ? mdTime(appeal.created_at) : null,
-          reportText: type === 'report' ? (target.text ?? null) : null, reportAt: type === 'report' ? mdTime(r.created_at) : null,
-          warningCount: num(r.participants?.warning_count), evidence, decidedAt: r.decided_at ? mdTime(r.decided_at) : null, decidedBy: r.decided_by ?? null,
+          slot: (meal?.slot as Slot | undefined) ?? (target.slot as Slot | undefined) ?? null, status: r.status, verdict: r.verdict ?? null, reasonTemplate: (r.reason_template as ReasonTemplate | null) ?? null,
+          slaDueAt: due, createdAt: r.created_at, appealText: appeal?.text ?? null, appealAt: appeal?.created_at ? mdTime(appeal.created_at) : null,
+          reportText: type === 'report' ? (reporter?.reason ?? target.report_reason ?? null) : null, reportAt: type === 'report' ? mdTime(r.created_at) : null,
+          warningCount: num(r.participants?.warning_count), evidence: await evidenceFor(r, meal),
+          decidedAt: r.decided_at ? mdTime(r.decided_at) : null, decidedBy: r.decided_by ? '운영자' : null,
         };
       }));
     },
     async verdict(reviewId, verdict: Verdict, reason: ReasonTemplate | null, dryRun): Promise<VerdictImpact> {
-      if (dryRun) {
-        const { data, error } = await sb.rpc('apply_verdict', { p_review_id: reviewId, p_verdict: verdict, p_dry_run: true });
-        if (error) fail('점수 영향을 미리 계산하지 못했어요', error);
-        return data as VerdictImpact;
-      }
-      // 확정은 알림(N-06)·감사 로그까지 처리하는 Edge Function `verdict`를 우선 쓰고, 없으면 RPC로 대체한다.
-      const fn = await sb.functions.invoke('verdict', { body: { review_id: reviewId, verdict, reason_template: reason, dry_run: false } });
-      if (!fn.error) { notify(); return ((fn.data as Row)?.impact ?? fn.data) as VerdictImpact; }
-      const { data, error } = await sb.rpc('apply_verdict', { p_review_id: reviewId, p_verdict: verdict, p_dry_run: false });
-      if (error) fail('판정을 저장하지 못했어요', error);
-      if (reason) await sb.from('reviews').update({ reason_template: reason }).eq('id', reviewId);
-      notify();
-      return data as VerdictImpact;
+      // apply_verdict가 점수 재계산·알림(N-06)·감사 로그까지 한 번에 처리한다. 확정도 같은 RPC를 쓴다.
+      const { data: u } = await sb.auth.getUser();
+      const { data, error } = await sb.rpc('apply_verdict', {
+        p_review_id: reviewId, p_verdict: verdict, p_dry_run: dryRun, p_reason_template: reason, p_actor: u.user?.id ?? null,
+      });
+      if (error) fail(dryRun ? '점수 영향을 미리 계산하지 못했어요' : '판정을 저장하지 못했어요', error);
+      const d = data as Row;
+      if (!dryRun) notify();
+      return {
+        local_date: d.local_date, s_before: num(d.s_before), s_after: num(d.s_after), cumulative_before: num(d.cumulative_before), cumulative_after: num(d.cumulative_after),
+        m_p: d.m_p != null ? num(d.m_p) : null, substitution: d.substitution ?? null, warning_count: num(d.warning_count),
+        is_final: d.provisional === undefined ? undefined : !d.provisional,
+      };
     },
     async auditLog(challengeId): Promise<AuditEntry[]> {
       const { data, error } = await sb.from('audit_logs').select('*').eq('challenge_id', challengeId).order('created_at', { ascending: false }).limit(30);
       if (error) return [];
-      return (data as Row[]).map((a) => ({ at: mdTime(a.created_at), by: a.actor_name ?? a.actor_id?.slice?.(0, 6) ?? '시스템', text: a.action + (a.detail ? ` · ${JSON.stringify(a.detail)}` : '') }));
+      return (data as Row[]).map((a) => ({
+        at: mdTime(a.created_at), by: a.actor_role === 'system' ? '시스템' : '운영자',
+        text: `${a.action}${a.target && Object.keys(a.target).length ? ` · ${JSON.stringify(a.target)}` : ''}`,
+      }));
     },
     completedReviewCount: (id) => count('reviews', (q) => q.eq('challenge_id', id).eq('status', 'decided')),
 
     async finalRanking(challengeId): Promise<FinalRanking> {
-      const { data, error } = await sb.from('leaderboard_snapshots').select('*').eq('challenge_id', challengeId).order('as_of', { ascending: false }).limit(5);
+      const { data, error } = await sb.from('leaderboard_snapshots').select('*').eq('challenge_id', challengeId).eq('scope', 'cumulative').order('as_of', { ascending: false }).limit(5);
       if (error) fail('최종 순위를 불러오지 못했어요', error);
       const snaps = (data ?? []) as Row[];
-      const snap = snaps.find((s) => s.is_final) ?? snaps.find((s) => s.scope === 'cumulative') ?? snaps[0];
-      const rows = ((snap?.rows ?? []) as Row[]).map((r, i) => {
-        const meals = num(r.confirmed_meals), total = num(r.meals_total, 84);
-        return { rank: num(r.rank, i + 1), nickname: r.nickname ?? r.name, score: num(r.score ?? r.score_total), confirmedMeals: meals, mealsTotal: total, fill: Math.round(meals / Math.max(1, total) * 4) };
-      });
-      return { rows: rows.slice(0, 5), total: rows.length, hiddenExcluded: 0, isFinal: Boolean(snap?.is_final), asOf: snap?.as_of ?? null };
+      const snap = snaps.find((s) => s.is_final) ?? snaps[0];
+      // 스냅샷 rows에는 확정 끼니 수가 없어 daily_scores에서 합산한다. 검토 중 행(aggregating)은 명단에서 뺀다.
+      const all = ((snap?.rows ?? []) as Row[]).filter((r) => !r.aggregating && r.participant_id);
+      const top = all.slice(0, 5);
+      const meals = new Map<string, number>();
+      let counted = 0;
+      if (top.length) {
+        const { data: sc } = await sb.from('daily_scores').select('participant_id, main_meal_count, local_date').in('participant_id', top.map((r) => r.participant_id)).eq('is_counted', true).eq('is_final', true);
+        const days = new Set<string>();
+        for (const r of (sc ?? []) as Row[]) { meals.set(r.participant_id, (meals.get(r.participant_id) ?? 0) + num(r.main_meal_count)); days.add(r.local_date); }
+        counted = days.size;
+      }
+      const excluded = await count('participants', (q) => q.eq('challenge_id', challengeId).eq('rank_eligible', false));
+      return {
+        rows: top.map((r, i) => {
+          const m = meals.get(r.participant_id) ?? 0, total = Math.max(1, counted * 3);
+          return { rank: num(r.rank, i + 1), nickname: r.nickname, score: num(r.score), confirmedMeals: m, mealsTotal: total, fill: Math.round(m / total * 4) };
+        }),
+        total: all.length, hiddenExcluded: excluded, isFinal: Boolean(snap?.is_final), asOf: snap?.as_of ?? null,
+      };
     },
     async sendAnnouncement(challengeId, a: Announcement) {
       const { data, error } = await sb.functions.invoke('announce', { body: { challenge_id: challengeId, title: a.title, body: a.body } });
@@ -290,22 +358,35 @@ export function createSupabaseApi(): ConsoleApi {
     },
   };
 
-  async function evidenceFor(pid: string, type: string, localDate: string, target: Row): Promise<ReviewEvidence> {
+  async function evidenceFor(r: Row, meal: Row | undefined): Promise<ReviewEvidence> {
     const ev: ReviewEvidence = {};
+    const pid: string = r.participant_id;
+    const localDate: string = r.local_date ?? meal?.local_date;
     try {
-      if (type === 'steps_spike') {
-        const from = addDays(localDate, -6);
-        const { data } = await sb.from('daily_activity').select('*').eq('participant_id', pid).gte('local_date', from).lte('local_date', localDate).order('local_date');
+      if (r.type === 'steps_spike' && localDate) {
+        const { data } = await sb.from('daily_activity').select('local_date, steps_total, sources').eq('participant_id', pid).gte('local_date', addDays(localDate, -6)).lte('local_date', localDate).order('local_date');
         const rows = (data ?? []) as Row[];
-        ev.steps7 = rows.map((r) => ({ label: mdDate(r.local_date), steps: num(r.steps_total ?? r.steps) }));
-        ev.stepsBaseline = rows.length ? median(rows.slice(0, 3).map((r) => num(r.steps_total ?? r.steps))) : undefined;
-        ev.stepsSource = rows.at(-1)?.source ?? undefined;
-        ev.sessionNote = rows.at(-1)?.sessions_count ? `${rows.at(-1)!.sessions_count}건` : '없음 · 걸음만 동기화';
-      } else {
-        // 사진 해시·AI 초안/확정값은 target jsonb에 서버가 채워 준다고 가정(계약 확인 필요).
-        if (target.photo_hash) ev.photoPair = { hash: String(target.photo_hash), labelA: String(target.label_a ?? '원본'), labelB: String(target.label_b ?? '중복') };
-        if (target.ai_kcal != null || target.confirmed_kcal != null) {
-          ev.ai = { title: String(target.title ?? ''), aiKcal: target.ai_kcal ?? null, confirmedKcal: target.confirmed_kcal ?? null, substituteKcal: target.m_p ?? null };
+        ev.steps7 = rows.map((x) => ({ label: mdDate(x.local_date), steps: num(x.steps_total) }));
+        ev.stepsBaseline = r.participants?.baseline_median_steps ?? (rows.length ? median(rows.slice(0, 3).map((x) => num(x.steps_total))) : undefined);
+        ev.stepsSource = sourceLabel(r.participants?.last_sync_source);
+        const { count: sess } = await sb.from('activity_sessions').select('id', { count: 'exact', head: true }).eq('participant_id', pid).eq('local_date', localDate);
+        ev.sessionNote = sess ? `세션 ${sess}건` : '없음 · 걸음만 동기화';
+      }
+      if (meal) {
+        const { data: dsRow } = await sb.from('daily_scores').select('m_p').eq('participant_id', pid).eq('local_date', meal.local_date).maybeSingle();
+        ev.ai = { title: meal.title ?? '', aiKcal: meal.ai_kcal != null ? num(meal.ai_kcal) : null, confirmedKcal: meal.confirmed_kcal != null ? num(meal.confirmed_kcal) : null, substituteKcal: dsRow?.m_p != null ? Math.ceil(num(dsRow.m_p)) : null };
+        if (meal.photo_id) {
+          const { data: ph } = await sb.from('photos').select('id, sha256, sha256_server').eq('id', meal.photo_id).maybeSingle();
+          const hash = (ph?.sha256_server ?? ph?.sha256 ?? '') as string;
+          const short = hash ? `${hash.slice(0, 4)} ${hash.slice(4, 8)} … ${hash.slice(-4)}` : '';
+          if (r.type === 'dup_photo' && hash) {
+            const { data: twin } = await sb.from('photos').select('id').or(`sha256.eq.${hash},sha256_server.eq.${hash}`).neq('id', meal.photo_id).limit(1);
+            const twinMeal = twin?.[0] ? (await sb.from('meals').select('local_date, slot').eq('photo_id', twin[0].id).maybeSingle()).data : null;
+            const lab = (m: Row | null, same: string) => (m ? `${mdDate(m.local_date)} ${SLOT_KO[m.slot as Slot]} · ${same}` : same);
+            ev.photoPair = { hash: short, labelA: lab(twinMeal, '원본'), labelB: lab(meal, '같은 사진') };
+          } else if (hash) {
+            ev.photo = { hash: short, label: `${mdDate(meal.local_date)} ${SLOT_KO[meal.slot as Slot]}` };
+          }
         }
       }
     } catch { /* 증거 일부만 보여도 판정 화면은 열린다 */ }
@@ -323,13 +404,12 @@ export function createSupabaseApi(): ConsoleApi {
       r.rows.forEach((x) => records.push({ rank: x.rank, nickname: x.nickname, score_total: x.score, confirmed_meals: x.confirmedMeals }));
     } else if (type === 'scores' || type === 'activity') {
       const { data: sc } = await sb.from('daily_scores').select('*').in('participant_id', ids).order('local_date');
-      const { data: ac } = await sb.from('daily_activity').select('*').in('participant_id', ids);
-      const stepsBy = new Map<string, number>(((ac ?? []) as Row[]).map((a) => [`${a.participant_id}|${a.local_date}`, num(a.steps_total ?? a.steps)]));
+      const { data: ac } = await sb.from('daily_activity').select('participant_id, local_date, steps_total, steps_net_kcal, sessions_net_kcal, floors_kcal, a_capped').in('participant_id', ids);
+      const actBy = new Map<string, Row>(((ac ?? []) as Row[]).map((a) => [`${a.participant_id}|${a.local_date}`, a]));
       for (const r of (sc ?? []) as Row[]) {
-        const steps = stepsBy.get(`${r.participant_id}|${r.local_date}`) ?? 0;
-        const bd = (r.breakdown ?? {}) as Row;
-        if (type === 'scores') records.push({ nickname: nick.get(r.participant_id), local_date: r.local_date, steps, a_d: r.a_d, i_d: r.i_d, d_d: r.d_d, s_d: r.s_d, is_counted: r.is_counted });
-        else records.push({ nickname: nick.get(r.participant_id), local_date: r.local_date, steps_total: steps, steps_net: bd.steps_net_kcal, sessions_net: bd.sessions_net_kcal, floors_bonus: bd.floors_kcal, a_capped: r.a_d });
+        const act = actBy.get(`${r.participant_id}|${r.local_date}`) ?? {};
+        if (type === 'scores') records.push({ nickname: nick.get(r.participant_id), local_date: r.local_date, steps: num(act.steps_total), a_d: r.a_d, i_d: r.i_d, d_d: r.d_d, s_d: r.s_d, is_counted: r.is_counted });
+        else records.push({ nickname: nick.get(r.participant_id), local_date: r.local_date, steps_total: num(act.steps_total), steps_net: act.steps_net_kcal, sessions_net: act.sessions_net_kcal, floors_bonus: act.floors_kcal, a_capped: act.a_capped });
       }
     } else {
       const { data: ms } = await sb.from('meals').select('participant_id, local_date, slot, status, confirmed_kcal').in('participant_id', ids).order('local_date');

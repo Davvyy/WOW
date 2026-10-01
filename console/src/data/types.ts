@@ -5,7 +5,9 @@ export type ChallengeStatus =
   | 'closing' | 'published' | 'archived' | 'cancelled';
 
 export type ReviewType =
-  | 'steps_spike' | 'source_unknown' | 'dup_photo' | 'downward_edit' | 'skip_abuse' | 'report' | 'objection';
+  | 'steps_spike' | 'source_unknown' | 'dup_photo' | 'downward_edit' | 'skip_abuse'
+  | 'session_anomaly' | 'manual_input_burst' | 'multi_device' | 'late_upload' | 'photo_mismatch'
+  | 'report' | 'objection';
 export type ReasonTemplate = 'steps_spike' | 'source_unknown' | 'dup_photo' | 'downward_edit' | 'skip_abuse';
 export type ReviewStatus = 'open' | 'appealed' | 'decided';
 export type Verdict = 'approve' | 'warn' | 'void' | 'exclude';
@@ -148,7 +150,7 @@ export interface VerdictImpact {
   cumulative_before: number;
   cumulative_after: number;
   m_p: number | null;
-  /** 서버가 보내는 대체 처리 식별자. 모르는 값은 그대로 문장에 쓰지 않는다. */
+  /** 서버가 만든 대체 처리 구절(예: "대체값 743", "AI 추정값 복원", "평소 걸음 기준", "해당 출처 제외"). */
   substitution: string | null;
   warning_count: number;
   /** 계약 밖 선택 필드(모의 데이터가 채움) */

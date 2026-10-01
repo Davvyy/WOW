@@ -30,6 +30,11 @@ export const VERDICT_KEYS: Verdict[] = ['approve', 'warn', 'void', 'exclude'];
 
 export const REASON_LABEL_BY_TYPE: Record<string, string> = {
   steps_spike: '걸음 급증',
+  session_anomaly: '세션 이상',
+  manual_input_burst: '수동 입력 급증',
+  multi_device: '다중 기기',
+  late_upload: '지연 업로드',
+  photo_mismatch: '사진 불일치',
   source_unknown: '출처 확인',
   dup_photo: '사진 중복',
   downward_edit: '하향 수정',
@@ -48,16 +53,13 @@ export function ro(word: string): '로' | '으로' {
   return fin === 0 || fin === 8 ? '로' : '으로';
 }
 
-/** {대체 처리} 문구. m_p는 daily_scores.m_p를 정수 반올림해 치환한다. */
+/**
+ * {대체 처리} 구절. 서버(apply_verdict)가 만든 `substitution` 구절을 그대로 쓰고,
+ * 없으면 m_p를 정수로 올림해 "대체값 N"으로 만든다(서버와 같은 규칙).
+ */
 export function substitutionText(impact: Pick<VerdictImpact, 'substitution' | 'm_p'>): string {
-  switch (impact.substitution) {
-    case 'ai_restore': return 'AI 추정값 복원';
-    case 'baseline_steps': return '평소 걸음 기준';
-    case 'exclude_source': return '해당 출처 제외';
-    case 'm_p':
-    default:
-      return impact.m_p != null ? `대체값 ${fmt.int(impact.m_p)}` : '대체 처리';
-  }
+  if (impact.substitution) return impact.substitution;
+  return impact.m_p != null ? `대체값 ${fmt.int(Math.ceil(impact.m_p))}` : '대체 처리';
 }
 
 export interface ComposeInput {
@@ -88,7 +90,7 @@ export function verdictSentence(verdict: Verdict, impact: VerdictImpact): string
 
 export function effectSentence(verdict: Verdict, impact: VerdictImpact): string {
   if (verdict !== 'void') return VERDICT[verdict].effect;
-  const delta = impact.s_after - impact.s_before;
+  const delta = impact.cumulative_after - impact.cumulative_before; // 누적 차액(서버 verdict_message와 같은 기준)
   return VERDICT.void.effect
     .replace('{날짜}', fmtMd(impact.local_date))
     .replace('{전}', fmt.k1(impact.s_before))

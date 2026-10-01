@@ -9,7 +9,7 @@ const voidImpact: VerdictImpact = {
   cumulative_before: 341.1,
   cumulative_after: 312.6,
   m_p: 742.5,
-  substitution: 'm_p',
+  substitution: '대체값 743',
   warning_count: 0,
 };
 
@@ -32,9 +32,11 @@ describe('verdictCopy', () => {
     expect(c?.effectSentence).toBe('10.12 41.2→12.7점 · 누적 −28.5');
   });
 
-  it('대체값은 정수 반올림(BMR 1,290 → 700, 1,730 → 779)', () => {
-    expect(substitutionText({ substitution: 'm_p', m_p: 700 })).toBe('대체값 700');
-    expect(substitutionText({ substitution: 'm_p', m_p: 778.5 })).toBe('대체값 779');
+  it('대체값은 m_p를 정수로 올림(BMR 1,650 → 743, 1,290 → 700, 1,730 → 779)', () => {
+    expect(substitutionText({ substitution: null, m_p: 742.5 })).toBe('대체값 743');
+    expect(substitutionText({ substitution: null, m_p: 700 })).toBe('대체값 700');
+    expect(substitutionText({ substitution: null, m_p: 778.5 })).toBe('대체값 779');
+    expect(substitutionText({ substitution: null, m_p: null })).toBe('대체 처리');
   });
 
   it('승인·경고·순위 제외', () => {
@@ -47,8 +49,8 @@ describe('verdictCopy', () => {
   });
 
   it('다른 대체 처리 문구', () => {
-    expect(substitutionText({ substitution: 'baseline_steps', m_p: null })).toBe('평소 걸음 기준');
-    const c = composeNotification({ reason: 'steps_spike', verdict: 'void', impact: { ...voidImpact, substitution: 'baseline_steps', s_before: 100, s_after: 62.4 } });
+    expect(substitutionText({ substitution: '평소 걸음 기준', m_p: null })).toBe('평소 걸음 기준');
+    const c = composeNotification({ reason: 'steps_spike', verdict: 'void', impact: { ...voidImpact, substitution: '평소 걸음 기준', s_before: 100, s_after: 62.4 } });
     expect(c?.verdictSentence).toBe('평소 걸음 기준으로 다시 계산했어요');
   });
 

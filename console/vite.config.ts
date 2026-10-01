@@ -7,5 +7,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
+    // 이중 패키지(ESM/CJS) 복제를 막아 react-router 컨텍스트가 하나만 쓰이게 한다.
+    server: { deps: { inline: [/@refinedev/, /react-router/] } },
   },
 });

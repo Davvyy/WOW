@@ -402,3 +402,20 @@ details.priv .table td, details.priv .table th { border-color: color-mix(in srgb
 .lock { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-2); font-size: 12px; }
 .lock .ms { font-size: 16px; }
 .sticky-bottom { position: sticky; bottom: 0; background: linear-gradient(to top, var(--bg) 70%, transparent); padding-top: 12px; z-index: 5; }
+
+/* ---------- 콘솔 앱 보정(React 구현용) ---------- */
+/* 검수 바가 여러 줄로 접힐 수 있어 고정하지 않고, 좌측 메뉴·상단 바만 화면에 붙인다. */
+.hbar { position: relative; }
+.app { min-height: 100vh; }
+.sidenav { top: 0; height: 100vh; }
+.topbar { top: 0; }
+.sidenav a.item { text-decoration: none; }
+.sidenav a.item.active[aria-current="page"] { background: var(--brand-soft); color: var(--brand); }
+.empty .ms.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.card.review-soft .kv .v { max-width: 70%; }
+details.priv .rowbtn { color: var(--fg); }
+@media (max-width: 1100px) {
+  .grid.form-preview { grid-template-columns: minmax(0, 1fr); }
+  .grid.two { grid-template-columns: minmax(0, 1fr); }
+}

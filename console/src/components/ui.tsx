@@ -88,7 +88,7 @@ export function Drawer({ label, onClose, head, children }: { label: string; onCl
 }
 
 export function Loading({ label = '불러오는 중이에요' }: { label?: string }) {
-  return <div className="empty" role="status"><Ms name="progress_activity" /><p className="body">{label}</p></div>;
+  return <div className="empty" role="status"><Ms name="progress_activity" cls="spin" /><p className="body">{label}</p></div>;
 }
 
 export function ErrorBox({ error, retry }: { error: Error; retry?: () => void }) {

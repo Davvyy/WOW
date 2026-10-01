@@ -28,9 +28,11 @@ export const mOf = (bmr: number) => Math.max(RULES.M_MIN, RULES.M_RATIO * bmr);
 export const fOf = (bmr: number) => Math.max(RULES.F_MIN, RULES.F_RATIO * bmr);
 const runMet = (kmh: number) => RULES.RUN_MET_TIERS.find((t) => kmh >= t.minKmh)!.met;
 
-function sessionMet(type: 'running' | 'stair' | 'walking', minutes: number, distanceM: number): number {
+/** 걷기 세션은 MET 없음(걸음 경로만). 서버 session_met과 같다. */
+function sessionMet(type: 'running' | 'stair' | 'walking', minutes: number, distanceM: number): number | null {
   if (type === 'stair') return RULES.MET_STAIR;
-  if (type === 'walking') return RULES.MET_WALK;
+  if (type === 'walking') return null;
+  if (minutes <= 0 || distanceM <= 0) return 7.5;
   const kmh = minutes > 0 ? (distanceM / 1000) / (minutes / 60) : 0;
   return runMet(kmh);
 }
@@ -40,10 +42,11 @@ export function mockSimulate(input: SimInput): SimResult {
   const bmr = input.bmr ?? bmrOf(input.sex ?? 'M', w, input.height_cm ?? 170, input.age ?? 30);
 
   // 활동
-  const sessionSteps = input.sessions.reduce((a, s) => a + (s.steps_in_range || 0), 0);
-  const stepsOut = Math.max(0, input.steps_total - sessionSteps);
-  const stepsNet = Math.min(stepsOut, RULES.STEPS_CAP) * (RULES.MET_WALK - 1) * w / 6000;
-  const sessNet = input.sessions.reduce((a, s) => a + (sessionMet(s.type, s.minutes, s.distance_m) - 1) * w * (s.minutes / 60), 0);
+  const counted = input.sessions.map((s) => ({ s, met: sessionMet(s.type, s.minutes, s.distance_m) })).filter((x) => x.met != null);
+  const sessionSteps = counted.reduce((a, x) => a + (x.s.steps_in_range || 0), 0);
+  const stepsOut = Math.min(Math.max(0, input.steps_total - sessionSteps), RULES.STEPS_CAP);
+  const stepsNet = stepsOut * (RULES.MET_WALK - 1) * w / 6000;
+  const sessNet = counted.reduce((a, x) => a + ((x.met as number) - 1) * w * (x.s.minutes / 60), 0);
   const floorsKcal = input.floors > 0 ? Math.min(input.floors, RULES.FLOORS_CAP) * (RULES.MET_STAIR - 1) * w * RULES.SEC_PER_FLOOR / 3600 : 0;
   const aRaw = stepsNet + sessNet + floorsKcal;
   const aD = Math.min(aRaw, RULES.C);
@@ -61,7 +64,7 @@ export function mockSimulate(input: SimInput): SimResult {
       I += M; substitute.push(slot); continue;
     }
     if (m.status === 'void') { I += M; substitute.push(slot); continue; }
-    if (m.status === 'confirmed' || m.status === 'auto') {
+    if (m.status === 'confirmed' || m.status === 'auto' || m.status === 'corrected') {
       const k = m.kcal ?? 0;
       if (k >= RULES.SNACK_KCAL) { I += k; mainCount++; } else { I += k + M; substitute.push(slot); snacks++; }
       continue;
@@ -72,7 +75,7 @@ export function mockSimulate(input: SimInput): SimResult {
     }
     I += M; pending.push(slot);
   }
-  for (const m of input.meals.filter((x) => x.slot === 'snack' && (x.status === 'confirmed' || x.status === 'auto'))) { I += m.kcal ?? 0; snacks++; }
+  for (const m of input.meals.filter((x) => x.slot === 'snack' && (x.status === 'confirmed' || x.status === 'auto' || x.status === 'corrected'))) { I += m.kcal ?? 0; snacks++; }
 
   // 점수
   const F = fOf(bmr);
