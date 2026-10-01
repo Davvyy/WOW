@@ -4,6 +4,7 @@
 import { analyzeMeal, type AnalyzeDeps, type FoodMatch } from '../_shared/analyze.ts';
 import { selectAdapter } from '../_shared/ai/select.ts';
 import { handle, HttpError, json } from '../_shared/http.ts';
+import { dispatch, selectPushSender, type ClaimedNotification } from '../_shared/push.ts';
 import { env, serviceClient } from '../_shared/supabase.ts';
 
 const BUCKET = 'meal-photos';
@@ -61,11 +62,15 @@ Deno.serve((req) =>
         const { count } = await db.from('notifications').select('id', { count: 'exact', head: true })
           .eq('user_id', part.user_id).eq('type', 'N-04').contains('payload', { meal_id: id });
         if (count) return;
-        await db.rpc('enqueue_notification', {
+        const { data: nid, error: e4 } = await db.rpc('enqueue_notification', {
           p_user: part.user_id, p_challenge: part.challenge_id, p_type: 'N-04', p_title: '분석 완료',
           p_body: kind === 'done' ? `${slot} 분석이 끝났어요. 확인하고 확정해 주세요` : '음식을 찾지 못했어요. 검색으로 확정해 주세요',
-          p_payload: { meal_id: id },
+          p_payload: { meal_id: id, slot: meal.slot },
         });
+        if (e4 || !nid) return;
+        // transactional: 워커 주기(1~5분)를 기다리지 않고 바로 보낸다. 토큰 없음·권한 미허용이면 no_push 로 남고 앱이 홈에서 다시 읽는다.
+        const { data: rows } = await db.rpc('claim_notification', { p_id: nid });
+        await dispatch((rows ?? []) as ClaimedNotification[], selectPushSender(env));
       },
     };
     const out = await analyzeMeal(meal_id, deps);
