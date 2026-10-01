@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "check": "deno check _shared/**/*.ts analyze-meal/*.ts sync-activity/*.ts verdict/*.ts notify/*.ts",
+    "check": "deno check _shared/**/*.ts */index.ts",
     "test": "deno test --allow-env --allow-read"
   },
   "imports": {

@@ -90,7 +90,7 @@ begin
   perform tests.ok((select count(*) from v_participant_sync where challenge_id = ch) = 12, '운영자: OP2 동기화 뷰');
   r := apply_verdict_rpc((select id from reviews where target ->> 'code' = 'R-0415'), 'void', true);
   perform tests.eq((r ->> 's_after')::numeric, 12.7, '운영자: 판정 dry-run');
-  perform tests.throws(format('select transition_challenge(%L, ''published'')', ch), 'PT422', '운영자: 진행 중 → 발표 불가');
+  perform tests.throws(format('select transition_challenge_rpc(%L, ''published'')', ch), 'PT422', '운영자: 진행 중 → 발표 불가');
   update challenge_rules set t = 400 where challenge_id = ch;
   perform tests.eq((select t from challenge_rules where challenge_id = ch), 500::numeric, '운영자: 잠긴 상수 변경 안 됨');
   perform tests.throws(format('update challenges set capacity = 99 where id = %L', ch), 'PT422', '운영자: 시작 후 정원 변경 불가');
@@ -143,6 +143,36 @@ set local role anon;
 do $$ begin
   perform tests.eq(get_invite('k7q2md') ->> 'name', '가을 걷기 챌린지', '익명: 초대코드 조회');
   perform tests.throws('select * from challenges', '42501', '익명: 테이블 접근 불가');
+end $$;
+reset role;
+rollback;
+
+-- 운영자 콘솔 RPC
+begin;
+select tests.login((select operator_id from challenges where invite_code = 'K7Q2MD'));
+set local role authenticated;
+do $$
+declare ch uuid := (select id from challenges where invite_code = 'K7Q2MD'); r jsonb;
+begin
+  r := announce_challenge(ch, '최종 결과는 11.3 09:00에 확정돼요', '마지막 날(11.2) 기록은 11.3 09:00에 확정돼요.');
+  perform tests.eq((r ->> 'recipients')::int, 12, '공지 N-03 12명');
+  r := export_rows(ch, 'scores');
+  perform tests.ok(jsonb_array_length(r) >= 96, 'CSV scores 행');
+  perform tests.ok(not (r -> 0 ? 'operator_note') and not (r -> 0 ? 'record_mode_reason'), 'CSV 금지 열 없음');
+  perform tests.ok(jsonb_array_length(export_rows(ch, 'ranking')) > 0, 'CSV ranking');
+  perform tests.throws(format('select purge_challenge_photos(%L)', ch), 'PT422', '진행 중에는 사진 파기 불가');
+  perform tests.throws(format('select transition_challenge(%L, ''closing'', null, now())', ch), '42501', '전환은 래퍼로만');
+  perform tests.eq(transition_challenge_rpc(ch, 'closing') ->> 'to', 'closing', '운영자 전환 래퍼');
+  perform tests.ok(exists (select 1 from audit_logs where action = 'transition' and actor_id = auth.uid()), '전환 감사 로그 actor = 본인');
+  perform log_operator_action(ch, 'rules_md_publish', '{"length": 10}');
+end $$;
+reset role;
+select tests.login(tests.uid('지수'));
+set local role authenticated;
+do $$ declare ch uuid := (select challenge_id from participants where id = tests.pid('지수'));
+begin
+  perform tests.throws(format('select announce_challenge(%L, ''t'', ''b'')', ch), 'PT403', '참가자: 공지 불가');
+  perform tests.throws(format('select export_rows(%L, ''scores'')', ch), 'PT403', '참가자: CSV 불가');
 end $$;
 reset role;
 rollback;

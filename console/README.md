@@ -71,24 +71,25 @@ src/
 |---|---|---|
 | 챌린지·규칙·참가자·검토·점수 읽기 | 테이블 직접 조회 | 메모리 시드 |
 | 샘플 시뮬레이션 | RPC `score_simulate_from_inputs` | TS 포트(모의 전용) |
-| 판정 미리보기·확정 | RPC `apply_verdict`(dry_run / 확정, `p_reason_template`, 알림 N-06·감사 로그는 서버가 처리) | TS 포트 |
-| 상태 전환 | RPC `transition_challenge`(미결이 있으면 서버가 거부) | 같은 규칙을 메모리에서 |
+| 판정 미리보기·확정 | RPC `apply_verdict_rpc`(dry_run / 확정, `p_reason_template`; 운영자 검사·N-06·감사 로그는 서버가 처리, actor = 본인 고정) | TS 포트 |
+| 상태 전환 | RPC `transition_challenge_rpc`(미결이 있으면 서버가 422 "미결 N건") | 같은 규칙을 메모리에서 |
 | 미결 건수 | RPC `challenge_open_review_count` | 메모리 |
-| 공지 | Edge Function `announce` (미구현이면 오류 토스트) | 메모리 |
-| CSV | Edge Function `export?type=` → 없으면 클라이언트 생성(허용 열만) | 클라이언트 생성 |
-| 사진 파기 | Edge Function `purge-photos` (미구현이면 오류 토스트) | 메모리 |
+| 공지 | Edge Function `announce` → RPC `announce_challenge`(N-03) | 메모리 |
+| CSV | Edge Function `export?type=` → RPC `export_rows`(서버 허용 열) → 실패 시 클라이언트 생성(허용 열만) | 클라이언트 생성 |
+| 사진 파기 | Edge Function `purge-photos` → RPC `purge_challenge_photos`(Archived만) + Storage 삭제 | 메모리 |
+| 감사 로그(화면 조치) | RPC `log_operator_action`(audit_logs 직접 insert 불가) | 메모리 |
 
 ## 열린 이슈 / supabase/ 계약과 다른 점
 
 `supabase/migrations/*.sql`(스키마·엔진·배치)을 읽고 맞췄어요. 아래는 확인이 필요하거나 다르게 해석한 부분이에요.
 
-1. **Edge Function이 아직 없어요**(`supabase/`에 functions 없음). 판정은 `apply_verdict` RPC만으로 충분해서 `verdict` 함수 없이 동작해요. `announce`·`purge-photos`는 호출만 연결했고, `export`는 없으면 클라이언트 생성으로 대체해요.
+1. Edge Function `announce`·`export`·`purge-photos`·`verdict`는 `supabase/functions/`에 있어요. 콘솔은 판정에 `apply_verdict_rpc`를 직접 부르고(같은 SQL), `verdict` 함수는 멱등 키가 필요한 외부 호출용이에요.
 2. **`apply_verdict` 반환**: `substitution`은 식별자가 아니라 구절("대체값 743", "AI 추정값 복원", "평소 걸음 기준", "해당 출처 제외")이에요. 콘솔은 이 구절을 그대로 쓰고, 없으면 `m_p`를 올림해 "대체값 N"을 만들어요(서버 `ceil(m_p)`와 같고, 문서의 "정수 반올림"과 .5에서 같은 값). 무효 문구의 누적 차액은 서버 `verdict_message`와 같이 `cumulative_after − cumulative_before`예요. 서버가 돌려주는 `message`는 쓰지 않고 콘솔이 `verdictCopy.ts`로 같은 문장을 조립해요(두 곳의 문자열이 같아야 해요). 순위(4→4)는 계약에 없어 서버 모드에서는 표시하지 않아요.
 3. **문장부호**: 요청서 예시는 마침표가 없고 "743로"였지만, 06 문서·프로토타입·서버(`josa_ro`) 모두 문장 사이에 ". "를 넣고 "743으로"라서 그쪽을 따랐어요.
 4. **테이블 모양 차이**: `participants`에는 `record_mode_reason`·`operator_note`·기기·출처 컬럼이 없어요. 운영자 메모는 `participant_notes`, 기록 모드 사유는 `profiles.record_mode_reason`(enum), 출처는 `last_sync_source`, 플랫폼은 `devices`에서 읽어요. 기기 모델명은 어디에도 없어 "iPhone/Android"까지만 보여 줘요. 상태는 `participant_status`(active/record_mode/excluded/kicked/left)이고 `left`는 목록에서 숨겨요.
 5. **리더보드**: `leaderboard_scope`는 `today`/`cumulative`뿐이라 최종 순위는 `scope=cumulative, is_final=true` 스냅샷으로 읽어요. 스냅샷 `rows`에 확정 끼니 수가 없어 `daily_scores.main_meal_count` 합으로 계산해요.
 6. **검토 큐**: `reviews`에 슬롯 컬럼이 없어 `target.meal_id → meals`에서 가져와요. 신고 내용은 `review_reporters.reason`(신고자 id는 조회하지 않아요). 유형은 스키마의 `review_type` 12종을 모두 처리하지만 증거 패널은 걸음 급증·사진 중복·신고(식사 사진)를 중심으로 만들었어요.
-7. **RLS 정책은 마이그레이션에 아직 없어요.** 운영자가 `profiles`·`participant_notes`·`review_reporters`를 읽고 `participants`·`participant_notes`를 고칠 수 있는지, `audit_logs`에 직접 insert할 수 있는지는 확인하지 못했어요(조치 시 audit insert는 실패해도 무시하도록 해 뒀어요; 서버 쪽 기록이 원칙).
+7. RLS는 `supabase/migrations/*_rls.sql`에 있고 `supabase/tests/03_rls.test.sql`이 검증해요: 운영자는 자기 챌린지의 `profiles`(기록 모드 사유)·`participant_notes`·`review_reporters`·`health_alerts`를 읽고, `participants`는 상태·재가입 차단만, `participant_notes`는 읽기·쓰기가 돼요. `audit_logs`는 직접 insert가 막혀 있어 `log_operator_action` RPC로 남겨요.
 8. **사진은 자리표시자예요.** 서명 URL(10분)·열람 로그를 아직 연결하지 않아서 증거 패널의 사진은 해시와 라벨만 있는 프로토타입식 자리표시자예요.
 9. Supabase 경로(조회·RPC 호출)는 실제 DB에 대해 실행해 보지 못했어요(타입 검사·빌드까지만 확인). 로컬 Supabase가 준비되면 OP1~OP4를 한 번씩 눌러 보며 컬럼명을 확인해 주세요.
 10. 브라우저가 없는 환경이라 화면 모양(1280~1024px 레이아웃)은 눈으로 확인하지 못했고, 프로토타입 CSS를 그대로 옮기고 jsdom 스모크 테스트로 동작만 확인했어요. 1100px 이하에서는 프로토타입처럼 좌측 메뉴가 아이콘만 남고, OP1 2열은 1열로 접혀요.

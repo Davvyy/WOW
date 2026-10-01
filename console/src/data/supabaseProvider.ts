@@ -68,11 +68,10 @@ export function createSupabaseApi(): ConsoleApi {
   const notify = () => listeners.forEach((f) => f());
 
   async function audit(challengeId: string, action: string, target: Record<string, unknown>) {
-    // audit_logs는 append-only이고 RPC·Edge Function이 기록하는 것이 원칙이다. 화면에서 직접 하는 조치만 최선으로 남긴다.
+    // audit_logs는 append-only라 직접 쓰지 않고 log_operator_action RPC(actor = 본인 고정)로 남긴다.
     try {
-      const { data } = await sb.auth.getUser();
-      await sb.from('audit_logs').insert({ challenge_id: challengeId, actor_id: data.user?.id ?? null, actor_role: 'operator', action, target });
-    } catch { /* RLS가 막으면 서버 쪽 기록만 남는다 */ }
+      await sb.rpc('log_operator_action', { p_challenge_id: challengeId, p_action: action, p_target: target });
+    } catch { /* 기록 실패는 화면 조치를 막지 않는다 */ }
   }
 
   async function challengeOfParticipant(pid: string) {
@@ -142,8 +141,8 @@ export function createSupabaseApi(): ConsoleApi {
       notify();
     },
     async transition(id, to: ChallengeStatus) {
-      const { data: u } = await sb.auth.getUser();
-      const { error } = await sb.rpc('transition_challenge', { p_challenge_id: id, p_to: to, p_actor: u.user?.id ?? null });
+      // actor 는 서버가 auth.uid() 로 고정한다(transition_challenge_rpc)
+      const { error } = await sb.rpc('transition_challenge_rpc', { p_challenge_id: id, p_to: to });
       if (error) {
         const m = /미결\s*(\d+)\s*건/.exec(error.message);
         if (m) throw new Error(`미결 ${m[1]}건이 있어 최종 확정을 할 수 없어요`);
@@ -286,10 +285,9 @@ export function createSupabaseApi(): ConsoleApi {
       }));
     },
     async verdict(reviewId, verdict: Verdict, reason: ReasonTemplate | null, dryRun): Promise<VerdictImpact> {
-      // apply_verdict가 점수 재계산·알림(N-06)·감사 로그까지 한 번에 처리한다. 확정도 같은 RPC를 쓴다.
-      const { data: u } = await sb.auth.getUser();
-      const { data, error } = await sb.rpc('apply_verdict', {
-        p_review_id: reviewId, p_verdict: verdict, p_dry_run: dryRun, p_reason_template: reason, p_actor: u.user?.id ?? null,
+      // apply_verdict_rpc 가 운영자 검사·점수 재계산·알림(N-06)·감사 로그까지 한 번에 처리한다(actor = 본인 고정).
+      const { data, error } = await sb.rpc('apply_verdict_rpc', {
+        p_review_id: reviewId, p_verdict: verdict, p_dry_run: dryRun, p_reason_template: reason,
       });
       if (error) fail(dryRun ? '점수 영향을 미리 계산하지 못했어요' : '판정을 저장하지 못했어요', error);
       const d = data as Row;
