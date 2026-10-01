@@ -8,6 +8,15 @@ import '../../core/engine/engine.dart';
 abstract class ChalloryApi {
   bool get isRemote;
 
+  /// API #2 초대코드 조회(로그인 전에도 가능). 없거나 모집이 끝났으면 null.
+  Future<InviteSummary?> getInvite(String code);
+
+  /// API #3 참가: 자격 게이트·기록 모드·BMR 잠금은 서버(join_challenge)가 판정
+  Future<JoinResult> joinChallenge(JoinRequest req);
+
+  /// 로그인한 사용자가 이미 참가 중인 챌린지가 있는지(재설치·재로그인 시 온보딩 건너뛰기)
+  Future<bool> hasParticipation();
+
   /// API #8 사진 행 + 서명 업로드 URL
   Future<PhotoUploadTicket> requestPhotoUpload(PreparedPhoto photo, {required String idempotencyKey});
 
@@ -40,6 +49,77 @@ abstract class ChalloryApi {
 
   /// API #22 계정 삭제(확인 문구 "삭제")
   Future<void> deleteAccount(String confirm);
+}
+
+class InviteSummary {
+  const InviteSummary({required this.challengeId, required this.name, required this.status, required this.startDate,
+      required this.endDate, required this.capacity, required this.joined, required this.days});
+  final String challengeId;
+  final String name;
+  final String status;
+  final DateTime startDate;
+  final DateTime endDate;
+  final int capacity;
+  final int joined;
+  final int days;
+
+  bool get recruiting => status == 'recruiting';
+  bool get full => joined >= capacity;
+
+  factory InviteSummary.fromJson(Map<String, dynamic> j) => InviteSummary(
+        challengeId: j['challenge_id'] as String,
+        name: j['name'] as String,
+        status: j['status'] as String,
+        startDate: DateTime.parse(j['start_date'] as String),
+        endDate: DateTime.parse(j['end_date'] as String),
+        capacity: (j['capacity'] as num).toInt(),
+        joined: (j['joined'] as num).toInt(),
+        days: (j['days'] as num).toInt(),
+      );
+}
+
+class JoinRequest {
+  const JoinRequest({required this.code, required this.nickname, required this.sex, required this.birthYear, required this.heightCm,
+      required this.weightKg, this.pregnancy = false, this.eatingDisorder = false, required this.terms, required this.sensitiveHealth,
+      required this.overseasAi});
+  final String code;
+  final String nickname;
+  final Sex sex;
+  final int birthYear;
+  final double heightCm;
+  final double weightKg;
+  final bool pregnancy;
+  final bool eatingDisorder;
+  final bool terms;
+  final bool sensitiveHealth;
+  final bool overseasAi;
+
+  Map<String, dynamic> toJson() => {
+        'code': code,
+        'nickname': nickname,
+        'sex': sex == Sex.m ? 'M' : 'F',
+        'birth_year': birthYear,
+        'height_cm': heightCm,
+        'weight_kg': weightKg,
+        'pregnancy': pregnancy,
+        'eating_disorder': eatingDisorder,
+        'consents': {'terms': terms, 'sensitive_health': sensitiveHealth, 'overseas_ai': overseasAi},
+      };
+}
+
+class JoinResult {
+  const JoinResult({required this.participantId, required this.challengeId, required this.bmr, required this.recordMode});
+  final String participantId;
+  final String challengeId;
+  final int bmr;
+  final bool recordMode;
+
+  factory JoinResult.fromJson(Map<String, dynamic> j) => JoinResult(
+        participantId: j['participant_id'] as String,
+        challengeId: j['challenge_id'] as String,
+        bmr: (j['bmr'] as num).toInt(),
+        recordMode: j['record_mode'] as bool? ?? false,
+      );
 }
 
 class ApiException implements Exception {

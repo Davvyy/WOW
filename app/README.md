@@ -17,12 +17,14 @@ flutter run                      # 모의 데이터 모드 (서버 없이 동작
 ```bash
 flutter run \
   --dart-define=SUPABASE_URL=https://<project>.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=<anon key>
+  --dart-define=SUPABASE_ANON_KEY=<anon key> \
+  --dart-define=KAKAO_NATIVE_APP_KEY=<카카오 네이티브 앱 키>   # 선택
 ```
 
 | 상수 | 설명 |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | 둘 다 있으면 `Supabase.initialize` 후 `SupabaseChalloryApi`(Edge Functions) 와 P11 RPC `score_simulate_from_inputs` 를 씁니다. 없으면 `MockChalloryApi`·로컬 엔진. |
+| `KAKAO_NATIVE_APP_KEY` | 있으면 카카오 SDK(카카오톡 앱·카카오계정)로 로그인해 ID 토큰을 Supabase 에 넘깁니다. 없으면 카카오도 브라우저 OAuth. Android 는 같은 dart-define 을 매니페스트 스킴 `kakao{키}` 에도 씁니다. iOS 는 `ios/Flutter/Kakao.xcconfig`(예시 `Kakao.xcconfig.example`)에 같은 키를 넣어야 합니다. |
 | `MOCK_HEALTH=true` | 실기기에서도 건강 데이터를 모의 값으로 강제합니다. |
 | `SCREEN_LIST=true` | 릴리스 빌드에서도 검수용 화면 목록(`/debug`)을 켭니다. 디버그 빌드에서는 항상 켜져 있습니다. |
 
@@ -113,6 +115,25 @@ lib/
 
 두 서체 모두 앱에 번들했고 라이선스 전문을 `assets/fonts/`에 함께 두었습니다. 프로토타입은 IBM Plex Sans KR을 대신 쓰지만 docs/06 §5.2의 지정(Pretendard)을 따랐습니다. Pretendard OTF가 약 1.5 MB × 4라 앱 용량이 늘어나므로, 필요하면 가변 폰트나 서브셋으로 줄일 수 있습니다. 아이콘은 Flutter 기본 번들의 Material Icons(`*_rounded`)를 씁니다(프로토타입의 Material Symbols Rounded와 모양이 약간 다릅니다).
 
+## 로그인·참가 (`lib/services/auth/`, P1~P3)
+
+```
+P1 초대코드 6자리 → get_invite(로그인 전, 익명) → 챌린지 카드
+   카카오 / Apple 로그인 → 이미 참가 중이면 홈, 아니면 P2(닉네임은 로그인 이름으로 미리 채움)
+P2 닉네임·성별·생년·키·체중·안전 체크·건강 정보 동의 → P3 약관·국외 AI 동의
+   → join_challenge(자격 게이트 · 기록 모드 · BMR 잠금은 서버 판정) → P4 건강 연결
+```
+
+| 제공자 | iOS | Android |
+|---|---|---|
+| 카카오 | 카카오 SDK → ID 토큰 → `signInWithIdToken(kakao)` (앱 키 없으면 브라우저 OAuth) | 같음 |
+| Apple | Sign in with Apple(네이티브) → ID 토큰 → `signInWithIdToken(apple)` | 브라우저 OAuth |
+
+- ID 토큰 경로는 nonce 를 씁니다: 제공자에게는 SHA-256 해시, Supabase 에는 원본(재사용 공격 방지).
+- 브라우저 OAuth 는 딥링크 `app.challory://login-callback` 으로 돌아옵니다(Android intent-filter·iOS URL 스킴 등록됨).
+- 서버 모드에서는 라우터가 로그인 전 화면 접근을 막습니다(P1·규칙 미리 보기만 공개). 로그아웃·계정 삭제 뒤에는 P1 로 돌아갑니다. 모의 모드는 가드 없이 모든 화면을 엽니다(검수용).
+- 사전 준비(코드 밖): Supabase Dashboard > Authentication > Providers 에서 Kakao·Apple 켜기, Redirect URLs 에 `app.challory://login-callback` 추가, 카카오 디벨로퍼스에서 OpenID Connect 활성화(ID 토큰), Apple Developer 에서 Sign in with Apple 기능·Services ID(Android 브라우저 경로용).
+
 ## 서버 연결 (`lib/services/api/`)
 
 | 화면·동작 | 호출 | 비고 |
@@ -132,13 +153,13 @@ lib/
 ## 모의/미구현
 
 모의로 동작하는 것
-- 모든 화면 데이터(챌린지·내 정보·끼니·장부·리더보드·최종 결과): `lib/data/mock/mock_data.dart`. 초대코드는 `K7Q2MD` 유효, `FULL00` 마감, `BLOCK0` 참가 불가, 그 외 오류.
-- 로그인(카카오/Apple)은 버튼만 있고 인증은 하지 않습니다.
+- 모든 화면 데이터(챌린지·내 정보·끼니·장부·리더보드·최종 결과): `lib/data/mock/mock_data.dart`.
+- 모의 모드의 로그인: 버튼을 누르면 로그인된 것으로 봅니다(`MockAuthService`). 초대코드는 `K7Q2MD` 유효, `FULL00` 마감, `BLOCK0` 참가 단계에서 거절.
 - 모의 모드의 AI 초안(2초 뒤 `draft`)과 식약처 DB 검색(P7) 목록. 서버 모드에서도 P7 검색 시트는 아직 모의 목록입니다(`food_search` RPC 연결은 남은 일).
 - 응원·소명·이의 전송은 화면 안에서만 동작합니다.
 
 알려진 공백
-- 서버 연동 남은 것: 인증(Kakao/Apple — 로그인 없이는 Edge Function 이 401), 리더보드·장부·규칙 조회, 응원·소명 전송, P7 음식 검색, 재시도 큐 디스크 보관, N-04 푸시로 초안 갱신.
+- 서버 연동 남은 것: 실기기에서 카카오·Apple 로그인 확인(제공자 설정 필요), 리더보드·장부·규칙 조회, 응원·소명 전송, P7 음식 검색, 재시도 큐 디스크 보관, N-04 푸시로 초안 갱신.
 - 푸시 알림(FCM)과 OS 알림 권한 요청: P6 프리퍼미션 카드는 화면만 있고 실제 권한 요청은 없습니다.
 - "설정 열기"·"삼성헬스 열기"·약관 링크처럼 외부 앱/URL을 여는 동작(`url_launcher`, `permission_handler` 미포함).
 - 볼륨 키 촬영(네이티브 구현), 백그라운드 동기화(WorkManager, `HKObserverQuery`), 딥링크·클립보드 초대코드 감지(P1 배너는 모의).

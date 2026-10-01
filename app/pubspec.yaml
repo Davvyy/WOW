@@ -18,6 +18,8 @@ dependencies:
   intl: ^0.20.2
   image: ^4.10.1
   crypto: ^3.0.7
+  sign_in_with_apple: ^8.2.0
+  kakao_flutter_sdk_user: ^2.0.1
 
 dev_dependencies:
   flutter_test:

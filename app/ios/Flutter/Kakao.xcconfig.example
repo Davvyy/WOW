@@ -1,0 +1,2 @@
+// 복사해서 Kakao.xcconfig 로 저장(커밋하지 않음). 카카오 디벨로퍼스 > 앱 키 > 네이티브 앱 키
+KAKAO_NATIVE_APP_KEY=

@@ -1,30 +1,60 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/format.dart';
 import '../../data/mock/mock_data.dart';
 import '../../router.dart';
+import '../../services/api/challory_api.dart';
+import '../../services/auth/auth_service.dart';
+import '../../state/app_state.dart';
 import '../widgets/common.dart';
 
 /// P1 시작·초대코드·로그인.
-/// 모의 코드: K7Q2MD 유효 · FULL00 모집 마감 · BLOCK0 참가 불가(사유 미노출) · 그 외 오류.
-class StartScreen extends StatefulWidget {
+/// 6자리가 되면 서버 get_invite 로 챌린지를 확인하고(모의: K7Q2MD 유효 · FULL00 모집 마감 · BLOCK0 참가 단계에서 거절),
+/// Kakao/Apple 로그인 뒤 이미 참가 중이면 홈, 아니면 P2 로 간다.
+class StartScreen extends ConsumerStatefulWidget {
   const StartScreen({super.key});
 
   @override
-  State<StartScreen> createState() => _StartScreenState();
+  ConsumerState<StartScreen> createState() => _StartScreenState();
 }
 
-enum _CodeState { empty, valid, wrong, closed, blocked }
+enum _CodeState { empty, checking, valid, wrong, closed, offline }
 
-class _StartScreenState extends State<StartScreen> {
+class _StartScreenState extends ConsumerState<StartScreen> {
   final _ctrl = TextEditingController();
   final _focus = FocusNode();
   bool _clipboardBanner = true;
+  _CodeState _st = _CodeState.empty;
+  InviteSummary? _invite;
+  String _checked = '';
+  bool _busy = false;
+  StreamSubscription<bool>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = ref.read(authServiceProvider);
+    // 브라우저 OAuth 에서 돌아오면(딥링크) 로그인 이후 단계로
+    _authSub = auth.changes.listen((signedIn) {
+      if (signedIn && mounted && _busy) _afterLogin();
+    });
+    // 재실행: 이미 로그인 + 참가 중이면 바로 홈
+    if (auth.isSignedIn && ref.read(apiProvider).isRemote) {
+      Future.microtask(() async {
+        if (await ref.read(apiProvider).hasParticipation() && mounted) context.go(R.home);
+      });
+    }
+  }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _ctrl.dispose();
     _focus.dispose();
     super.dispose();
@@ -32,14 +62,70 @@ class _StartScreenState extends State<StartScreen> {
 
   String get _code => _ctrl.text;
 
-  _CodeState get _state {
-    if (_code.length < 6) return _CodeState.empty;
-    return switch (_code) {
-      'K7Q2MD' => _CodeState.valid,
-      'FULL00' => _CodeState.closed,
-      'BLOCK0' => _CodeState.blocked,
-      _ => _CodeState.wrong,
-    };
+  _CodeState get _state => _code.length < 6 ? _CodeState.empty : (_checked == _code ? _st : _CodeState.checking);
+
+  Future<void> _lookup() async {
+    final code = _code;
+    if (code.length < 6 || code == _checked) {
+      setState(() {});
+      return;
+    }
+    setState(() => _st = _CodeState.checking);
+    try {
+      final inv = await ref.read(apiProvider).getInvite(code);
+      if (!mounted || code != _code) return;
+      setState(() {
+        _checked = code;
+        _invite = inv;
+        _st = inv == null ? _CodeState.wrong : (!inv.recruiting || inv.full ? _CodeState.closed : _CodeState.valid);
+      });
+      ref.read(onboardingProvider.notifier).setInvite(code, inv);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _checked = code;
+          _st = _CodeState.offline;
+        });
+      }
+    }
+  }
+
+  Future<void> _login(Future<AuthOutcome> Function(AuthService) how) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final out = await how(ref.read(authServiceProvider));
+      if (!mounted) return;
+      if (out == AuthOutcome.signedIn) {
+        await _afterLogin();
+      } else if (out == AuthOutcome.cancelled) {
+        setState(() => _busy = false);
+      } // redirected: 딥링크 복귀 때 _authSub 가 이어서 처리
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showToast(context, e.message);
+    }
+  }
+
+  Future<void> _afterLogin() async {
+    final api = ref.read(apiProvider);
+    var participating = false;
+    try {
+      participating = await api.hasParticipation();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (participating) {
+      context.go(R.home);
+      return;
+    }
+    final draft = ref.read(onboardingProvider);
+    if (draft.nickname.isEmpty) {
+      final name = ref.read(authServiceProvider).displayName;
+      if (name != null) ref.read(onboardingProvider.notifier).setInvite(draft.code, draft.invite, nickname: name);
+    }
+    context.go(R.p2);
   }
 
   void _paste() {
@@ -47,6 +133,7 @@ class _StartScreenState extends State<StartScreen> {
       _ctrl.text = mockChallenge.code;
       _clipboardBanner = false;
     });
+    _lookup();
   }
 
   @override
@@ -56,11 +143,11 @@ class _StartScreenState extends State<StartScreen> {
     final err = switch (st) {
       _CodeState.wrong => '코드를 다시 확인해 주세요',
       _CodeState.closed => '모집이 마감된 챌린지예요',
-      _CodeState.blocked => '참가할 수 없는 코드예요',
+      _CodeState.offline => '연결이 불안정해요. 잠시 뒤 다시 입력해 주세요',
       _ => null,
     };
-    final ch = mockChallenge;
-    final valid = st == _CodeState.valid;
+    final inv = _invite;
+    final valid = st == _CodeState.valid && inv != null;
     return Scaffold(
       backgroundColor: c.bg,
       body: SafeArea(
@@ -86,7 +173,7 @@ class _StartScreenState extends State<StartScreen> {
                 icon: Icons.content_paste_rounded,
                 action: ChButton('붙여넣기', small: true, kind: BtnKind.quiet, onPressed: _paste),
                 onClose: () => setState(() => _clipboardBanner = false),
-                child: boldThen(context, '복사한 초대코드 ${ch.code}를 붙여넣을까요?', '', color: c.brand),
+                child: boldThen(context, '복사한 초대코드 ${mockChallenge.code}를 붙여넣을까요?', '', color: c.brand),
               ),
               const SizedBox(height: 12),
             ],
@@ -130,7 +217,7 @@ class _StartScreenState extends State<StartScreen> {
                           FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
                           TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase())),
                         ],
-                        onChanged: (_) => setState(() {}),
+                        onChanged: (_) => _lookup(),
                         decoration: const InputDecoration(counterText: ''),
                       ),
                     ),
@@ -152,24 +239,28 @@ class _StartScreenState extends State<StartScreen> {
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Txt.cap('초대받은 챌린지', color: c.brand),
-                        Txt.title(ch.name),
+                        Txt.title(inv.name),
                       ]),
                     ),
                     Icon(Icons.check_circle_rounded, color: c.brand),
                   ]),
                   Wrap(spacing: 6, runSpacing: 6, children: [
-                    const ChChip('10.6 ~ 11.2 · 28일', icon: Icons.calendar_month_rounded),
-                    ChChip('${ch.joined}/${ch.capacity}명 참가', icon: Icons.group_rounded),
+                    ChChip('${fmtMd(inv.startDate)} ~ ${fmtMd(inv.endDate)} · ${inv.days}일', icon: Icons.calendar_month_rounded),
+                    ChChip('${inv.joined}/${inv.capacity}명 참가', icon: Icons.group_rounded),
                   ]),
                   ChLink('규칙 미리 보기', onTap: () => context.go(R.rules)),
                 ], gap: 10)),
               )
+            else if (st == _CodeState.checking)
+              ChCard(outline: true, child: Center(child: Txt.cap('챌린지를 확인하고 있어요')))
             else
               ChCard(outline: true, child: Center(child: Txt.cap('코드를 입력하면 챌린지 정보가 여기에 보여요'))),
             const SizedBox(height: 32),
-            ChButton('카카오로 계속하기', kind: BtnKind.kakao, icon: Icons.chat_bubble_rounded, onPressed: valid ? () => context.go(R.p2) : null),
+            ChButton('카카오로 계속하기', kind: BtnKind.kakao, icon: Icons.chat_bubble_rounded,
+                onPressed: valid && !_busy ? () => _login((a) => a.signInWithKakao()) : null),
             const SizedBox(height: 8),
-            ChButton('Apple로 계속하기', kind: BtnKind.apple, icon: Icons.apple_rounded, onPressed: valid ? () => context.go(R.p2) : null),
+            ChButton('Apple로 계속하기', kind: BtnKind.apple, icon: Icons.apple_rounded,
+                onPressed: valid && !_busy ? () => _login((a) => a.signInWithApple()) : null),
             const SizedBox(height: 12),
             Center(child: Txt.cap('계속하면 이용약관과 개인정보 처리방침을 확인한 것으로 봐요', align: TextAlign.center)),
             if (kDebugMode || const bool.fromEnvironment('SCREEN_LIST')) ...[

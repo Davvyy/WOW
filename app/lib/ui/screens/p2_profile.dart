@@ -1,31 +1,72 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/engine/engine.dart';
 import '../../core/format.dart';
 import '../../data/mock/mock_data.dart';
 import '../../router.dart';
+import '../../state/app_state.dart';
 import '../widgets/common.dart';
 
 /// P2 프로필·안전 체크. 4항목(성별·생년·키·체중)으로 BMR을 즉시 계산한다(엔진 사용).
-class ProfileScreen extends StatefulWidget {
+/// 입력값은 온보딩 초안(onboardingProvider)에 담아 P3 참가 신청(join_challenge)에 쓴다.
+/// 서버 모드는 빈 칸(닉네임만 로그인 이름으로)에서, 모의 모드는 프로토타입 값(지수)에서 시작한다.
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  bool _consent = true;
-  Sex _sex = mockMe.sex;
-  final _birth = TextEditingController(text: '${mockMe.birthYear}');
-  final _height = TextEditingController(text: '${mockMe.heightCm.round()}');
-  final _weight = TextEditingController(text: '${mockMe.weightKg.round()}');
-  bool _pregnant = false;
-  bool _eatingDisorder = false;
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  late bool _consent;
+  late Sex _sex;
+  late final TextEditingController _nick;
+  late final TextEditingController _birth;
+  late final TextEditingController _height;
+  late final TextEditingController _weight;
+  late bool _pregnant;
+  late bool _eatingDisorder;
+
+  @override
+  void initState() {
+    super.initState();
+    final d = ref.read(onboardingProvider);
+    final mock = !ref.read(apiProvider).isRemote;
+    String init(num? v, num fallback) => v != null ? '${v.round()}' : (mock ? '${fallback.round()}' : '');
+    _consent = d.sensitiveHealth || mock;
+    _sex = d.birthYear != null ? d.sex : mockMe.sex;
+    _nick = TextEditingController(text: d.nickname.isNotEmpty ? d.nickname : (mock ? mockMe.nickname : ''));
+    _birth = TextEditingController(text: init(d.birthYear, mockMe.birthYear));
+    _height = TextEditingController(text: init(d.heightCm, mockMe.heightCm));
+    _weight = TextEditingController(text: init(d.weightKg, mockMe.weightKg));
+    _pregnant = d.pregnancy;
+    _eatingDisorder = d.eatingDisorder;
+  }
+
+  /// 시작일(나이 기준): 초대코드로 받은 챌린지, 없으면 예시 챌린지
+  DateTime get _start => ref.read(onboardingProvider).invite?.startDate ?? mockChallenge.start;
+
+  bool get _nickOk => _nick.text.trim().length >= 2 && _nick.text.trim().length <= 12;
+
+  void _next() {
+    ref.read(onboardingProvider.notifier).setProfile(
+          nickname: _nick.text,
+          sex: _sex,
+          birthYear: _year!,
+          heightCm: _h!,
+          weightKg: _w!,
+          pregnancy: _pregnant,
+          eatingDisorder: _eatingDisorder,
+          sensitiveHealth: _consent,
+        );
+    context.go(R.p3);
+  }
 
   @override
   void dispose() {
+    _nick.dispose();
     _birth.dispose();
     _height.dispose();
     _weight.dispose();
@@ -37,10 +78,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double? get _w => double.tryParse(_weight.text);
 
   /// BMR 나이 = 시작 연도 − 출생 연도
-  int? get _age => _year == null ? null : ChalloryEngine.ageOnDate(_year!, mockChallenge.start);
+  int? get _age => _year == null ? null : ChalloryEngine.ageOnDate(_year!, _start);
 
   /// 자격 판정은 12월 31일생으로 보수 적용
-  int? get _ageCons => _year == null ? null : ChalloryEngine.ageConservative(_year!, mockChallenge.start);
+  int? get _ageCons => _year == null ? null : ChalloryEngine.ageConservative(_year!, _start);
 
   BmrResult? get _bmr {
     if (_age == null || _h == null || _w == null || _h! <= 0 || _w! <= 0) return null;
@@ -57,13 +98,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final minorRecord = _ageCons != null && _ageCons! >= 14 && _ageCons! < 19;
     final recordMode = _pregnant || _eatingDisorder || minorRecord || (_bmi != null && _bmi! < 18.5);
     final recheck = _bmi != null && (_bmi! < 15 || _bmi! > 45);
-    final canNext = _consent && bmr != null && !blocked;
+    final canNext = _consent && bmr != null && !blocked && _nickOk;
     final inputsEnabled = _consent;
     return ChScaffold(
       title: '기본 정보',
       backFallback: R.p1,
       progress: 1,
-      cta: ChButton('다음', onPressed: canNext ? () => context.go(R.p3) : null),
+      cta: ChButton('다음', onPressed: canNext ? _next : null),
       children: [
         ChCard(
           outline: _consent,
@@ -83,6 +124,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ]),
         ),
         Txt('기본 정보 4가지만\n알려주세요', size: 24, weight: FontWeight.w700, color: c.fg, height: 1.33),
+        ChInput(label: '닉네임 (2~12자 · 순위에 보여요)', controller: _nick, numeric: false, hint: '지수', enabled: inputsEnabled, maxLength: 12,
+            onChanged: (_) => setState(() {})),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Txt.cap('성별', weight: FontWeight.w500),
           const SizedBox(height: 6),

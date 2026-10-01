@@ -16,6 +16,7 @@ import '../services/api/challory_api.dart';
 import '../services/api/meal_wire.dart';
 import '../services/api/mock_api.dart';
 import '../services/api/supabase_api.dart';
+import '../services/auth/auth_service.dart';
 import '../services/photo/meal_uploader.dart';
 import '../services/photo/photo_prep.dart';
 import '../services/score_simulator.dart';
@@ -29,6 +30,85 @@ final apiProvider = Provider<ChalloryApi>((_) {
   }
   return MockChalloryApi();
 });
+
+/// 로그인. 서버 모드는 Supabase Auth(Kakao·Apple), 모의 모드는 버튼만 누르면 로그인된 것으로 본다.
+final authServiceProvider = Provider<AuthService>((_) {
+  if (AppConfig.hasSupabase) {
+    try {
+      return SupabaseAuthService(Supabase.instance.client);
+    } catch (_) {}
+  }
+  return MockAuthService();
+});
+
+/// 온보딩(P1 코드 → 로그인 → P2 프로필·건강 동의 → P3 약관·국외 AI 동의 → 참가) 입력을 모아 두는 초안
+class OnboardingDraft {
+  const OnboardingDraft({this.code = '', this.invite, this.nickname = '', this.sex = Sex.m, this.birthYear, this.heightCm, this.weightKg,
+      this.pregnancy = false, this.eatingDisorder = false, this.sensitiveHealth = false, this.join});
+  final String code;
+  final InviteSummary? invite;
+  final String nickname;
+  final Sex sex;
+  final int? birthYear;
+  final double? heightCm;
+  final double? weightKg;
+  final bool pregnancy;
+  final bool eatingDisorder;
+  final bool sensitiveHealth;
+  final JoinResult? join;
+
+  bool get profileReady => nickname.trim().length >= 2 && birthYear != null && heightCm != null && weightKg != null && sensitiveHealth;
+
+  OnboardingDraft copyWith({String? code, InviteSummary? invite, String? nickname, Sex? sex, int? birthYear, double? heightCm, double? weightKg,
+          bool? pregnancy, bool? eatingDisorder, bool? sensitiveHealth, JoinResult? join}) =>
+      OnboardingDraft(
+        code: code ?? this.code,
+        invite: invite ?? this.invite,
+        nickname: nickname ?? this.nickname,
+        sex: sex ?? this.sex,
+        birthYear: birthYear ?? this.birthYear,
+        heightCm: heightCm ?? this.heightCm,
+        weightKg: weightKg ?? this.weightKg,
+        pregnancy: pregnancy ?? this.pregnancy,
+        eatingDisorder: eatingDisorder ?? this.eatingDisorder,
+        sensitiveHealth: sensitiveHealth ?? this.sensitiveHealth,
+        join: join ?? this.join,
+      );
+}
+
+class OnboardingNotifier extends Notifier<OnboardingDraft> {
+  @override
+  OnboardingDraft build() => const OnboardingDraft();
+
+  void setInvite(String code, InviteSummary? invite, {String? nickname}) =>
+      state = OnboardingDraft(code: code, invite: invite, nickname: nickname ?? state.nickname);
+
+  void setProfile({required String nickname, required Sex sex, required int birthYear, required double heightCm, required double weightKg,
+          required bool pregnancy, required bool eatingDisorder, required bool sensitiveHealth}) =>
+      state = state.copyWith(nickname: nickname.trim(), sex: sex, birthYear: birthYear, heightCm: heightCm, weightKg: weightKg,
+          pregnancy: pregnancy, eatingDisorder: eatingDisorder, sensitiveHealth: sensitiveHealth);
+
+  /// P3 마지막 단계: 서버 join_challenge. 자격·기록 모드 판정은 서버가 한다. 성공 시 null, 아니면 안내 문구.
+  Future<String?> join({required bool terms, required bool overseasAi}) async {
+    final d = state;
+    final api = ref.read(apiProvider);
+    if (!d.profileReady) {
+      if (!api.isRemote) return null; // 모의 모드에서 화면 목록으로 바로 P3 를 연 경우(검수용)
+      return '기본 정보를 먼저 입력해 주세요';
+    }
+    try {
+      final r = await api.joinChallenge(JoinRequest(
+            code: d.code, nickname: d.nickname, sex: d.sex, birthYear: d.birthYear!, heightCm: d.heightCm!, weightKg: d.weightKg!,
+            pregnancy: d.pregnancy, eatingDisorder: d.eatingDisorder, terms: terms, sensitiveHealth: d.sensitiveHealth, overseasAi: overseasAi));
+      if (ref.mounted) state = state.copyWith(join: r);
+      return null;
+    } catch (e) {
+      return apiErrorText(e);
+    }
+  }
+}
+
+final onboardingProvider = NotifierProvider<OnboardingNotifier, OnboardingDraft>(OnboardingNotifier.new);
 
 final mealUploaderProvider = Provider<MealUploader>((ref) => MealUploader(ref.watch(apiProvider), prepare: preparePhoto));
 

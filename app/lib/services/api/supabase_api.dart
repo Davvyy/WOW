@@ -32,6 +32,40 @@ class SupabaseChalloryApi implements ChalloryApi {
     }
   }
 
+  Future<Object?> _rpc(String fn, Map<String, dynamic> params) async {
+    try {
+      return await _client.rpc(fn, params: params);
+    } on PostgrestException catch (e) {
+      // SQL 함수의 SQLSTATE 'PTnnn' → HTTP nnn (supabase/README.md)
+      final m = RegExp(r'^PT(\d{3})$').firstMatch(e.code ?? '');
+      throw ApiException(m != null ? int.parse(m.group(1)!) : (e.code == '42501' ? 403 : 500), e.message);
+    } catch (e) {
+      throw ApiException(0, e.toString());
+    }
+  }
+
+  @override
+  Future<InviteSummary?> getInvite(String code) async {
+    final j = await _rpc('get_invite', {'p_code': code});
+    return j == null ? null : InviteSummary.fromJson(Map<String, dynamic>.from(j as Map));
+  }
+
+  @override
+  Future<JoinResult> joinChallenge(JoinRequest req) async =>
+      JoinResult.fromJson(Map<String, dynamic>.from(await _rpc('join_challenge', {'p': req.toJson()}) as Map));
+
+  @override
+  Future<bool> hasParticipation() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return false;
+    try {
+      final rows = await _client.from('participants').select('id').eq('user_id', uid).not('status', 'in', '(kicked,left)').limit(1);
+      return rows.isNotEmpty;
+    } catch (e) {
+      throw ApiException(0, e.toString());
+    }
+  }
+
   @override
   Future<PhotoUploadTicket> requestPhotoUpload(PreparedPhoto p, {required String idempotencyKey}) async {
     final j = await _fn('photo-upload-url', {

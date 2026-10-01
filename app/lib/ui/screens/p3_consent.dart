@@ -17,6 +17,21 @@ class ConsentScreen extends ConsumerStatefulWidget {
 class _ConsentScreenState extends ConsumerState<ConsentScreen> {
   bool _terms = false;
   bool _ai = false;
+  bool _busy = false;
+
+  /// 참가 신청(05 API #3 join_challenge): 자격·기록 모드·BMR 잠금은 서버가 판정
+  Future<void> _submit() async {
+    setState(() => _busy = true);
+    ref.read(aiConsentProvider.notifier).set(_ai);
+    final err = await ref.read(onboardingProvider.notifier).join(terms: _terms, overseasAi: _ai);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      showToast(context, err);
+      return;
+    }
+    context.go(R.p4);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,12 +65,7 @@ class _ConsentScreenState extends ConsumerState<ConsentScreen> {
       progress: 2,
       cta: Column(mainAxisSize: MainAxisSize.min, children: [
         if (!_terms) Padding(padding: const EdgeInsets.only(bottom: 6), child: Txt.cap('필수 항목에 동의해 주세요')),
-        ChButton('동의하고 계속', onPressed: _terms
-            ? () {
-                ref.read(aiConsentProvider.notifier).set(_ai);
-                context.go(R.p4);
-              }
-            : null),
+        ChButton(_busy ? '참가 신청 중' : '동의하고 계속', onPressed: _terms && !_busy ? _submit : null),
       ]),
       children: [
         Txt('세 가지만 확인해 주세요', size: 24, weight: FontWeight.w700, color: c.fg, height: 1.33),

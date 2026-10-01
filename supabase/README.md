@@ -100,6 +100,14 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 
 신고(`reports`)는 신고자를 운영자 전용 `review_reporters` 에만 남기고, 대상에게는 N-05 만 보낸다(하루 3건). 계정 삭제(`account`, 확인 문구 "삭제")는 기록을 즉시 지우고 일별 점수만 익명(`탈퇴 참가자`)으로 Archived 까지 남긴다.
 
+## 로그인(Auth) 설정
+
+앱은 Kakao·Apple ID 토큰을 `grant_type=id_token` 으로 넘기거나(네이티브), 브라우저 OAuth 로 로그인한다(app/README.md "로그인·참가").
+
+- Dashboard > Authentication > Providers: **Kakao**(REST API 키·Client Secret), **Apple**(Services ID·키) 활성화
+- Authentication > URL Configuration > Redirect URLs: `app.challory://login-callback`
+- 로그인만으로는 `public.users` 행이 생기지 않는다. 참가 RPC `join_challenge` 가 users·profiles·consents·participants 를 한 번에 만든다.
+
 ## 권한 모델
 
 | 호출자 | 할 수 있는 것 |

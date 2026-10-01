@@ -4,6 +4,15 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+/** flutter build/run 의 --dart-define 값(gradle 속성 dart-defines, base64 목록)을 읽는다. */
+fun dartDefine(key: String): String? =
+    (project.findProperty("dart-defines") as String?)
+        ?.split(",")
+        ?.map { String(java.util.Base64.getDecoder().decode(it)) }
+        ?.firstOrNull { it.startsWith("$key=") }
+        ?.substringAfter("=")
+        ?.takeIf { it.isNotEmpty() }
+
 android {
     namespace = "app.challory.challory"
     compileSdk = flutter.compileSdkVersion
@@ -27,6 +36,8 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // --dart-define=KAKAO_NATIVE_APP_KEY=... 를 매니페스트 스킴(kakao{키})에도 쓴다
+        manifestPlaceholders["kakaoNativeAppKey"] = dartDefine("KAKAO_NATIVE_APP_KEY") ?: "none"
     }
 
     buildTypes {
@@ -47,3 +58,4 @@ kotlin {
 flutter {
     source = "../.."
 }
+

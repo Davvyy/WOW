@@ -30,6 +30,42 @@ class MockChalloryApi implements ChalloryApi {
     }
   }
 
+  /// 모의 코드: K7Q2MD 유효 · FULL00 모집 마감 · BLOCK0 참가 불가 · 그 외 없음(P1 프로토타입과 같음)
+  @override
+  Future<InviteSummary?> getInvite(String code) async {
+    calls.add('get_invite');
+    final ch = mockChallenge;
+    InviteSummary s(String status, int joined) => InviteSummary(challengeId: 'mock-challenge', name: ch.name, status: status,
+        startDate: ch.start, endDate: ch.end, capacity: ch.capacity, joined: joined, days: ch.days);
+    return switch (code.toUpperCase()) {
+      'K7Q2MD' => s('recruiting', ch.joined),
+      'FULL00' => s('recruiting', ch.capacity),
+      'BLOCK0' => s('recruiting', ch.joined), // 재가입 차단은 로그인 뒤 참가 단계에서 거절(사유 미노출)
+      _ => null,
+    };
+  }
+
+  JoinRequest? lastJoin;
+
+  @override
+  Future<JoinResult> joinChallenge(JoinRequest req) async {
+    _maybeFail('join_challenge');
+    lastJoin = req;
+    if (!req.terms || !req.sensitiveHealth) throw const ApiException(422, '필수 동의가 필요해요');
+    if (req.code == 'BLOCK0') throw const ApiException(403, '참가할 수 없는 챌린지예요');
+    final age = mockChallenge.start.year - req.birthYear;
+    if (age - 1 < 14) throw const ApiException(422, '만 14세 이상부터 참가할 수 있어요');
+    final bmi = req.weightKg / ((req.heightCm / 100) * (req.heightCm / 100));
+    final bmr = ChalloryEngine.bmr(Profile(sex: req.sex, weightKg: req.weightKg, heightCm: req.heightCm, age: age)).bmr;
+    return JoinResult(participantId: 'mock-participant', challengeId: 'mock-challenge', bmr: bmr,
+        recordMode: age - 1 < 19 || bmi < 18.5 || req.pregnancy || req.eatingDisorder);
+  }
+
+  bool participating = false;
+
+  @override
+  Future<bool> hasParticipation() async => participating;
+
   @override
   Future<PhotoUploadTicket> requestPhotoUpload(PreparedPhoto p, {required String idempotencyKey}) async {
     _maybeFail('photo-upload-url');

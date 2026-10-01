@@ -55,3 +55,6 @@ String roParticle(String s) {
   final jong = (code - 0xAC00) % 28;
   return (jong == 0 || jong == 8) ? '로' : '으로';
 }
+
+/// 날짜 "10.6" (월.일, 06 §6 표기)
+String fmtMd(DateTime d) => '${d.month}.${d.day}';

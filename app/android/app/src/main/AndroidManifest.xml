@@ -38,9 +38,27 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 로그인 브라우저 OAuth 복귀 딥링크(AppConfig.authRedirect, Supabase Redirect URLs 에 등록) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="app.challory" android:host="login-callback"/>
+            </intent-filter>
             <!-- Health Connect 권한 사용 목적 안내(Android 13 이하): 개인정보 처리방침/권한 사유 화면으로 연결 -->
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
+            </intent-filter>
+        </activity>
+        <!-- 카카오 로그인(카카오계정 웹 로그인 복귀). 스킴 kakao{네이티브 앱 키}는 build.gradle.kts 가 dart-define 에서 채운다 -->
+        <activity
+            android:name="com.kakao.sdk.flutter.AuthCodeCustomTabsActivity"
+            android:exported="true">
+            <intent-filter android:label="flutter_web_auth">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="kakao${kakaoNativeAppKey}" android:host="oauth"/>
             </intent-filter>
         </activity>
         <!-- Health Connect 권한 사용 내역 화면(Android 14+) -->
@@ -68,6 +86,8 @@
     <queries>
         <!-- Health Connect 앱(Android 13 이하 설치 확인) -->
         <package android:name="com.google.android.apps.healthdata"/>
+        <!-- 카카오톡 설치 확인(카카오톡으로 로그인) -->
+        <package android:name="com.kakao.talk"/>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

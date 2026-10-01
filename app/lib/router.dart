@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/config.dart';
 import 'core/engine/engine.dart';
+import 'services/auth/auth_service.dart';
+import 'state/app_state.dart';
 import 'ui/screens/p10_ledger.dart';
 import 'ui/screens/p11_rules.dart';
 import 'ui/screens/p12_settings.dart';
@@ -40,11 +45,25 @@ class R {
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
-GoRouter buildRouter({String initialLocation = R.p1}) {
+/// 로그인 전에도 열 수 있는 화면(초대코드·규칙 미리 보기·검수 목록)
+const _publicPaths = {R.p1, R.rules, R.debug};
+
+/// [auth] 가 있으면 로그인 가드: 로그인 전에는 P1 으로, 로그아웃되면 P1 으로 돌려보낸다.
+/// 모의 모드(서버 없음)는 가드 없이 모든 화면을 연다(검수·테스트용).
+GoRouter buildRouter({String initialLocation = R.p1, AuthService? auth}) {
+  final refresh = auth == null ? null : _StreamListenable(auth.changes);
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: initialLocation,
     debugLogDiagnostics: false,
+    refreshListenable: refresh,
+    redirect: auth == null
+        ? null
+        : (_, state) {
+            final path = state.uri.path;
+            if (!auth.isSignedIn && !_publicPaths.contains(path)) return R.p1;
+            return null;
+          },
     routes: [
       GoRoute(path: R.p1, builder: (_, _) => const StartScreen()),
       GoRoute(path: R.p2, builder: (_, _) => const ProfileScreen()),
@@ -94,7 +113,20 @@ MealSlot? _slotOf(String? name) {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final r = buildRouter();
+  final auth = ref.watch(authServiceProvider);
+  final r = buildRouter(auth: AppConfig.hasSupabase ? auth : null);
   ref.onDispose(r.dispose);
   return r;
 });
+
+class _StreamListenable extends ChangeNotifier {
+  _StreamListenable(Stream<bool> s) {
+    _sub = s.listen((_) => notifyListeners());
+  }
+  late final StreamSubscription<bool> _sub;
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+}

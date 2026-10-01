@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# 카카오 네이티브 앱 키(로컬 전용)
+ios/Flutter/Kakao.xcconfig
