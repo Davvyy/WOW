@@ -183,11 +183,11 @@ begin
         v_skips_today := v_skips_today + 1;
         continue;
       end if;
-      v_i := v_i + v_m; v_sub := v_sub || v_slot; v_skip_over := true;
+      v_i := v_i + v_m; v_sub := v_sub || v_slot::text; v_skip_over := true;
       continue;
     end if;
     v_i := v_i + v_m;
-    if v_has_pending then v_pending := v_pending || v_slot; else v_sub := v_sub || v_slot; end if;
+    if v_has_pending then v_pending := v_pending || v_slot; else v_sub := v_sub || v_slot::text; end if;
   end loop;
 
   for m in select * from jsonb_array_elements(coalesce(p_meals, '[]')) e

@@ -313,6 +313,7 @@ create table meals (
   delta_ratio numeric,
   is_main boolean generated always as (coalesce(confirmed_kcal, 0) >= 150) stored,
   title text,
+  items_hash text,                       -- 확정 항목 해시(동일 내용 재전송 시 revision 미생성)
   late_upload boolean not null default false,
   counted boolean not null default true,  -- false: is_final 날짜로 지연 업로드된 끼니(미인정)
   captured_at timestamptz not null default now(),
