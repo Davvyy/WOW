@@ -69,6 +69,7 @@ class AppShell extends StatelessWidget {
                         color: c.brand,
                         shape: const CircleBorder(),
                         elevation: 4,
+                        shadowColor: c.brand.withValues(alpha: 0.35),
                         child: InkWell(
                           customBorder: const CircleBorder(),
                           onTap: () => context.push('${R.camera}?slot=${slotForNow(DateTime.now()).name}'),

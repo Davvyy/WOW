@@ -1,8 +1,6 @@
 import 'package:challory/core/engine/engine.dart';
 import 'package:challory/core/format.dart';
-import 'package:challory/core/theme/theme.dart';
 import 'package:challory/data/mock/mock_data.dart';
-import 'package:challory/data/models.dart';
 import 'package:challory/router.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/ui/screens/p11_rules.dart';

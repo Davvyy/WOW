@@ -102,23 +102,15 @@ class ChCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final deco = BoxDecoration(
+    final inner = Padding(padding: padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 14), child: SizedBox(width: double.infinity, child: child));
+    final card = Material(
       color: outline ? c.bg : (color ?? c.surface),
-      borderRadius: BorderRadius.circular(12),
-      border: outline ? Border.all(color: c.border) : null,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: outline ? BorderSide(color: c.border) : BorderSide.none),
+      child: onTap == null ? inner : InkWell(onTap: onTap, child: inner),
     );
-    final content = Container(
-      width: double.infinity,
-      decoration: deco,
-      padding: padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: child,
-    );
-    if (onTap == null) return content;
-    return Semantics(
-      button: true,
-      label: semanticsLabel,
-      child: InkWell(borderRadius: BorderRadius.circular(12), onTap: onTap, child: content),
-    );
+    if (onTap == null) return card;
+    return Semantics(button: true, label: semanticsLabel, child: card);
   }
 }
 

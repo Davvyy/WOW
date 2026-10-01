@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Challory</string>
+	<string>챌로리</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +24,12 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>식사 사진을 찍어 칼로리를 추정하기 위해 카메라를 사용해요. 촬영한 사진은 기기 사진첩에 저장되지 않고, 앨범에서 가져오는 기능은 없어요.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>걸음·거리·층수·운동 세션·활동 칼로리(참고)를 읽기 전용으로 가져와 챌린지 점수를 계산해요. 직접 입력한 걸음은 점수에 반영되지 않아요.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>챌로리는 건강 앱에 어떤 데이터도 쓰지 않아요. 읽기 전용으로만 사용해요.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
