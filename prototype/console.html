@@ -95,6 +95,8 @@ a { color: var(--brand); }
 .ctrl button, .ctrl a { border: 1px solid var(--h-border); background: var(--h-surface); color: var(--h-fg); border-radius: 8px; padding: 4px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
 .ctrl button[aria-pressed="true"] { border-color: var(--h-accent); color: var(--h-accent); font-weight: 600; }
 .hbar code { background: var(--h-surface); border: 1px solid var(--h-border); padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+@media (max-width: 1440px) { .hbar .ttl small, .hbar .sec { display: none; } }
+@media (max-width: 1180px) { .hbar #hashcode { display: none; } }
 
 /* ---------- 콘솔 레이아웃 ---------- */
 .app { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 44px); }
@@ -154,7 +156,7 @@ a { color: var(--brand); }
 }
 
 /* ---------- 타이포·카드·그리드 ---------- */
-.h2 { font-size: 16px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.h2 { font-size: 16px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; scroll-margin-top: 124px; }
 .h2 .cap { font-weight: 500; }
 .title { font-size: 15px; font-weight: 600; margin: 0; }
 .cap { font-size: 12px; color: var(--fg-2); margin: 0; }
@@ -173,6 +175,8 @@ a { color: var(--brand); }
 .grid.const { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .grid.fields2 { grid-template-columns: 1fr 1fr; gap: 12px; }
 .grid.fields3 { grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.grid.csv { grid-template-columns: 1fr 1fr; gap: 10px; }
+button.card:not(.outline) { border: 0; }
 @media (max-width: 1100px) { .grid.kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid.const { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .kpi .card { gap: 4px; padding: 14px 16px; }
@@ -248,7 +252,7 @@ textarea.ta.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .radio:has(input:disabled) { opacity: .6; cursor: default; }
 .checkrow { display: flex; align-items: flex-start; gap: 10px; }
 .checkrow input { width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--brand); flex: none; }
-.checkrow .d { font-size: 12px; color: var(--fg-2); }
+.checkrow .d { font-size: 12px; color: var(--fg-2); display: block; }
 
 /* 표 */
 .table-wrap { overflow-x: auto; max-width: 100%; }
@@ -299,7 +303,7 @@ textarea.ta.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .banner.lg .ms { font-size: 28px; }
 
 /* 미니 바 차트(걸음 7일) */
-.bars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end; gap: 8px; height: 120px; padding-top: 18px; }
+.bars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end; gap: 8px; height: 132px; padding-top: 22px; }
 .bars .bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; position: relative; min-width: 0; }
 .bars .bar i { width: 100%; max-width: 34px; background: var(--brand); border-radius: 4px 4px 0 0; display: block; opacity: .6; }
 .bars .bar.hi i { background: var(--warn); opacity: 1; }
@@ -309,7 +313,8 @@ textarea.ta.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .bars .bar .d { font-size: 11px; color: var(--fg-2); font-family: var(--font-num); }
 .baseline { position: relative; }
 .baseline .line { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--border-strong); }
-.baseline .line span { position: absolute; right: 0; top: -18px; font-size: 11px; color: var(--fg-2); font-family: var(--font-num); background: var(--surface); padding: 0 4px; }
+.baseline .line { z-index: 2; }
+.baseline .line span { position: absolute; left: 0; top: -17px; font-size: 11px; color: var(--fg-2); font-family: var(--font-num); background: var(--surface); padding: 0 4px; border-radius: 4px; }
 .gauge { height: 8px; border-radius: 4px; background: var(--border-strong); overflow: hidden; position: relative; }
 .gauge i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand); border-radius: 4px; }
 
@@ -320,7 +325,7 @@ textarea.ta.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .photo .tag { background: rgba(0,0,0,.5); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; position: relative; }
 .photo .hash { position: absolute; top: 10px; left: 12px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: rgba(0,0,0,.5); padding: 2px 8px; border-radius: 6px; }
 .ai-vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
-.ai-vs .box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.ai-vs .box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ai-vs .box .k { font-size: 12px; color: var(--fg-2); }
 .ai-vs .box .v { font-family: var(--font-num); font-weight: 700; font-size: 20px; }
 .ai-vs .box .v small { font-size: 12px; font-family: var(--font-body); color: var(--fg-2); font-weight: 500; }
@@ -437,3 +442,747 @@ details.priv .table td, details.priv .table th { border-color: color-mix(in srgb
 <div id="overlay"></div>
 
 <script src="data.js"></script>
+<script>
+/* ======================= 공용 ======================= */
+const { ENGINE, CONST, fmt, CHALLENGE, ME, TODAY, FINAL, TODAY_MEALS, WATCH_USER, WATCH_ACTIVITY, WATCH_MEALS, WATCH_TODAY, LEDGER, CUMULATIVE, TODAY_ROW, LEADERBOARD, REASON, VERDICT } = window.CHALLORY;
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ms = (name, cls = '') => `<span class="ms ${cls}" aria-hidden="true">${name}</span>`;
+const chip = (text, kind = 'neutral', icon = '') => `<span class="chip ${kind}">${icon ? ms(icon) : ''}${text}</span>`;
+const round1 = ENGINE.round1;
+const signed1 = (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + fmt.k1(Math.abs(n));
+const mdDate = (iso) => `${+iso.slice(5, 7)}.${+iso.slice(8, 10)}`;
+const M_ME = fmt.int(Math.ceil(ME.M)); // 대체값 743 — P10과 동일 표기(올림)
+const SLOT_LABEL = { breakfast: '아침', lunch: '점심', dinner: '저녁', snack: '간식' };
+const AVATAR_COLORS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
+const avatarCls = (name) => AVATAR_COLORS[[...name].reduce((a, ch) => a + ch.charCodeAt(0), 0) % AVATAR_COLORS.length];
+const avatar = (name) => `<span class="sm-avatar avatar ${avatarCls(name)}" aria-hidden="true">${esc(name[0])}</span>`;
+const fill4 = (n) => `<span class="fill4" aria-hidden="true">${[0, 1, 2, 3].map(i => `<i class="${i < n ? '' : 'off'}"></i>`).join('')}</span>`;
+const median = (arr) => { const a = [...arr].sort((x, y) => x - y); const m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+// 조사 '(으)로': 받침 없음·ㄹ 받침·숫자 1,2,4,5,7,8,9 → '로', 그 외 → '으로' (06 §6 예: "대체값 743으로")
+function ro(word) {
+  const ch = String(word).trim().slice(-1);
+  if (/[0-9]/.test(ch)) return '1245789'.includes(ch) ? '로' : '으로';
+  const code = ch.charCodeAt(0); if (code < 0xAC00 || code > 0xD7A3) return '로';
+  const fin = (code - 0xAC00) % 28; return fin === 0 || fin === 8 ? '로' : '으로';
+}
+
+/* 03 §7 챌린지 8상태 — 색 + 아이콘 + 텍스트 */
+const STATUS = {
+  Draft: { label: '초안', en: 'Draft', kind: 'neutral', icon: 'edit_note', d: ['D−5', `시작 ${mdDate(CHALLENGE.start)} · ${mdDate(CHALLENGE.start)}~${mdDate(CHALLENGE.end)} · ${CHALLENGE.days}일`] },
+  Recruiting: { label: '모집 중', en: 'Recruiting', kind: 'brand', icon: 'campaign', d: ['D−5', `시작 ${mdDate(CHALLENGE.start)} · 초대코드 활성`] },
+  Checking: { label: '점검 기간', en: 'Checking', kind: 'review', icon: 'hourglass_top', d: ['D+1', '첫 3일 · 누적 미반영'] },
+  Running: { label: '진행 중', en: 'Running', kind: 'good', icon: 'play_circle', d: [`D+${CHALLENGE.dayIndex}`, `${mdDate(CHALLENGE.today)} · 종료 ${mdDate(CHALLENGE.end)} · 남은 20일`] },
+  Closing: { label: '집계 마감', en: 'Closing', kind: 'warn', icon: 'lock_clock', d: ['D+29', `${CHALLENGE.finalizeAt} 확정 배치 완료 · 미결 처리 중`] },
+  Published: { label: '결과 확정', en: 'Published', kind: 'brand', icon: 'verified', d: ['이의 D−3', `결과 확정 11.3 · 이의 기간 ~${CHALLENGE.objectionUntil} (7일 중 3일 남음)`] },
+  Archived: { label: '종료', en: 'Archived', kind: 'neutral', icon: 'inventory_2', d: ['종료', `${CHALLENGE.objectionUntil} 이의 기간 종료 · 열람 전용`] },
+  Cancelled: { label: '취소', en: 'Cancelled', kind: 'critical', icon: 'cancel', d: ['취소', '참가자에게 공지됨'] },
+};
+
+/* ======================= 참가자 데이터(엔진으로 계산) ======================= */
+const DATES = LEDGER.map(r => r.date);
+const PEOPLE_RAW = [
+  { name: '달려라하니', sex: 'F', birthYear: 1992, heightCm: 165, weightKg: 57, device: 'iPhone + Apple Watch', source: 'Apple 건강', platform: 'HealthKit', badge: 'watch', baseSteps: 12400, spikeDay: 7, spikeSteps: 28400, mealScale: 0.8, status: 'review', flag: 'steps_spike', warns: 0, mealsToday: 3, syncAt: '21:05' },
+  { name: '강남콩', sex: 'M', birthYear: 1990, heightCm: 178, weightKg: 76, device: 'Galaxy', source: '삼성헬스', platform: 'Health Connect', baseSteps: 11800, status: 'ok', warns: 0, mealsToday: 3, syncAt: '21:10', health: 'high_activity_3d' },
+  { name: WATCH_USER.nickname, sex: WATCH_USER.sex, birthYear: WATCH_USER.birthYear, heightCm: WATCH_USER.heightCm, weightKg: WATCH_USER.weightKg, device: WATCH_USER.device, source: WATCH_USER.source, platform: 'HealthKit', badge: 'watch', baseSteps: 11500, lowIntakeDays: [4, 5, 6], status: 'ok', warns: 0, mealsToday: 3, syncAt: '20:58', health: 'low_intake_3d' },
+  { name: ME.nickname, sex: ME.sex, birthYear: ME.birthYear, heightCm: ME.heightCm, weightKg: ME.weightKg, device: ME.device, source: ME.source, platform: CHALLENGE.platform, baseSteps: 9000, status: 'review', flag: 'dup_photo', warns: 0, mealsToday: 3, syncAt: CHALLENGE.syncTime },
+  { name: '오이냉국', sex: 'F', birthYear: 1988, heightCm: 160, weightKg: 62, device: 'Galaxy', source: '삼성헬스', platform: 'Health Connect', baseSteps: 7600, status: 'ok', warns: 2, mealsToday: 2, syncAt: '20:40', noAi: true },
+  { name: '초록이', sex: 'M', birthYear: 1999, heightCm: 172, weightKg: 68, device: 'iPhone', source: 'Apple 건강', platform: 'HealthKit', baseSteps: 10200, status: 'ok', warns: 0, mealsToday: 3, syncAt: '21:00' },
+  { name: '라떼한잔', sex: 'F', birthYear: 1995, heightCm: 158, weightKg: 54, device: 'Galaxy', source: '삼성헬스', platform: 'Health Connect', baseSteps: 6900, status: 'unsynced', lastSync: '10.12 22:40', zeroFrom: 8, warns: 0, mealsToday: 1 },
+  { name: '마포구민', sex: 'M', birthYear: 1985, heightCm: 174, weightKg: 80, device: 'Galaxy', source: '삼성헬스', platform: 'Health Connect', baseSteps: 8400, status: 'ok', warns: 1, mealsToday: 2, syncAt: '19:30' },
+  { name: '야근요정', sex: 'F', birthYear: 1993, heightCm: 162, weightKg: 55, device: 'Galaxy', source: '삼성헬스', platform: 'Health Connect', baseSteps: 7200, status: 'unsynced', lastSync: '10.12 19:05', zeroFrom: 8, warns: 0, mealsToday: 2 },
+  { name: '새벽커피', sex: 'F', birthYear: 2001, heightCm: 167, weightKg: 49, device: 'iPhone', source: 'Apple 건강', platform: 'HealthKit', baseSteps: 6800, status: 'record', recordReason: 'BMI 17.6 (18.5 미만) · 안전 체크 해당 · P2 기록 모드 안내에 동의(10.5)', warns: 0, mealsToday: 3, syncAt: '21:02' },
+  { name: '한강러너', sex: 'M', birthYear: 1997, heightCm: 180, weightKg: 73, device: 'Galaxy', source: '삼성헬스', platform: 'Health Connect', baseSteps: 13100, status: 'unsynced', lastSync: '10.11 23:50', zeroFrom: 7, warns: 0, mealsToday: 0 },
+  { name: '도토리', sex: 'M', birthYear: 1994, heightCm: 170, weightKg: 66, device: 'Galaxy', source: '삼성헬스', platform: 'Health Connect', baseSteps: 11300, status: 'ok', warns: 0, mealsToday: 3, syncAt: '21:08' },
+];
+function genLedger(p, i) {
+  if (p.name === ME.nickname) return LEDGER.map(r => ({ date: r.date, steps: r.steps, A: r.A, I: r.I, D: r.D, S: r.S, S_before: r.S_before, check: r.check, provisional: r.provisional, substituted: r.substituted, floorApplied: r.floorApplied, health: r.health, revision: r.revision, bmr: r.bmr, meals: r.d === 8 ? TODAY_MEALS : null }));
+  return DATES.map((date, k) => {
+    const d = k + 1;
+    let steps = Math.round(p.baseSteps * (0.86 + ((i * 7 + d * 13) % 9) / 32) / 10) * 10;
+    if (p.spikeDay === d) steps = p.spikeSteps;
+    if (p.zeroFrom && d >= p.zeroFrom) steps = 0;
+    let sessions = [];
+    const kc = [360 + ((i * 3 + d * 5) % 6) * 20, 640 + ((i * 5 + d * 7) % 8) * 25, 500 + ((i * 2 + d * 11) % 7) * 20];
+    let meals = kc.map((k2, si) => ({ slot: ['breakfast', 'lunch', 'dinner'][si], status: 'confirmed', kcal: k2 }));
+    if (p.mealScale) meals = meals.map(m => ({ ...m, kcal: Math.round(m.kcal * p.mealScale / 10) * 10 }));
+    if (p.lowIntakeDays && p.lowIntakeDays.includes(d)) meals = meals.map(m => ({ ...m, kcal: Math.round(m.kcal * 0.55 / 10) * 10 }));
+    if (d === 8) meals = meals.map((m, si) => si < p.mealsToday ? m : { slot: m.slot, status: 'empty' });
+    if (p.name === WATCH_USER.nickname && d === 8) { steps = WATCH_ACTIVITY.stepsTotal; sessions = WATCH_ACTIVITY.sessions; meals = WATCH_MEALS; } // 예시 2와 동일(72.1)
+    const r = ENGINE.simulate({ profile: p, stepsTotal: steps, sessions, meals });
+    return { date, steps, sessions, A: r.act.A, I: r.inn.I, D: r.sc.D, S: r.sc.S, check: d <= CONST.CHECK_DAYS, provisional: d === 8, substituted: r.inn.substitutedSlots, floorApplied: r.sc.floorApplied, meals, bmr: r.bmr };
+  });
+}
+const PEOPLE = PEOPLE_RAW.map((p, i) => {
+  p.age = ENGINE.ageOnDate(p.birthYear, CHALLENGE.start);
+  p.bmr = ENGINE.bmr(p).bmr;
+  p.ledger = genLedger(p, i);
+  const lb = LEADERBOARD.cumulative.find(x => x.name === p.name);
+  p.cum = lb ? lb.score : round1(p.ledger.filter(r => !r.check && !r.provisional).reduce((a, r) => a + r.S, 0));
+  return p;
+});
+const person = (name) => PEOPLE.find(p => p.name === name);
+const HEALTH_ALERTS = [
+  { who: WATCH_USER.nickname, type: 'low_intake_3d', text: '섭취 기록 3일 연속 적음(10.9~10.11)', nudge: '넛지 발송됨 · 10.12 09:10 (N-07)' },
+  { who: '강남콩', type: 'high_activity_3d', text: '활동 기록 3일 연속 높음(10.10~10.12, 약 1,000 kcal 초과)', nudge: '넛지 발송됨 · 10.13 09:10 (N-07)' },
+];
+
+/* ======================= 검토 큐 ======================= */
+const QUEUE = [
+  { id: 'R-0412', type: 'steps_spike', label: '걸음 급증', who: '달려라하니', date: '10.12', dayIdx: 6, slaBase: 41, slaH: 41, state: 'appealed', tpl: 'steps_spike', appeal: '10.12에 하프마라톤 대회(21.1 km)에 나갔어요. 워치에서 운동으로 기록된 2시간 3분 세션 화면을 함께 보내요. 평소보다 많이 걸은 날이 맞아요.', appealAt: '10.13 08:12' },
+  { id: 'R-0415', type: 'dup_photo', label: '사진 중복', who: ME.nickname, date: '10.12', slot: 'dinner', dayIdx: 6, slaBase: 44, slaH: 44, state: 'open', tpl: 'dup_photo' },
+  { id: 'R-0417', type: 'report', label: '신고(기타)', who: '오이냉국', date: '10.13', slot: 'lunch', dayIdx: 7, slaBase: 60, slaH: 60, state: 'open', tpl: '', report: '10.13 점심 사진이 음식이 아니라 메뉴판 사진 같아요. 확인 부탁드려요.', reportAt: '10.13 13:40' },
+];
+const AUDIT_BASE = [
+  ['10.13 21:02', '민호', '검토 R-0412 소명 열람'],
+  ['10.13 20:48', '민호', '검토 R-0415 사진 서명 URL 발급(10분) · 열람'],
+  ['10.13 13:41', '시스템', '신고 접수 → R-0417 생성 · SLA 72h'],
+  ['10.13 09:00', '시스템', '10.12 확정 배치 · is_final · 플래그 2건 → R-0412 · R-0415'],
+];
+
+/* ======================= 화면 상태 ======================= */
+const DEFAULT_MD = '## 운영자 추가 규칙\n- 회식 날(10.17)은 저녁 자동 확정 대신 대체값 적용을 요청할 수 있어요(운영자에게 메시지).\n- 상품은 상위 3명 + 반영률 100% 달성자 추첨 2명.';
+const OP1 = { md: DEFAULT_MD, recruiting: false, kakaoOpen: false };
+const OP2 = { filter: 'all', healthOpen: false, drawerWho: null, action: null, menu: null, memo: {} };
+const OP3 = { sel: 'R-0415', verdict: null, tpl: 'dup_photo', previewed: false, decided: {}, lastDecided: null, empty: false };
+const OP4 = { title: CHALLENGE.notice.title, body: CHALLENGE.notice.body, noticePreview: false, sent: false, csv: {}, finalChk: false, destroyChk: false };
+let OVERLAY = '';
+let CURRENT = { id: 'op1', variant: 'default' };
+
+/* ======================= OP0 챌린지 목록 ======================= */
+function renderOP0() {
+  const s = STATUS.Running;
+  return `<div class="pagehead"><div><h1><span class="id">OP0</span>챌린지 목록</h1><p class="lead">운영자 민호 · 1개 운영 중</p></div><div class="acts"><button class="btn secondary" disabled title="1회차는 챌린지 1개">${ms('add')}새 챌린지</button></div></div>
+  <div class="grid two">
+    <button class="card outline" style="text-align:left;cursor:pointer;gap:14px" data-nav="op2" aria-label="가을 걷기 챌린지 열기">
+      <div class="card-head"><p class="title" style="font-size:18px">${esc(CHALLENGE.name)}</p><span class="pill ${s.kind}">${ms(s.icon)}${s.label}<small>${s.en}</small></span></div>
+      <div class="chips">${chip(`D+${CHALLENGE.dayIndex} · ${mdDate(CHALLENGE.start)}~${mdDate(CHALLENGE.end)}`, 'neutral', 'calendar_today')}${chip(`참가 ${CHALLENGE.joined}/${CHALLENGE.capacity}`, 'neutral', 'group')}${chip(`미결 ${pendingCount()}건`, pendingCount() ? 'critical' : 'good', 'gavel')}${chip('오늘 동기화 93%', 'good', 'sync')}</div>
+      <div class="grid kpi" style="gap:10px">
+        <div><span class="cap">정원</span><div class="num" style="font-size:22px;font-weight:700">${CHALLENGE.joined}<span class="cap">/${CHALLENGE.capacity}</span></div></div>
+        <div><span class="cap">동기화율</span><div class="num" style="font-size:22px;font-weight:700">93%</div></div>
+        <div><span class="cap">미확정 끼니</span><div class="num" style="font-size:22px;font-weight:700">17</div></div>
+        <div><span class="cap">미결 검토</span><div class="num" style="font-size:22px;font-weight:700">${pendingCount()}</div></div>
+      </div>
+      <span class="link">열기 ${ms('chevron_right')}</span>
+    </button>
+    <div class="card"><p class="title">운영 메모</p><p class="body muted">AI 분석 월 예산·Edge Function 호출 수는 1회차 Supabase Studio 대시보드에서 확인해요(05 §9). 콘솔 OP1~OP4는 좌측 메뉴에서 열어요.</p></div>
+  </div>`;
+}
+
+/* ======================= OP1 설정·규칙·초대코드 ======================= */
+const CONSTS = [
+  { k: 'T 목표 순적자', v: fmt.int(CONST.T), s: 'kcal/일 → 100점 · 최대 150점' },
+  { k: '활동 상한 C', v: fmt.int(CONST.C), s: 'kcal/일 (= 2T)' },
+  { k: '섭취 하한 F', v: `max(${fmt.int(CONST.F_MIN)}, ${CONST.F_RATIO}×BMR)`, s: '운영자 조정 미결 · v1 기본값', long: true },
+  { k: '대체값 M', v: `max(${fmt.int(CONST.M_MIN)}, ${CONST.M_RATIO}×BMR)`, s: '미기록 끼니 · 운영자 조정 미결', long: true },
+  { k: '간식 임계', v: fmt.int(CONST.SNACK_KCAL), s: 'kcal 미만은 간식(슬롯 미충족)' },
+  { k: '걸음 상한', v: fmt.int(CONST.STEPS_CAP), s: '보/일 · 세션 창 밖 걸음' },
+  { k: '층수 상한', v: fmt.int(CONST.FLOORS_CAP), s: '층/일 · 17.5초/층' },
+  { k: '건너뜀', v: `${CONST.SKIP_PER_DAY}/일 · ${CONST.SKIP_PER_WEEK}/주`, s: '운영자 조정 미결 · v1 기본값' },
+  { k: '점검 기간', v: `${CONST.CHECK_DAYS}일`, s: '누적 미반영 · 플래그 기준선' },
+];
+const SAMPLES = [
+  { label: '폰만 70 kg 남', sub: '예시 1 · Galaxy · 걸음 9,000 · 세 끼 확정', profile: ME, stepsTotal: 9000, sessions: [], meals: TODAY_MEALS },
+  { label: '워치 58 kg 여', sub: '예시 2 · Apple Watch · 걸음 12,000 + 달리기 30분', profile: WATCH_USER, stepsTotal: WATCH_ACTIVITY.stepsTotal, sessions: WATCH_ACTIVITY.sessions, meals: WATCH_MEALS },
+  { label: '1끼 600만 확정', sub: '대체값·하한 검증 · 걸음 9,000 · 저녁만 확정', profile: ME, stepsTotal: 9000, sessions: [], meals: [{ slot: 'dinner', status: 'confirmed', kcal: 600 }] },
+];
+function mdToHtml(md) {
+  const lines = esc(md).split('\n'); let out = '', inList = false;
+  for (let l of lines) {
+    l = l.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    if (/^##\s+/.test(l)) { if (inList) { out += '</ul>'; inList = false; } out += `<h3>${l.replace(/^##\s+/, '')}</h3>`; }
+    else if (/^[-*]\s+/.test(l)) { if (!inList) { out += '<ul>'; inList = true; } out += `<li>${l.replace(/^[-*]\s+/, '')}</li>`; }
+    else if (l.trim()) { if (inList) { out += '</ul>'; inList = false; } out += `<p>${l}</p>`; }
+  }
+  if (inList) out += '</ul>';
+  return out || '<p class="cap">아직 추가 규칙이 없어요</p>';
+}
+function p11Preview(md) {
+  const M = M_ME;
+  const cards = [
+    ['①', '먹은 걸 찍어요', `세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 약 ${M} kcal로, 간식은 찍은 만큼 더해져요.`, `대체값 ${M} · 간식 150 미만`],
+    ['②', '움직여요', `걸음·달리기·계단 자동 기록만 인정. 하루 활동 최대 약 ${fmt.int(CONST.C)} kcal.`, `활동 상한 ${fmt.int(CONST.C)} · 걸음 30,000`],
+    ['③', '점수는 이렇게', `(기초대사 + 활동) − 섭취 = 순적자. ${CONST.T} kcal면 100점, 최대 150점.`, `T ${CONST.T} · 최대 150점`],
+    ['④', '공정하게', '폰이든 워치든 같은 공식. 이상 기록은 조용히 확인하고 설명 기회를 드려요.', '소명 1회 · 72시간'],
+  ];
+  return `<div class="statusbar" aria-hidden="true"><span>21:10</span><span class="icons">${ms('signal_cellular_alt')}${ms('wifi')}${ms('battery_5_bar')}</span></div>
+  <div class="appbar"><span>규칙</span><span class="meta">${esc(CHALLENGE.name)}</span></div>
+  <div class="pscroll">
+    ${cards.map(([n, t, b, c]) => `<div class="rule"><div class="head"><span class="no">${n}</span><span class="t">${t}</span></div><span class="b">${b}</span><span class="c">${c}</span></div>`).join('')}
+    <div class="card"><p class="title">상수 <span class="cap">챌린지 시작 후 잠금</span></p><div class="chips">${chip(`T ${CONST.T}`)}${chip(`활동 상한 ${fmt.int(CONST.C)}`)}${chip('섭취 하한 max(1,200, 0.8×BMR)')}${chip('대체값 max(700, 0.45×BMR)')}${chip('간식 150')}${chip('걸음 30,000')}${chip('층수 50')}${chip('건너뜀 1/일 · 3/주')}</div></div>
+    <div class="card outline md" id="mdPreviewCard">${mdToHtml(md)}<p class="cap">운영자 민호 · 10.5 게시</p></div>
+    <p class="disclaimer">모든 수치는 추정이에요 · 의료 조언이 아니에요</p>
+  </div>`;
+}
+function sampleTable() {
+  const rows = SAMPLES.map(s => {
+    const r = ENGINE.simulate({ profile: s.profile, stepsTotal: s.stepsTotal, sessions: s.sessions, meals: s.meals });
+    const notes = [];
+    if (r.inn.substitutedSlots.length) notes.push(`대체값 ${r.inn.substitutedSlots.length}끼`);
+    if (r.sc.floorApplied) notes.push('하한 적용');
+    if (r.act.capped) notes.push('활동 상한');
+    if (r.sc.S === 0 && r.sc.D < 0) notes.push('순적자 음수 → 0점');
+    if (r.inn.confirmedMeals === 0) notes.push('확정 끼니 0 → 0점');
+    return `<tr><td><b>${esc(s.label)}</b><span class="sub">${esc(s.sub)}</span></td><td class="num">${fmt.int(r.bmr)}</td><td class="num">약 ${fmt.k1(r.act.A)}</td><td class="num">약 ${fmt.k1(r.inn.I)}</td><td class="num">약 ${fmt.int(r.sc.D)}</td><td class="num" style="font-size:18px;color:var(--brand)">약 ${fmt.k1(r.sc.S)}</td><td>${notes.length ? notes.map(n => chip(n, n.includes('0점') ? 'warn' : 'neutral')).join(' ') : chip('세 끼 확정', 'good', 'check')}</td></tr>`;
+  }).join('');
+  return `<div class="table-wrap"><table class="table" id="simTable"><caption class="sr">샘플 3명 시뮬레이션 — 엔진 계산 결과</caption><thead><tr><th scope="col">샘플</th><th scope="col" class="num">BMR</th><th scope="col" class="num">활동 A (kcal)</th><th scope="col" class="num">섭취 I (kcal)</th><th scope="col" class="num">순적자 D (kcal)</th><th scope="col" class="num">점수 S</th><th scope="col">비고</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function renderOP1(v) {
+  const locked = v === 'locked';
+  const st = topState();
+  const ro = locked ? 'ro' : '';
+  const roattr = locked ? 'readonly aria-readonly="true"' : '';
+  const lockTxt = locked ? `<span class="lock">${ms('lock')}🔒 잠금</span>` : '';
+  const left = `<div class="stack">
+    <div class="card" id="basicInfo">
+      <div class="card-head"><p class="title">${ms('tune', 'sm')}기본 정보</p>${locked ? `<span class="lock">${ms('lock')}시작 후 잠금 · 읽기 전용</span>` : chip('기간 7~30일 · 정원 30~100명')}</div>
+      ${locked ? `<div class="banner neutral">${ms('lock')}<div class="grow">시작(점검 기간 진입) 후에는 기간·정원·상수가 바뀌지 않아요 🔒 <span class="cap">10.6 00:00 잠금 · 변경 요청은 운영 로그에 남겨요</span></div></div>` : ''}
+      <div class="field"><label for="f-name">챌린지명 ${lockTxt}</label><div class="input ${ro}"><input id="f-name" value="${esc(CHALLENGE.name)}" ${roattr}></div></div>
+      <div class="grid fields3">
+        <div class="field"><label for="f-start">시작일 ${lockTxt}</label><div class="input ${ro}"><input id="f-start" type="date" value="${CHALLENGE.start}" ${roattr}></div></div>
+        <div class="field"><label for="f-end">종료일 ${lockTxt}</label><div class="input ${ro}"><input id="f-end" type="date" value="${CHALLENGE.end}" ${roattr}></div></div>
+        <div class="field"><label for="f-cap">정원 ${lockTxt}</label><div class="input ${ro}"><input id="f-cap" class="num" inputmode="numeric" value="${CHALLENGE.capacity}" ${roattr}><span class="unit">명${locked ? ` · 참가 ${CHALLENGE.joined}` : ''}</span></div></div>
+      </div>
+      <p class="cap">${CHALLENGE.days}일 · 점검 기간 10.6~10.8(첫 3일, 누적 미반영) · 확정 배치 매일 ${CONST.FINALIZE_HOUR} · 최종 집계 ${CHALLENGE.finalizeAt}</p>
+    </div>
+    <div class="card" id="constCard">
+      <div class="card-head"><p class="title">${ms('functions', 'sm')}상수</p><span class="lock">${ms('lock')}🔒 v1 조정 불가 · 시작 후 잠금</span></div>
+      <div class="grid const">${CONSTS.map(c => `<div class="card outline" style="gap:2px;padding:10px 12px" aria-readonly="true"><span class="cap">${c.k}</span><span class="num" style="font-weight:700;font-size:${c.long ? 15 : 18}px">${c.v}</span><span class="cap">${c.s}</span></div>`).join('')}</div>
+      <div class="inline-note">${ms('info')}<span>T·C·상한은 v1 조정 불가(04 §5.2), 대체값·섭취 하한·건너뜀은 운영자 조정이 미결이라 기본값으로 잠겨 있어요. 아래 샘플 시뮬레이션은 이 상수로 계산돼요.</span></div>
+    </div>
+    <div class="card" id="mdCard">
+      <div class="card-head"><p class="title">${ms('article', 'sm')}규칙 Markdown</p>${locked ? chip('시작 후에도 편집 가능 · 게시 즉시 P11 반영', 'brand', 'edit') : chip('P11 "운영자 추가 규칙" 카드로 보여요')}</div>
+      <textarea class="ta mono" id="mdInput" aria-label="규칙 Markdown" rows="7">${esc(OP1.md)}</textarea>
+      <div class="kv"><span class="counter" id="mdCount">${OP1.md.length} / 2,000</span><div class="btn-row"><button class="btn sm quiet" data-act="md-reset">기본 문구로</button><button class="btn sm secondary" data-act="md-save">${ms('publish')}게시</button></div></div>
+    </div>
+  </div>`;
+  const right = `<div class="stack">
+    <div class="card-head"><p class="title">${ms('smartphone', 'sm')}P11 미리보기</p><a class="link" href="index.html#p11-markdown" target="_blank" rel="noopener">index.html#p11 ${ms('open_in_new')}</a></div>
+    <p class="cap" style="margin-top:-10px">참가자가 보는 규칙 화면과 같아요 · 390px · Markdown 입력 즉시 갱신</p>
+    <section class="pframe" aria-label="참가자 규칙 미리보기" id="p11preview">${p11Preview(OP1.md)}</section>
+  </div>`;
+  const allowed = st === 'Draft' ? `<button class="btn" data-nav="op1-transition">${ms('campaign')}모집 시작</button>`
+    : st === 'Recruiting' ? `<button class="btn quiet" data-act="back-draft">${ms('undo')}초안으로(참가자 0명일 때)</button><button class="btn critical ghost" data-act="cancel-ch">${ms('cancel')}취소(참가자에게 공지)</button>`
+    : `<span class="cap">다음 전환은 자동이에요 · ${CHALLENGE.finalizeAt} 확정 배치 완료 → 집계 마감(Closing)</span>`;
+  const flow = ['Draft', 'Recruiting', 'Checking', 'Running', 'Closing', 'Published', 'Archived'];
+  const bottom = `<div class="card" id="simCard">
+      <div class="card-head"><p class="title">${ms('calculate', 'sm')}샘플 3명 시뮬레이션</p><div class="chips">${chip('05 API #25 골든 3건', 'brand', 'verified')}${chip('/simulate 동일 함수 · P5·P11과 같은 엔진', 'neutral')}</div></div>
+      ${sampleTable()}
+      <p class="disclaimer">모든 kcal·점수는 추정이에요 · 상수가 잠겨 있어 표는 항상 같은 값이에요</p>
+    </div>
+    <div class="card" id="inviteCard">
+      <div class="card-head"><p class="title">${ms('key', 'sm')}초대코드</p>${st === 'Draft' ? chip('모집을 시작하면 활성화돼요', 'neutral', 'schedule') : chip(`참가 ${CHALLENGE.joined}/${CHALLENGE.capacity}명 · 활성`, 'good', 'group')}</div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+        <div class="codes ${st === 'Draft' ? 'inactive' : ''}" role="img" aria-label="초대코드 ${CHALLENGE.code}">${[...CHALLENGE.code].map(c => `<span>${c}</span>`).join('')}</div>
+        <div class="stack" style="gap:8px;flex:1;min-width:240px">
+          <p class="cap">초대 링크 <b class="num" style="color:var(--fg)">https://challory.app/j/${CHALLENGE.code}</b> · 카카오톡 공유 시 챌린지 요약 카드(P1)가 함께 보여요</p>
+          <div class="btn-row"><button class="btn sm secondary" data-act="copy-link" ${st === 'Draft' ? 'disabled' : ''}>${ms('link')}초대 링크 복사</button><button class="btn sm quiet" data-act="kakao-text" aria-expanded="${OP1.kakaoOpen}">${ms('chat')}카카오톡 공유 문구</button></div>
+        </div>
+      </div>
+      ${OP1.kakaoOpen ? `<textarea class="ta" id="kakaoText" aria-label="카카오톡 공유 문구" rows="4" readonly>[${CHALLENGE.name}] 함께 걸어요
+${mdDate(CHALLENGE.start)}~${mdDate(CHALLENGE.end)} · 4주 · 정원 ${CHALLENGE.capacity}명
+세 끼 사진 + 걸음만 있으면 돼요. 폰이든 워치든 같은 공식이에요.
+코드 ${CHALLENGE.code} 또는 링크로 참가: https://challory.app/j/${CHALLENGE.code}</textarea><div class="btn-row"><button class="btn sm quiet" data-act="copy-kakao">${ms('content_copy')}문구 복사</button></div>` : ''}
+    </div>
+    <div class="transbar" id="transBar" aria-label="상태 전환">
+      <div class="grow"><div class="flow">${flow.map(s => `<span class="${s === st ? 'cur' : ''}">${s === st ? ms(STATUS[s].icon) : ''}${STATUS[s].label}</span>`).join(ms('chevron_right'))}</div>
+        <p class="cap">${st === 'Draft' ? '허용 전환: 초안 → 모집 중. 취소(참가자에게 공지)는 모집 중에만 가능해요.' : st === 'Recruiting' ? `모집 중 · 시작일 ${mdDate(CHALLENGE.start)} 00:00에 점검 기간으로 자동 전환되고 프로필·상수가 잠겨요.` : '진행 중에는 수동 전환이 없어요 · 03 §7 상태도'}</p></div>
+      <div class="btn-row">${allowed}</div>
+    </div>`;
+  if (v === 'transition') OVERLAY = modal({ title: `${ms('campaign')}모집을 시작할까요?`, id: 'mTrans', body: `<p class="body">모집을 시작하면 초대코드 <b class="num" style="letter-spacing:.06em">${CHALLENGE.code}</b>가 활성화돼요. 기간·정원·상수는 시작일(${mdDate(CHALLENGE.start)}) 00:00에 잠겨요.</p><ul class="cap" style="margin:0;padding-left:18px"><li>초대 링크 https://challory.app/j/${CHALLENGE.code}</li><li>참가자 0명이면 초안으로 되돌릴 수 있어요</li><li>감사 로그에 기록돼요</li></ul>`, acts: `<button class="btn quiet" data-nav="op1">돌아가기</button><button class="btn" data-act="do-recruit">${ms('campaign')}모집 시작</button>` });
+  return `<div class="pagehead"><div><h1><span class="id">OP1</span>챌린지 설정 · 규칙 · 초대코드</h1><p class="lead">${locked ? '시작 후 잠금 · 규칙 Markdown만 편집할 수 있어요' : '기간·정원·상수 → 규칙 Markdown → 샘플 시뮬레이션 → 초대코드 → 상태 전환'}</p></div></div>
+  <div class="grid form-preview">${left}${right}</div>${bottom}`;
+}
+
+/* ======================= OP2 참가자·동기화 ======================= */
+function statusCell(p) {
+  if (p.status === 'excluded') return { chip: chip('순위 제외', 'critical', 'block'), sync: `${p.syncAt || '—'} · ${esc(p.source)}` };
+  if (p.status === 'kicked') return { chip: chip('강퇴 · 재가입 차단', 'critical', 'person_off'), sync: `마지막 ${p.lastSync || p.syncAt}` };
+  if (p.status === 'unsynced') return { chip: chip('미동기화', 'warn', 'sync_problem'), sync: `<span style="color:var(--warn)">오늘 동기화 없음</span><span class="sub">마지막 ${p.lastSync}</span>` };
+  if (p.status === 'review') return { chip: chip('검토 중', 'review', 'rule'), sync: `${p.syncAt} · ${esc(p.source)}` };
+  if (p.status === 'record') return { chip: chip('기록 모드', 'neutral', 'edit_note'), sync: `${p.syncAt} · ${esc(p.source)}` };
+  return { chip: chip('정상', 'good', 'check_circle'), sync: `${p.syncAt} · ${esc(p.source)}` };
+}
+const FILTERS = [
+  { k: 'all', label: '전체', f: () => true },
+  { k: 'unsynced', label: '미동기화', f: p => p.status === 'unsynced' },
+  { k: 'flag', label: '플래그', f: p => !!p.flag },
+  { k: 'record', label: '기록 모드', f: p => p.status === 'record' },
+  { k: 'excluded', label: '제외', f: p => p.status === 'excluded' || p.status === 'kicked' },
+];
+function actionMenu(p) {
+  return `<div class="menu" role="menu" aria-label="${esc(p.name)} 조치">
+    <button role="menuitem" class="critical" data-action="exclude" data-who="${esc(p.name)}">${ms('block')}순위 제외</button>
+    <button role="menuitem" class="critical" data-action="kick" data-who="${esc(p.name)}">${ms('person_off')}강퇴</button>
+    <button role="menuitem" class="critical" data-action="block" data-who="${esc(p.name)}">${ms('no_accounts')}재가입 차단</button>
+    <button role="menuitem" data-action="memo" data-who="${esc(p.name)}">${ms('sticky_note_2')}메모</button>
+  </div>`;
+}
+function op2Row(p) {
+  const st = statusCell(p);
+  const today = p.ledger[7];
+  return `<tr>
+    <td><button class="rowbtn" data-drawer="${esc(p.name)}" aria-label="${esc(p.name)} 상세 드로어 열기">${avatar(p.name)}${esc(p.name)}${p.badge === 'watch' ? ms('watch', 'xs') : ''}</button></td>
+    <td>${st.chip}</td>
+    <td>${st.sync}</td>
+    <td>${esc(p.source)}<span class="sub">${esc(p.device)} · ${esc(p.platform)}</span></td>
+    <td class="num" ${today.steps === 0 ? 'style="color:var(--warn)"' : ''}>${fmt.int(today.steps)}</td>
+    <td class="num">${p.mealsToday}/3 ${fill4(p.mealsToday + (today.steps > 0 ? 1 : 0))}</td>
+    <td class="num" ${p.warns >= 2 ? 'style="color:var(--warn)"' : ''}>${p.warns}/3</td>
+    <td><div class="menu-wrap"><button class="btn sm quiet" data-menu="${esc(p.name)}" aria-haspopup="menu" aria-expanded="${OP2.menu === p.name}" aria-label="${esc(p.name)} 조치 메뉴">조치 ${ms('expand_more')}</button>${OP2.menu === p.name ? actionMenu(p) : ''}</div></td>
+  </tr>`;
+}
+function miniLedger(p) {
+  return `<div class="table-wrap"><table class="table"><caption class="sr">${esc(p.name)} 일별 A/I/S 미니 장부</caption><thead><tr><th scope="col">날짜</th><th scope="col" class="num">걸음</th><th scope="col" class="num">A</th><th scope="col" class="num">I</th><th scope="col" class="num">S</th><th scope="col">상태</th></tr></thead><tbody>
+  ${p.ledger.map(r => `<tr class="${r.check ? 'dim' : ''}"><td>${r.date}</td><td class="num">${fmt.int(r.steps)}</td><td class="num">${fmt.int(r.A)}</td><td class="num">${fmt.int(r.I)}</td><td class="num">${fmt.k1(r.S)}${r.S_before != null ? `<span class="sub">← ${fmt.k1(r.S_before)}</span>` : ''}</td><td>${r.check ? chip('점검', 'neutral') : r.provisional ? chip('잠정', 'neutral', 'schedule') : r.revision ? chip('정정', 'warn', 'history') : r.floorApplied ? chip('하한 적용', 'warn') : chip('확정', 'good', 'check')}</td></tr>`).join('')}
+  </tbody></table></div><p class="cap">A 활동 · I 섭취 · S 점수(모두 추정) · 점검 기간은 누적 미반영 · 하한 적용은 건강 안내와 분리</p>`;
+}
+function drawer(p) {
+  const st = statusCell(p);
+  const alerts = HEALTH_ALERTS.filter(a => a.who === p.name);
+  const q = QUEUE.find(x => x.who === p.name && !OP3.decided[x.id]);
+  const priv = p.recordReason ? `<div class="kv"><span class="k">기록 모드 사유</span><span class="v" style="text-align:right">${esc(p.recordReason)}</span></div>` : '';
+  const privAlerts = alerts.map(a => `<div class="kv"><span class="k">건강 알림</span><span class="v" style="text-align:right">${esc(a.text)}<span class="sub">${esc(a.nudge)}</span></span></div>`).join('');
+  return `<div class="scrim right" data-close="drawer"><aside class="drawer" role="dialog" aria-modal="true" aria-label="참가자 상세: ${esc(p.name)}" id="drawer">
+    <div class="dhead">${avatar(p.name)}<div class="who"><div class="nm">${esc(p.name)}${p.badge === 'watch' ? chip('워치', 'neutral', 'watch') : ''}${st.chip}</div><p class="cap">${p.sex === 'M' ? '남' : '여'} · ${p.birthYear}년 · ${p.heightCm} cm · ${p.weightKg} kg · BMR 약 ${fmt.int(p.bmr)} · 경고 ${p.warns}/3</p></div><button class="iconbtn" data-close="drawer" aria-label="드로어 닫기">${ms('close')}</button></div>
+    <div class="dbody">
+      ${p.status === 'unsynced' ? `<div class="banner warn">${ms('sync_problem')}<div class="grow"><b>오늘 동기화 없음</b> · 마지막 ${p.lastSync}<br><span class="cap">Galaxy는 삼성헬스 → Health Connect 동기화 OFF가 흔한 원인이에요</span></div><button class="btn sm secondary" data-act="send-diag">P4 진단 안내</button></div>` : ''}
+      <div class="card"><p class="title">연결 상태</p>
+        <div class="kv"><span class="k">기기</span><span class="v">${esc(p.device)}</span></div>
+        <div class="kv"><span class="k">출처 · 플랫폼</span><span class="v">${esc(p.source)} · ${esc(p.platform)}</span></div>
+        <div class="kv"><span class="k">마지막 동기화</span><span class="v">${p.status === 'unsynced' ? p.lastSync : `${mdDate(CHALLENGE.today)} ${p.syncAt}`}</span></div>
+        <div class="kv"><span class="k">권한</span><span class="v">${p.status === 'unsynced' ? chip('걸음 읽기 · 확인 필요', 'warn', 'warning') : chip('걸음 · 세션 · 층수 읽기', 'good', 'check')}</span></div>
+      </div>
+      <div class="card"><p class="title">출처 목록</p>
+        <div class="kv"><span class="k">걸음</span><span class="v">${esc(p.source)} (자동)</span></div>
+        <div class="kv"><span class="k">세션</span><span class="v">${p.ledger.some(r => r.sessions && r.sessions.length) ? 'Apple Watch 운동' : '없음'}</span></div>
+        <div class="kv"><span class="k">층수</span><span class="v">${p.badge === 'watch' ? '있음' : '없음(기기 미지원)'}</span></div>
+        <div class="kv"><span class="k">수동 입력</span><span class="v">없음 · 인정하지 않아요</span></div>
+      </div>
+      <div class="card"><div class="card-head"><p class="title">일별 A/I/S 미니 장부</p>${q ? `<button class="btn sm secondary" data-act="open-review" data-who="${esc(p.name)}">${ms('gavel')}검토 보기</button>` : ''}</div>${miniLedger(p)}</div>
+      <div class="card review-soft" aria-label="운영자 전용 비공개 섹션"><div class="card-head"><p class="title" style="color:var(--review)">${ms('visibility_off', 'sm')}운영자만 열람</p>${chip('CSV 미포함', 'review')}</div>${priv || privAlerts ? priv + privAlerts : '<p class="cap">비공개 항목 없음</p>'}<p class="cap">당사자·다른 참가자에게 보이지 않아요. 기록 모드 사유와 건강 신호는 판정과 섞지 않아요(O-06).</p></div>
+      <div class="card"><p class="title">메모</p><textarea class="ta" id="memoInput" aria-label="운영자 메모" rows="3" placeholder="운영자만 보는 메모 · 감사 로그에 남아요">${esc(OP2.memo[p.name] || '')}</textarea><div class="btn-row" style="justify-content:flex-end"><button class="btn sm secondary" data-act="save-memo" data-who="${esc(p.name)}">${ms('save')}메모 저장</button></div></div>
+      <div class="btn-row"><button class="btn sm critical ghost" data-action="exclude" data-who="${esc(p.name)}">${ms('block')}순위 제외</button><button class="btn sm critical ghost" data-action="kick" data-who="${esc(p.name)}">${ms('person_off')}강퇴</button><button class="btn sm critical ghost" data-action="block" data-who="${esc(p.name)}">${ms('no_accounts')}재가입 차단</button></div>
+    </div></aside></div>`;
+}
+const ACTION_TEXT = {
+  exclude: { title: '순위에서 제외할까요?', body: '순위에서 제외하면 이 참가자는 리더보드 명단에서 빠지고, 점수와 기록은 계속 볼 수 있어요. 당사자에게 사유는 보이지 않아요.', btn: '순위 제외', toast: '순위에서 제외했어요 · 감사 로그 기록', icon: 'block' },
+  kick: { title: '강퇴할까요?', body: '강퇴하면 이 참가자는 순위에서 빠지고 재가입이 차단돼요. 당사자에게 사유는 보이지 않아요.', btn: '강퇴', toast: '강퇴했어요 · 재가입 차단 · 감사 로그 기록', icon: 'person_off' },
+  block: { title: '재가입을 차단할까요?', body: '재가입을 차단하면 같은 계정으로 이 챌린지 초대코드를 다시 쓸 수 없어요. 당사자에게는 "참가할 수 없는 코드예요"로만 보여요.', btn: '재가입 차단', toast: '재가입을 차단했어요 · 감사 로그 기록', icon: 'no_accounts' },
+};
+function renderOP2(v) {
+  const empty = v === 'empty';
+  const pend = pendingCount();
+  const unsyncedN = PEOPLE.filter(p => p.status === 'unsynced').length;
+  const total = empty ? 0 : CHALLENGE.joined;
+  const syncRate = empty ? 0 : Math.round((total - unsyncedN) / total * 100);
+  const kpis = `<div class="grid kpi">
+    <div class="card"><span class="k">${ms('group', 'xs')}참가자</span><span class="v">${total}<small>/ ${CHALLENGE.capacity}</small></span><span class="s">${empty ? '모집 중 · 초대코드 K7Q2MD' : `${chip('워치 3', 'neutral', 'watch')} ${chip('기록 모드 1', 'neutral')}`}</span></div>
+    <div class="card"><span class="k">${ms('sync', 'xs')}오늘 동기화율</span><span class="v">${syncRate}<small>%</small></span><span class="s">${empty ? '—' : `${total - unsyncedN}/${total} · 미동기화 ${unsyncedN}명 · ${CHALLENGE.syncTime} 기준`}</span></div>
+    <div class="card"><span class="k">${ms('restaurant', 'xs')}미확정 끼니</span><span class="v">${empty ? 0 : 17}</span><span class="s">${empty ? '—' : `오늘 ${total * 3}끼 중 · 내일 ${CONST.FINALIZE_HOUR} 자동 확정`}</span></div>
+    <button class="card" style="text-align:left;cursor:pointer" data-nav="op3" aria-label="미결 검토 ${pend}건 · 검토 큐 열기"><span class="k">${ms('gavel', 'xs')}미결 검토</span><span class="v" style="color:${pend ? 'var(--critical)' : 'var(--good)'}">${pend}<small>건</small></span><span class="s">${pend ? '24h 이내 0 · 초과 0 · 검토 큐 열기' : '최종 확정 가능'} ${ms('chevron_right', 'xs')}</span></button>
+  </div>`;
+  if (empty) {
+    return `${pageHead2()}${kpis}<div class="card"><div class="empty">${ms('group_add')}<p class="title">아직 참가자가 없어요</p><p class="body">초대코드를 공유해 주세요 · 모집 중(Recruiting) · 시작 ${mdDate(CHALLENGE.start)}</p><div class="btn-row"><button class="btn" data-nav="op1">${ms('key')}초대코드 보기</button><button class="btn quiet" data-act="copy-link">${ms('link')}초대 링크 복사</button></div></div></div>`;
+  }
+  const flt = FILTERS.find(f => f.k === OP2.filter) || FILTERS[0];
+  const rows = PEOPLE.filter(flt.f);
+  const filterBar = `<div class="filter" role="group" aria-label="참가자 필터">${FILTERS.map(f => `<button data-filter="${f.k}" aria-pressed="${OP2.filter === f.k}">${f.label}<span class="n">${f.k === 'all' ? CHALLENGE.joined : PEOPLE.filter(f.f).length}</span></button>`).join('')}</div>`;
+  const table = `<div class="card" style="padding:0;overflow:hidden">
+    <div class="card-head" style="padding:14px 18px 0">${filterBar}<span class="cap">${OP2.filter === 'all' ? `${rows.length}/${CHALLENGE.joined}명 표시 · 더 보기는 스크롤` : `${rows.length}명`} · 내보내기는 OP4에서만</span></div>
+    ${OP2.filter === 'unsynced' ? `<div style="padding:10px 18px 0"><div class="banner warn">${ms('sync_problem')}<div class="grow"><b>미동기화 ${rows.length}명</b> · 모두 Galaxy · 삼성헬스 — Health Connect 동기화 OFF가 흔한 원인이에요. 드로어에서 P4 진단 안내를 보낼 수 있어요.</div></div></div>` : ''}
+    <div class="table-wrap" style="padding:6px 18px 10px"><table class="table" id="peopleTable"><caption class="sr">참가자 표</caption><thead><tr>
+      <th scope="col"><button class="sortable" data-act="sort">닉네임 ${ms('swap_vert')}</button></th><th scope="col">상태</th><th scope="col"><button class="sortable" data-act="sort">마지막 동기화 ${ms('swap_vert')}</button></th><th scope="col">출처</th><th scope="col" class="num"><button class="sortable" data-act="sort">오늘 걸음 ${ms('swap_vert')}</button></th><th scope="col" class="num">끼니 확정</th><th scope="col" class="num">경고</th><th scope="col">조치</th></tr></thead>
+      <tbody>${rows.length ? rows.map(op2Row).join('') : `<tr><td colspan="8"><div class="empty" style="padding:24px">${ms('filter_alt_off')}<p class="body">해당하는 참가자가 없어요</p></div></td></tr>`}</tbody></table></div>
+  </div>`;
+  const health = `<details class="priv" ${OP2.healthOpen ? 'open' : ''} id="healthSec" aria-label="운영자 전용 비공개 섹션">
+    <summary>${ms('health_and_safety')}건강 알림 ${chip('운영자만 열람 · CSV 미포함', 'review', 'visibility_off')}<span class="num" style="font-weight:700">${HEALTH_ALERTS.length}건</span><span style="flex:1"></span>${ms('expand_more', 'chev')}</summary>
+    <div class="inner"><p class="cap" style="color:var(--review)">검토 큐가 아니에요 — 판정과 건강 배려를 섞지 않아요(O-06). 당사자에게는 점수와 무관한 중립 카드(N-07)로만 보여요. 하한 미달 3일(low_intake_3d)·과도 활동 3일(high_activity_3d)·체중 급감(weight_drop).</p>
+    <div class="table-wrap"><table class="table"><caption class="sr">건강 알림 목록</caption><thead><tr><th scope="col">참가자</th><th scope="col">유형</th><th scope="col">내용</th><th scope="col">처리</th></tr></thead><tbody>
+    ${HEALTH_ALERTS.map(a => `<tr><td><button class="rowbtn" data-drawer="${esc(a.who)}">${avatar(a.who)}${esc(a.who)}</button></td><td><code style="font-size:12px">${a.type}</code></td><td style="white-space:normal">${esc(a.text)}</td><td>${chip(a.nudge, 'review', 'notifications')}</td></tr>`).join('')}
+    </tbody></table></div></div></details>`;
+  if (v === 'drawer' && OP2.drawerWho) OVERLAY = drawer(person(OP2.drawerWho));
+  if (v === 'action' && OP2.action) {
+    const a = ACTION_TEXT[OP2.action.type]; const who = OP2.action.who;
+    OVERLAY = modal({ id: 'mAction', title: `${ms(a.icon)}${esc(who)} 님을 ${a.title}`, body: `<p class="body">${a.body}</p><div class="field"><label for="actMemo">사유 메모 (운영자만 · 감사 로그)</label><textarea class="ta" id="actMemo" rows="2" placeholder="예: 10.12 걸음 급증 소명 없이 반복"></textarea></div>`, acts: `<button class="btn quiet" data-nav="op2">돌아가기</button><button class="btn critical" data-act="confirm-action">${ms(a.icon)}${a.btn}</button>` });
+  }
+  return `${pageHead2()}${kpis}${table}${health}`;
+}
+function pageHead2() { return `<div class="pagehead"><div><h1><span class="id">OP2</span>참가자 · 동기화 현황</h1><p class="lead">"걸음 0" 문의 즉답 · 조치(제외·강퇴·재가입 차단·메모) · 건강 신호 비공개 열람</p></div><div class="acts"><span class="cap">${ms('schedule', 'xs')} ${mdDate(CHALLENGE.today)} ${CHALLENGE.syncTime} 기준 · 매시 정각 재계산</span></div></div>`; }
+
+/* ======================= OP3 검토 큐·판정 ======================= */
+function slaChip(q) {
+  if (OP3.decided[q.id]) return chip('판정 확정', 'good', 'check_circle');
+  if (q.slaH < 0) return chip(`+${Math.abs(q.slaH)}h 초과`, 'critical', 'alarm');
+  if (q.slaH < 24) return chip(`남은 ${q.slaH}h · 임박`, 'warn', 'timer');
+  return chip(`남은 ${q.slaH}h`, 'neutral', 'timer');
+}
+function stateChip(q) {
+  if (OP3.decided[q.id]) return chip(`확정 · ${VERDICT[OP3.decided[q.id].verdict].label}`, 'good', 'gavel');
+  if (q.state === 'appealed') return chip('소명 도착', 'review', 'mark_chat_read');
+  return chip('검토 중 · 소명 대기', 'neutral', 'hourglass_top');
+}
+function voidCalc(item) {
+  const p = person(item.who);
+  if (item.type === 'dup_photo' && item.who === ME.nickname) {
+    const r = LEDGER[item.dayIdx]; // 10.12 — data.js 정정 예시와 동일 수치
+    return { date: r.date, before: r.revision.before, after: r.revision.after, subst: `대체값 ${M_ME}`, detail: `저녁 → 대체값 ${M_ME} · I ${fmt.int(r.I)} · D ${fmt.int(r.D)}`, cumBefore: CUMULATIVE + (r.revision.before - r.revision.after), cumAfter: CUMULATIVE, final: true };
+  }
+  const row = p.ledger[item.dayIdx];
+  if (item.type === 'steps_spike') {
+    const baseline = median(p.ledger.slice(0, CONST.CHECK_DAYS).map(r => r.steps));
+    const before = ENGINE.simulate({ profile: p, stepsTotal: row.steps, sessions: row.sessions, meals: row.meals });
+    const after = ENGINE.simulate({ profile: p, stepsTotal: baseline, sessions: row.sessions, meals: row.meals });
+    return { date: row.date, before: before.sc.S, after: after.sc.S, subst: '평소 걸음 기준', detail: `걸음 ${fmt.int(row.steps)} → 기준선 중앙값 ${fmt.int(baseline)} · A ${fmt.int(before.act.A)} → ${fmt.int(after.act.A)}`, cumBefore: p.cum, cumAfter: round1(p.cum - (before.sc.S - after.sc.S)), final: !row.provisional };
+  }
+  const Mp = fmt.int(Math.ceil(ENGINE.M(row.bmr)));
+  const before = ENGINE.simulate({ profile: p, stepsTotal: row.steps, sessions: row.sessions, meals: row.meals });
+  const after = ENGINE.simulate({ profile: p, stepsTotal: row.steps, sessions: row.sessions, meals: row.meals.map(m => m.slot === item.slot ? { slot: m.slot, status: 'void' } : m) });
+  return { date: row.date, before: before.sc.S, after: after.sc.S, subst: `대체값 ${Mp}`, detail: `${SLOT_LABEL[item.slot]} → 대체값 ${Mp} · I ${fmt.int(before.inn.I)} → ${fmt.int(after.inn.I)}`, cumBefore: p.cum, cumAfter: p.cum, provisional: row.provisional, final: !row.provisional };
+}
+function rankOf(name, score) { const others = LEADERBOARD.cumulative.filter(x => !x.aggregating && x.name !== name); return 1 + others.filter(x => x.score > score).length; }
+function dryRun(item, verdict) {
+  if (!verdict) return null;
+  const p = person(item.who);
+  if (verdict === 'approve') return { kind: 'approve', headline: VERDICT.approve.effect, rows: [`경고 ${p.warns}/3 유지`, item.state === 'appealed' ? '소명 확인 완료' : '기록으로 확인'], sentence: VERDICT.approve.text, effect: VERDICT.approve.effect };
+  if (verdict === 'warn') { const n = p.warns + 1; return { kind: 'warn', n, headline: VERDICT.warn.effect, rows: [`경고 ${p.warns}/3 → ${n}/3`], sentence: VERDICT.warn.text.replace('{n}', n), effect: VERDICT.warn.effect, excludeToo: n >= 3 }; }
+  if (verdict === 'exclude') return { kind: 'exclude', headline: '순위 제외 · 점수 변동 없음', rows: [`경고 ${p.warns}/3 → 3/3`, '리더보드 명단에서 빠져요 · 본인 점수·기록은 유지'], sentence: VERDICT.exclude.text, effect: VERDICT.exclude.effect, excludeToo: true };
+  const v = voidCalc(item); const delta = round1(v.after - v.before);
+  const rows = [];
+  if (v.provisional) rows.push(`${v.date}은 잠정(오늘) · 내일 ${CONST.FINALIZE_HOUR} 확정 시 누적 반영`);
+  else rows.push(`누적 ${fmt.k1(v.cumBefore)} → ${fmt.k1(v.cumAfter)} (${signed1(delta)})`, `순위 ${rankOf(item.who, v.cumBefore)} → ${rankOf(item.who, v.cumAfter)}`);
+  rows.push(v.detail);
+  return { kind: 'void', v, delta, headline: `S ${fmt.k1(v.before)} → ${fmt.k1(v.after)}`, rows, sentence: VERDICT.void.text.replace('{대체 처리}로', v.subst + ro(v.subst)), effect: VERDICT.void.effect.replace('{날짜}', v.date).replace('{전}', fmt.k1(v.before)).replace('{후}', fmt.k1(v.after)).replace('{차액}', signed1(delta)) };
+}
+function pushText(item, dr, tpl) { return tpl && dr ? `${REASON[tpl]}. ${dr.sentence}. ${dr.effect}` : ''; }
+function evidence(item) {
+  const p = person(item.who);
+  if (item.type === 'steps_spike') {
+    const days = p.ledger.slice(0, 7); const max = Math.max(...days.map(r => r.steps));
+    const baseline = median(p.ledger.slice(0, CONST.CHECK_DAYS).map(r => r.steps));
+    const H = 84; // 막대 최대 높이(컨테이너 132 − 상단 라벨 22 − 날짜 라벨 26)
+    return `<div class="card"><div class="card-head"><p class="title">걸음 7일 추이</p>${chip(`${esc(p.source)} · ${esc(p.device)}`, 'neutral', 'watch')}</div>
+      <div class="bars baseline" role="img" aria-label="걸음 7일: ${days.map(r => `${r.date} ${fmt.int(r.steps)}`).join(', ')} · 기준선 중앙값 ${fmt.int(baseline)}">
+        <div class="line" style="bottom:${(baseline / max * H + 22).toFixed(0)}px" aria-hidden="true"><span>기준선 ${fmt.int(baseline)}</span></div>
+        ${days.map((r, i) => `<div class="bar ${r.steps === max ? 'hi' : i < 3 ? 'base' : ''}"><span class="v">${fmt.int(r.steps)}</span><i style="height:${(r.steps / max * H).toFixed(0)}px"></i><span class="d">${r.date}</span></div>`).join('')}
+      </div>
+      <p class="cap">${item.date} ${fmt.int(days[6].steps)}보 = 기준선 ×${(days[6].steps / baseline).toFixed(1)} → 플래그 조건(25,000 초과 또는 중앙값 ×2.5) · 첫 3일이 기준선</p>
+      <div class="kv"><span class="k">세션 기록</span><span class="v">없음 · 걸음만 동기화</span></div>
+      <div class="kv"><span class="k">출처</span><span class="v">Apple Watch(자동) · 수동 입력 없음</span></div>
+    </div>
+    <div class="card"><div class="card-head"><p class="title">소명</p>${chip(`도착 ${item.appealAt}`, 'review', 'mark_chat_read')}</div><div class="quote">${esc(item.appeal)}<p class="cap">소명 1회 · 72h · 첨부 1장(워치 운동 화면)</p></div></div>`;
+  }
+  if (item.type === 'dup_photo') {
+    const dinner = TODAY_MEALS.find(m => m.slot === 'dinner');
+    return `<div class="card"><div class="card-head"><p class="title">사진 중복 쌍</p>${chip('SHA-256 일치', 'critical', 'fingerprint')}</div>
+      <div class="photos"><figure class="photo" style="margin:0" role="img" aria-label="식사 사진 10.11 저녁 (원본)"><span class="hash">a3f9 2c17 … c21e</span><span class="tag">10.11 저녁 · 원본</span></figure><figure class="photo" style="margin:0" role="img" aria-label="식사 사진 10.12 저녁 (중복)"><span class="hash">a3f9 2c17 … c21e</span><span class="tag">10.12 저녁 · 같은 사진</span></figure></div>
+      <p class="cap">서명 URL 10분 · 열람은 감사 로그에 남아요 · 사진은 본인·운영자만 볼 수 있어요</p></div>
+    <div class="card"><p class="title">AI 초안 vs 확정 · 10.12 저녁</p><div class="ai-vs"><div class="box"><span class="k">AI 초안</span><span class="v">약 ${fmt.int(dinner.aiKcal)} <small>kcal</small></span></div>${ms('arrow_forward')}<div class="box"><span class="k">본인 확정 19:05</span><span class="v">약 ${fmt.int(dinner.kcal)} <small>kcal</small></span></div></div><p class="cap">${esc(dinner.title)} · 하향 폭 ${Math.round((1 - dinner.kcal / dinner.aiKcal) * 100)}% (downward_edit 기준 50% 미만)</p></div>
+    <div class="card"><div class="card-head"><p class="title">소명</p>${chip(`소명 대기 · 남은 ${item.slaH}h`, 'neutral', 'hourglass_top')}</div><div class="quote muted">아직 소명이 없어요. 기간이 지나면 기록으로만 확인해요.</div></div>`;
+  }
+  const row = p.ledger[item.dayIdx]; const lunch = row.meals.find(m => m.slot === item.slot);
+  return `<div class="card"><div class="card-head"><p class="title">신고 내용</p>${chip('신고자는 표시되지 않아요', 'neutral', 'visibility_off')}</div><div class="quote">${esc(item.report)}<p class="cap">접수 ${item.reportAt} · 유형 기타 · 신고 1건</p></div></div>
+    <div class="card"><p class="title">${item.date} ${SLOT_LABEL[item.slot]} 사진</p><div class="photos"><figure class="photo" style="margin:0;background:linear-gradient(135deg,#c96f3a,#8a3f1e)" role="img" aria-label="식사 사진 ${item.date} ${SLOT_LABEL[item.slot]}"><span class="hash">7be0 91aa … 04d3</span><span class="tag">${item.date} ${SLOT_LABEL[item.slot]} · 12:41</span></figure><div class="box" style="display:flex;flex-direction:column;justify-content:center;gap:4px"><span class="cap">AI 초안</span><span class="num" style="font-size:18px;font-weight:700">없음</span><span class="cap">engine=none · 국외 AI 미동의 → 검색으로 확정</span></div></div></div>
+    <div class="card"><p class="title">확정값</p><div class="ai-vs"><div class="box"><span class="k">본인 확정(검색)</span><span class="v">약 ${fmt.int(lunch.kcal)} <small>kcal</small></span></div>${ms('arrow_forward')}<div class="box"><span class="k">무효 시 대체값</span><span class="v">약 ${fmt.int(Math.ceil(ENGINE.M(row.bmr)))} <small>kcal</small></span></div></div></div>`;
+}
+function verdictForm(item) {
+  const decided = OP3.decided[item.id];
+  const dr = dryRun(item, OP3.verdict);
+  const canConfirm = !decided && dr && OP3.tpl && OP3.previewed;
+  const desc = { approve: '점수 변동 없음', warn: `경고 ${person(item.who).warns}/3 → ${person(item.who).warns + 1}/3`, void: '대체 처리로 재계산', exclude: '경고 3회 → 순위 제외' };
+  const icons = { approve: 'check_circle', warn: 'warning', void: 'history', exclude: 'visibility_off' };
+  let dryHtml;
+  if (!dr) dryHtml = `<div class="dry" id="dryRun" aria-live="polite" aria-atomic="true"><div class="row">${ms('preview')} 판정을 선택하면 점수 영향을 바로 미리 볼 수 있어요 (dry_run · 05 API #28)</div></div>`;
+  else {
+    const excl = dr.excludeToo ? `<div class="banner review" style="padding:8px 12px">${ms('policy')}<div class="grow">이 판정으로 경고 3회 → 순위 제외가 함께 적용돼요</div></div>` : '';
+    const finalTag = dr.kind === 'void' && dr.v.final ? chip('정정으로 기록돼요 · is_final 이후', 'warn', 'history') : '';
+    dryHtml = `<div class="dry live" id="dryRun" aria-live="polite" aria-atomic="true"><div class="kv"><span class="cap">점수 영향 미리보기 · dry_run</span>${finalTag}</div>
+      <div class="big">${ms(icons[dr.kind])}${dr.headline}${dr.kind === 'void' ? `<small>${item.date} · ${signed1(dr.delta)}점</small>` : ''}</div>
+      <div class="row">${dr.rows.map(r => `<span>${r}</span>`).join('')}</div>${excl}</div>`;
+  }
+  const txt = pushText(item, dr, OP3.tpl);
+  const push = `<div class="push" id="pushPreview" aria-live="polite"><div class="app">C</div><div style="flex:1;min-width:0"><div class="t"><span>당사자에게만 보내요 · N-06</span><small>${esc(item.who)}</small></div><div class="b">${txt ? `“${esc(txt)}”` : '<span class="muted">판정과 사유 템플릿을 선택하면 알림 문구가 완성돼요 · 사유 문장 + 판정 문장 + 점수 영향 문장(§6)</span>'}</div></div></div>`;
+  const decidedBox = decided ? `<div class="banner good">${ms('check_circle', 'fill')}<div class="grow"><b>판정을 저장했어요</b> · N-06 발송 · 감사 로그 기록<br><span class="cap">${VERDICT[decided.verdict].label} · ${decided.tpl} · ${decided.at} · ${decided.by}</span></div></div>` : '';
+  return `<div class="card" id="verdictForm">
+    ${decidedBox}
+    <p class="title">판정</p>
+    <fieldset class="radios" style="border:0;padding:0;margin:0;min-width:0"><legend class="sr">판정</legend>
+      ${['approve', 'warn', 'void', 'exclude'].map(k => `<label class="radio"><input type="radio" name="verdict" value="${k}" ${OP3.verdict === k ? 'checked' : ''} ${decided ? 'disabled' : ''}><span><span class="t">${ms(icons[k], 'sm')}${VERDICT[k].label}</span><span class="d">${desc[k]}</span></span></label>`).join('')}
+    </fieldset>
+    <div class="field"><label for="tplSel">사유 템플릿 (§6 · reason_template)</label><div class="input"><select id="tplSel" ${decided ? 'disabled' : ''}><option value="" ${OP3.tpl ? '' : 'selected'}>선택해 주세요</option>${Object.entries(REASON).map(([k, t]) => `<option value="${k}" ${OP3.tpl === k ? 'selected' : ''}>${esc(t)} (${k})</option>`).join('')}</select></div></div>
+    ${dryHtml}
+    ${push}
+    <div class="btn-row"><button class="btn lg" id="confirmBtn" data-act="confirm-verdict" ${canConfirm ? '' : 'disabled'}>${ms('gavel')}판정 확정</button><span class="cap">${decided ? '확정된 판정은 정정으로만 바꿀 수 있어요' : '미리보기 확인 후 활성 · 당사자에게만 N-06 · 감사 로그'}</span></div>
+  </div>`;
+}
+function renderOP3(v) {
+  const empty = OP3.empty;
+  const open = QUEUE.filter(q => !OP3.decided[q.id]);
+  const soon = open.filter(q => q.slaH >= 0 && q.slaH < 24).length, over = open.filter(q => q.slaH < 0).length;
+  const pend = empty ? 0 : open.length;
+  const kpis = `<div class="grid kpi">
+    <div class="card"><span class="k">${ms('gavel', 'xs')}미결</span><span class="v" style="color:${pend ? 'var(--fg)' : 'var(--good)'}">${pend}<small>건</small></span><span class="s">플래그 ${empty ? 0 : open.filter(q => q.type !== 'report').length} · 신고 ${empty ? 0 : open.filter(q => q.type === 'report').length} · 소명 도착 ${empty ? 0 : open.filter(q => q.state === 'appealed').length}</span></div>
+    <div class="card"><span class="k">${ms('timer', 'xs')}24h 이내</span><span class="v" style="color:${soon && !empty ? 'var(--warn)' : 'var(--fg)'}">${empty ? 0 : soon}<small>건</small></span><span class="s">SLA 72h · 임박은 텍스트로도 표시</span></div>
+    <div class="card"><span class="k">${ms('alarm', 'xs')}초과</span><span class="v" style="color:${over && !empty ? 'var(--critical)' : 'var(--fg)'}">${empty ? 0 : over}<small>건</small></span><span class="s">초과 시 "설명 기간이 지나 기록으로만 확인했어요"</span></div>
+    <div class="card"><span class="k">${ms('task_alt', 'xs')}완료</span><span class="v">${12 + Object.keys(OP3.decided).length}<small>건</small></span><span class="s">점검 기간 이후 누적 · 정정 ${1 + Object.values(OP3.decided).filter(d => d.verdict === 'void').length}</span></div>
+  </div>`;
+  if (empty) {
+    return `${pageHead3()}${kpis}<div class="card"><div class="empty">${ms('task_alt')}<p class="title">미결 0건 · 최종 확정이 가능해요</p><p class="body">집계 마감(Closing) · 모든 플래그·신고·소명을 처리했어요. OP4에서 최종 순위를 확정하면 결과가 발표되고 7일 이의 기간이 시작돼요.</p><div class="btn-row"><button class="btn" data-nav="op4">${ms('emoji_events')}결과 확정으로 이동</button><button class="btn quiet" data-act="show-done">완료 12건 보기</button></div></div></div>`;
+  }
+  const sorted = [...QUEUE].sort((a, b) => (OP3.decided[a.id] ? 1 : 0) - (OP3.decided[b.id] ? 1 : 0) || a.slaH - b.slaH);
+  const table = `<div class="card" style="padding:0;overflow:hidden"><div class="table-wrap" style="padding:4px 18px 8px"><table class="table" id="queueTable"><caption class="sr">검토 큐 — SLA 잔여 오름차순</caption><thead><tr><th scope="col">유형</th><th scope="col">대상</th><th scope="col">날짜</th><th scope="col">SLA 잔여</th><th scope="col">상태</th><th scope="col">ID</th><th scope="col"><span class="sr">열기</span></th></tr></thead><tbody>
+    ${sorted.map(q => `<tr aria-selected="${q.id === OP3.sel}"><td><b>${q.label}</b></td><td><button class="rowbtn" data-act="sel-queue" data-id="${q.id}">${avatar(q.who)}${esc(q.who)}</button></td><td>${q.date}${q.slot ? ` ${SLOT_LABEL[q.slot]}` : ''}</td><td>${slaChip(q)}</td><td>${stateChip(q)}</td><td class="num" style="font-weight:500;color:var(--fg-2)">${q.id}</td><td><button class="btn sm ${q.id === OP3.sel ? 'secondary' : 'quiet'}" data-act="sel-queue" data-id="${q.id}" aria-label="${q.id} 상세 보기">${q.id === OP3.sel ? '보고 있어요' : '열기'}</button></td></tr>`).join('')}
+  </tbody></table></div></div>`;
+  const item = QUEUE.find(q => q.id === OP3.sel) || QUEUE[0];
+  const slaBanner = item.slaH < 0 && !OP3.decided[item.id] ? `<div class="banner critical" role="alert">${ms('alarm')}<div class="grow"><b>SLA +${Math.abs(item.slaH)}h 초과</b> · 소명 기간이 지났어요. 판정 문구에 "설명 기간이 지나 기록으로만 확인했어요"가 덧붙여져요.</div></div>`
+    : item.slaH < 24 && !OP3.decided[item.id] ? `<div class="banner warn" role="status">${ms('timer')}<div class="grow"><b>SLA 임박 · 남은 ${item.slaH}h</b> · 72시간 안에 판정해 주세요. 소명이 도착했어요.</div></div>` : '';
+  const detail = `<div class="card-head" style="margin-top:4px"><h2 class="h2">${ms('rule')}${item.id} · ${item.label} · ${esc(item.who)} · ${item.date}${item.slot ? ` ${SLOT_LABEL[item.slot]}` : ''}</h2><div class="chips">${slaChip(item)}${stateChip(item)}${chip(`경고 ${person(item.who).warns}/3`, person(item.who).warns >= 2 ? 'warn' : 'neutral')}</div></div>
+  ${slaBanner}
+  <div class="grid two"><div class="stack" id="evidence">${evidence(item)}</div>${verdictForm(item)}</div>`;
+  const audit = `<div class="card"><div class="card-head"><p class="title">${ms('history', 'sm')}감사 로그</p>${chip('append-only · 종료+90일 보존', 'neutral')}</div><div class="log">${[...Object.entries(OP3.decided).map(([id, d]) => [d.at, d.by, `검토 ${id} 판정 확정: ${VERDICT[d.verdict].label} · ${d.tpl} · N-06 발송${d.verdict === 'void' ? ' · score_revisions(reason=verdict)' : ''}`]), ...AUDIT_BASE].map(([t, w, a]) => `<span class="num">${t}</span><b>${w}</b><span>${a}</span>`).join('')}</div></div>`;
+  return `${pageHead3()}${kpis}${table}${detail}${audit}`;
+}
+function pageHead3() { return `<div class="pagehead"><div><h1><span class="id">OP3</span>검토 큐 · 판정</h1><p class="lead">플래그·신고·소명을 한 큐에서 증거와 함께 72h 안에 판정 · 문구는 §6 템플릿만</p></div></div>`; }
+
+/* ======================= OP4 결과·공지·CSV·파기 ======================= */
+const CSVS = {
+  ranking: { label: '최종 순위', icon: 'leaderboard', file: 'final_ranking', rows: () => [['rank', 'nickname', 'score_total', 'confirmed_meals'], ...FINAL.list.map((r, i) => [r.rank, r.name, r.score, [84, 82, 84, 83, 79][i]])] },
+  ledger: { label: '일별 장부', icon: 'table_chart', file: 'daily_scores', rows: () => [['nickname', 'local_date', 'steps', 'a_d', 'i_d', 'd_d', 's_d', 'is_counted'], ...PEOPLE.flatMap(p => p.ledger.map(r => [p.name, r.date, r.steps, r.A, r.I, r.D, r.S, !r.check && !r.provisional]))] },
+  meals: { label: '끼니 확정값', icon: 'restaurant', file: 'meals_confirmed', rows: () => [['nickname', 'local_date', 'slot', 'status', 'confirmed_kcal'], ...PEOPLE.flatMap(p => p.ledger.filter(r => r.meals).flatMap(r => r.meals.map(m => [p.name, r.date, m.slot, m.status, m.kcal ?? ''])))] },
+  activity: { label: '활동 분해', icon: 'directions_walk', file: 'activity_breakdown', rows: () => [['nickname', 'local_date', 'steps_total', 'steps_net', 'sessions_net', 'floors_bonus', 'a_capped'], ...PEOPLE.flatMap(p => p.ledger.map(r => { const a = ENGINE.activity({ weightKg: p.weightKg, stepsTotal: r.steps, sessions: r.sessions || [] }); return [p.name, r.date, r.steps, a.stepsNet, a.sessionNet, a.floorsBonus, a.A]; }))] },
+};
+function makeCsv(key) {
+  const rows = CSVS[key].rows();
+  const text = '﻿' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  return { url, n: rows.length - 1, at: '09:36', file: `${CSVS[key].file}_${CHALLENGE.code}.csv` };
+}
+function renderOP4(v) {
+  const blocked = v === 'blocked'; const published = v === 'published'; const archived = v === 'archived';
+  const pend = blocked ? 3 : 0;
+  let banner;
+  if (blocked) banner = `<div class="banner critical lg" role="alert">${ms('error')}<div class="grow"><b>미결 ${pend}건이 있어 최종 확정을 할 수 없어요</b><br><span class="cap">걸음 급증 1 · 사진 중복 1 · 신고 1 — 모두 판정하면 확정 버튼이 열려요 (05 API #24 · 422 미결 N건)</span></div><div class="btn-row" style="flex:none"><button class="btn quiet" disabled aria-disabled="true" title="미결 ${pend}건 · 모두 판정하면 활성화돼요">${ms('verified')}최종 확정</button><button class="btn critical" data-nav="op3">${ms('gavel')}검토 큐 열기</button></div></div>`;
+  else if (published) banner = `<div class="banner brand lg" role="status">${ms('verified')}<div class="grow"><b>결과 확정 11.3 09:30</b> · 이의 기간 ~${CHALLENGE.objectionUntil} · 이의 0건<br><span class="cap">7일 중 3일 남음 · 이의가 접수되면 OP3 큐(type=objection)로 들어와요</span></div><div style="min-width:180px;display:flex;flex-direction:column;gap:4px"><span class="cap" style="color:inherit;text-align:right">이의 기간 4/7일 경과</span><div class="gauge" aria-label="이의 기간 7일 중 4일 경과, 3일 남음"><i style="width:${(4 / 7 * 100).toFixed(0)}%"></i></div></div></div>`;
+  else if (archived) banner = `<div class="banner neutral lg" role="status">${ms('inventory_2')}<div class="grow"><b>종료 · 1,247장 파기 완료 11.10 10:02</b> · 해시·확정값만 보존 · 열람 전용<br><span class="cap">일별 점수는 익명으로 보존 후 삭제 · 감사 로그 종료+90일</span></div></div>`;
+  else banner = `<div class="banner good lg" role="status">${ms('task_alt')}<div class="grow"><b>미결 0건</b> · 최종 확정하면 결과가 발표되고 7일 이의 기간이 시작돼요<br><span class="cap">마지막 날(11.2) 기록 확정 ${CHALLENGE.finalizeAt} 완료 · 정정 1건 반영</span></div><button class="btn lg" data-nav="op4-confirm">${ms('verified')}최종 확정</button></div>`;
+  const confirmedMeals = [84, 82, 84, 83, 79];
+  const table = `<div class="card"><div class="card-head"><p class="title">${ms('leaderboard', 'sm')}최종 순위</p><div class="chips">${published || archived ? chip('Published 스냅샷 11.3 09:30', 'good', 'verified') : chip('잠정 · 집계 마감 · 정정 반영 중', 'warn', 'lock_clock')}${chip(`${LEADERBOARD.total}명 · 순위 제외 2명은 명단 미표시`, 'neutral', 'visibility_off')}</div></div>
+    <div class="table-wrap"><table class="table"><caption class="sr">최종 순위 표</caption><thead><tr><th scope="col" class="num" style="text-align:left">순위</th><th scope="col">닉네임</th><th scope="col" class="num">누적 점수(추정)</th><th scope="col" class="num">확정 끼니</th><th scope="col">반영률</th></tr></thead><tbody>
+    ${FINAL.list.map((r, i) => `<tr><td class="num" style="text-align:left;font-size:16px">${r.rank}${r.rank <= 3 ? ms('workspace_premium', 'xs') : ''}</td><td>${avatar(r.name)} ${esc(r.name)}</td><td class="num" style="font-size:16px">약 ${fmt.k1(r.score)}</td><td class="num">${confirmedMeals[i]} / 84</td><td>${fill4(r.fill)} <span class="cap">${Math.round(confirmedMeals[i] / 84 * 100)}%</span></td></tr>`).join('')}
+    <tr class="dim"><td colspan="5"><span class="cap">… 6~40위 · ${LEADERBOARD.total}명 중 상위 5명 표시 · 전체는 CSV "최종 순위"</span></td></tr>
+    </tbody></table></div></div>`;
+  const ro = archived ? 'disabled' : '';
+  const sentChip = OP4.sent ? chip(`발송 완료 · ${CHALLENGE.joined}명 · 11.3 09:35`, 'good', 'check_circle') : chip(`발송 대상 전원 ${CHALLENGE.joined}명`, 'neutral', 'group');
+  const notice = `<div class="card" id="noticeCard"><div class="card-head"><p class="title">${ms('campaign', 'sm')}공지 작성</p>${sentChip}</div>
+    <div class="field"><label for="nTitle">제목 <span class="counter ${OP4.title.length > 40 ? 'over' : ''}" id="nTitleCount">${OP4.title.length} / 40</span></label><div class="input"><input id="nTitle" maxlength="40" value="${esc(OP4.title)}" ${ro}></div></div>
+    <div class="field"><label for="nBody">본문 <span class="counter ${OP4.body.length > 500 ? 'over' : ''}" id="nBodyCount">${OP4.body.length} / 500</span></label><textarea class="ta" id="nBody" maxlength="500" rows="4" ${ro}>${esc(OP4.body)}</textarea></div>
+    ${OP4.noticePreview ? `<div class="push" id="noticePreview" aria-live="polite"><div class="app">C</div><div style="flex:1;min-width:0"><div class="t"><span>${esc(OP4.title)}</span><small>N-03 · P5 배너 · P12 공지 목록 보관</small></div><div class="b">${esc(OP4.body)}</div></div></div>` : ''}
+    <div class="btn-row"><button class="btn secondary" data-act="notice-preview" ${ro}>${ms('preview')}미리보기</button><button class="btn" data-act="notice-send" ${OP4.noticePreview && !OP4.sent && !archived ? '' : 'disabled'}>${ms('send')}보내기</button><span class="cap">미리보기 필수 · 전원 ${CHALLENGE.joined}명 · 공지·판정 알림은 참가자가 끌 수 없어요</span></div>
+  </div>`;
+  const csv = `<div class="card"><div class="card-head"><p class="title">${ms('download', 'sm')}CSV 4종</p>${chip('건강 신호 미포함', 'review', 'visibility_off')}</div>
+    <div class="grid csv">${Object.entries(CSVS).map(([k, c]) => { const g = OP4.csv[k]; return `<div class="card outline" style="gap:8px"><div style="display:flex;align-items:center;gap:8px">${ms(c.icon)}<b>${c.label}</b></div>${g ? `<a class="link" href="${g.url}" download="${g.file}">${ms('download_done')}다운로드 · ${fmt.int(g.n)}행</a><span class="cap">${g.file} · 생성 ${g.at}</span>` : `<button class="btn sm quiet" data-act="csv" data-csv="${k}">${ms('build')}생성</button><span class="cap">${k === 'ranking' ? '순위·닉네임·누적·확정 끼니' : k === 'ledger' ? '참가자×일 · A/I/D/S · is_counted' : k === 'meals' ? '끼니별 status · confirmed_kcal' : 'steps_net · sessions_net · floors · a_capped'}</span>`}</div>`; }).join('')}</div>
+    <p class="cap">health_alerts · 기록 모드 사유 · 사진은 어떤 CSV에도 들어가지 않아요. 생성 후 다운로드 링크가 생겨요(파기 전까지 유효).</p></div>`;
+  const destroy = `<div class="card" id="destroyCard"><div class="card-head"><p class="title">${ms('delete_forever', 'sm')}사진 원본 파기</p>${archived ? chip('1,247장 파기 완료 11.10 10:02', 'good', 'check_circle') : chip(`이의 기간 종료 후 활성 · ~${CHALLENGE.objectionUntil}`, 'neutral', 'schedule')}</div>
+    <label class="checkrow"><input type="checkbox" id="destroyChk" ${archived ? 'checked disabled' : 'disabled'}><span>사진 원본 파기(해시·확정값만 보존)<span class="d">되돌릴 수 없어요 · 1,247장 · 비공개 버킷 · Cancelled는 즉시 파기</span></span></label>
+    <div class="btn-row"><button class="btn critical" id="destroyBtn" disabled>${ms('delete_forever')}파기 실행</button><span class="cap">${archived ? '파기 완료 · 열람 전용' : published ? `이의 기간이 끝나는 ${CHALLENGE.objectionUntil} 이후 체크할 수 있어요` : '결과 확정 → 7일 이의 기간 → 종료(Archived) 후 활성'}</span></div></div>`;
+  if (v === 'confirm') OVERLAY = modal({ id: 'mFinal', title: `${ms('verified')}최종 확정할까요?`, body: `<p class="body">미결 0건 · 최종 확정하면 결과가 발표되고 7일 이의 기간(~${CHALLENGE.objectionUntil})이 시작돼요.</p><div class="banner warn">${ms('lock')}<div class="grow"><b>최종 확정 후에는 정정만 가능해요</b> · 순위 스냅샷이 저장되고 전원에게 발표돼요</div></div><label class="checkrow"><input type="checkbox" id="finalChk" ${OP4.finalChk ? 'checked' : ''}><span>미결 0건과 순위 표를 확인했어요</span></label>`, acts: `<button class="btn quiet" data-nav="op4">돌아가기</button><button class="btn" id="finalGo" data-act="final-go" ${OP4.finalChk ? '' : 'disabled'}>${ms('verified')}최종 확정</button>` });
+  return `<div class="pagehead"><div><h1><span class="id">OP4</span>결과 · 공지 · CSV · 파기</h1><p class="lead">최종 순위 확정("미결 0건" 조건) → 공지 발송 → CSV 4종 → 이의 기간 · 사진 파기</p></div></div>${banner}${table}<div class="grid two">${notice}<div class="stack">${csv}${destroy}</div></div>`;
+}
+
+/* ======================= 모달 공용 ======================= */
+function modal({ id, title, body, acts }) {
+  return `<div class="scrim" data-close="modal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="${id}-t" id="${id}"><h2 id="${id}-t">${title}</h2>${body}<div class="acts">${acts}</div></div></div>`;
+}
+
+/* ======================= 라우터 ======================= */
+const SCREENS = {
+  op0: { name: '챌린지 목록', icon: 'dashboard', variants: { default: '목록' }, render: renderOP0 },
+  op1: { name: '챌린지 설정 · 규칙 · 초대코드', short: '설정 · 규칙 · 초대코드', icon: 'tune', variants: { default: 'Draft 편집', locked: '시작 후 잠금 🔒', transition: '전환 확인 모달' }, render: renderOP1 },
+  op2: { name: '참가자 · 동기화 현황', short: '참가자 · 동기화', icon: 'group', variants: { default: '정상', empty: '빈(0명)', unsynced: '미동기화 필터', health: '건강 섹션 펼침', drawer: '개인 드로어', action: '조치 확인 모달' }, render: renderOP2 },
+  op3: { name: '검토 큐 · 판정', icon: 'gavel', variants: { default: '정상(미결 3)', empty: '빈 큐', 'sla-warn': 'SLA 임박', 'sla-critical': 'SLA 초과', 'dry-run': 'dry_run 미리보기', decided: '판정 확정됨' }, render: renderOP3 },
+  op4: { name: '결과 · 공지 · CSV · 파기', icon: 'emoji_events', variants: { blocked: '미결 3건 차단', default: '확정 가능', confirm: '확정 모달', published: '확정됨 + 이의 타이머', archived: '파기 완료' }, render: renderOP4 },
+};
+const ORDER = ['op1', 'op2', 'op3', 'op4'];
+function parseHash() {
+  const h = (location.hash || '#op1').slice(1).toLowerCase();
+  const m = h.match(/^(op[0-4])(?:-(.+))?$/);
+  if (!m || !SCREENS[m[1]]) return { id: 'op1', variant: 'default' };
+  const variant = m[2] && SCREENS[m[1]].variants[m[2]] ? m[2] : 'default';
+  return { id: m[1], variant };
+}
+function navigate(target) {
+  const [id, ...rest] = target.split('-'); const variant = rest.join('-') || 'default';
+  const newHash = '#' + id + (variant !== 'default' ? '-' + variant : '');
+  if (location.hash === newHash) render(); else location.hash = newHash;
+}
+function pendingCount() {
+  if (CURRENT.id === 'op4') return CURRENT.variant === 'blocked' ? 3 : 0;
+  if (CURRENT.id === 'op3' && OP3.empty) return 0;
+  return QUEUE.filter(q => !OP3.decided[q.id]).length;
+}
+function topState() {
+  const { id, variant } = CURRENT;
+  if (id === 'op1') return variant === 'locked' ? 'Running' : (OP1.recruiting ? 'Recruiting' : 'Draft');
+  if (id === 'op2') return variant === 'empty' ? 'Recruiting' : 'Running';
+  if (id === 'op3') return variant === 'empty' ? 'Closing' : 'Running';
+  if (id === 'op4') return variant === 'published' ? 'Published' : variant === 'archived' ? 'Archived' : 'Closing';
+  return 'Running';
+}
+let LAST_KEY = null;
+function applyVariant({ id, variant }) {
+  OP2.menu = null; OP1.kakaoOpen = false;
+  if (id !== 'op3') { OP3.decided = {}; OP3.lastDecided = null; OP3.empty = false; QUEUE.forEach(q => { q.slaH = q.slaBase; }); }
+  if (id === 'op2') {
+    OP2.filter = variant === 'unsynced' ? 'unsynced' : 'all';
+    OP2.healthOpen = variant === 'health';
+    if (variant === 'drawer') { if (!OP2.drawerWho) OP2.drawerWho = ME.nickname; } else OP2.drawerWho = null;
+    if (variant === 'action') { if (!OP2.action) OP2.action = { type: 'kick', who: '마포구민' }; } else OP2.action = null;
+  }
+  if (id === 'op3') {
+    QUEUE.forEach(q => { q.slaH = q.slaBase; });
+    OP3.empty = variant === 'empty';
+    if (variant === 'decided') {
+      if (!Object.keys(OP3.decided).length) OP3.decided['R-0415'] = { verdict: 'void', tpl: 'dup_photo', at: '10.13 21:14', by: '민호' };
+      const did = OP3.lastDecided || 'R-0415'; OP3.sel = did; const d = OP3.decided[did]; OP3.verdict = d.verdict; OP3.tpl = d.tpl; OP3.previewed = true;
+    } else {
+      OP3.decided = {}; OP3.lastDecided = null;
+      if (variant === 'sla-warn' || variant === 'sla-critical') { QUEUE[0].slaH = variant === 'sla-warn' ? 18 : -6; selectQueue('R-0412'); }
+      else if (variant === 'dry-run') { selectQueue('R-0415'); OP3.verdict = 'void'; OP3.previewed = true; }
+      else if (!OP3.keepSel) selectQueue('R-0415');
+      OP3.keepSel = false;
+    }
+  }
+  if (id === 'op4') { OP4.noticePreview = false; OP4.sent = false; OP4.csv = {}; OP4.finalChk = false; }
+}
+function selectQueue(id) { const q = QUEUE.find(x => x.id === id); OP3.sel = id; OP3.verdict = null; OP3.tpl = q.tpl || ''; OP3.previewed = false; }
+function render() {
+  CURRENT = parseHash();
+  const key = CURRENT.id + '-' + CURRENT.variant;
+  if (key !== LAST_KEY) { applyVariant(CURRENT); LAST_KEY = key; }
+  draw();
+}
+function draw() {
+  OVERLAY = '';
+  const s = SCREENS[CURRENT.id];
+  const html = s.render(CURRENT.variant);
+  document.getElementById('view').innerHTML = html;
+  document.getElementById('overlay').innerHTML = OVERLAY;
+  drawChrome();
+  const dlg = document.querySelector('#overlay [role="dialog"]');
+  if (dlg) { const f = dlg.querySelector('input:not([disabled]), textarea, select, button:not([disabled])'); (f || dlg).focus({ preventScroll: true }); }
+  document.body.style.overflow = OVERLAY ? 'hidden' : '';
+  // 검토 상세 변형은 URL로 바로 열었을 때 상세(증거·판정 폼)가 보이도록 이동
+  if (CURRENT.id === 'op3' && ['dry-run', 'decided', 'sla-warn', 'sla-critical'].includes(CURRENT.variant) && !DRAWN_ONCE[CURRENT.id + CURRENT.variant]) {
+    DRAWN_ONCE[CURRENT.id + CURRENT.variant] = true; const h = document.querySelector('#view .h2'); if (h) h.scrollIntoView({ block: 'start' });
+  }
+}
+const DRAWN_ONCE = {};
+function drawChrome() {
+  const s = SCREENS[CURRENT.id]; const pend = pendingCount(); const st = STATUS[topState()];
+  document.getElementById('sidenav').innerHTML = `<div class="brand"><span class="logo">C</span><div><div class="t">챌로리 콘솔</div><div class="s">운영자 웹</div></div></div>
+    <button class="item" data-nav="op0" ${CURRENT.id === 'op0' ? 'aria-current="page"' : ''}>${ms('dashboard')}<span><span class="id">OP0</span><span class="nm">챌린지 목록</span></span><span></span></button>
+    <div class="lbl">${esc(CHALLENGE.name)}</div>
+    ${ORDER.map(id => `<button class="item sub" data-nav="${id}" ${CURRENT.id === id ? 'aria-current="page"' : ''}>${ms(SCREENS[id].icon)}<span><span class="id">${id.toUpperCase()}</span><span class="nm">${esc(SCREENS[id].short || SCREENS[id].name)}</span></span>${id === 'op3' ? `<span class="badge ${pend ? '' : 'zero'}" aria-label="미결 ${pend}건">${pend}</span>` : '<span></span>'}</button>`).join('')}
+    <div class="foot"><span class="av">민</span><span>운영자 민호 · 감사 로그 ON</span></div>`;
+  document.getElementById('topbar').innerHTML = `<div class="cname">${esc(CHALLENGE.name)}<span class="code">${CHALLENGE.code}</span></div>
+    <span class="pill ${st.kind}" role="status">${ms(st.icon)}${st.label}<small>${st.en}</small></span>
+    <span class="dday">${ms('calendar_today', 'sm')}<b>${st.d[0]}</b><span>${st.d[1]}</span></span>
+    <span class="grow"></span>
+    <span class="sync">${ms('sync', 'xs')}데이터 기준 ${mdDate(CHALLENGE.today)} ${CHALLENGE.syncTime} · 매시 정각 재계산</span>`;
+  document.getElementById('variants').innerHTML = Object.entries(s.variants).map(([k, label]) => `<button data-nav="${CURRENT.id}${k === 'default' ? '' : '-' + k}" aria-pressed="${k === CURRENT.variant}">${esc(label)}</button>`).join('');
+  document.getElementById('hashcode').textContent = location.hash || '#op1';
+  document.title = `${CURRENT.id.toUpperCase()} ${s.name} · 챌로리 운영자 콘솔`;
+}
+
+/* ======================= 인터랙션 ======================= */
+let toastTimer;
+function toast(msg, icon = 'check_circle') {
+  let t = document.querySelector('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.innerHTML = `${ms(icon)}<span>${esc(msg)}</span>`; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 2400);
+}
+function closeOverlay() {
+  const v = CURRENT.variant;
+  if (['transition', 'drawer', 'action', 'confirm'].includes(v)) navigate(CURRENT.id); else { OVERLAY = ''; document.getElementById('overlay').innerHTML = ''; document.body.style.overflow = ''; }
+}
+function redrawForm() {
+  const item = QUEUE.find(q => q.id === OP3.sel); const el = document.getElementById('verdictForm'); if (!el) return;
+  el.outerHTML = verdictForm(item);
+}
+async function copyText(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); } catch (_) { toast(msg + ' (클립보드 권한 없음 · 프로토타입)', 'content_copy'); } }
+
+document.addEventListener('click', (e) => {
+  const navBtn = e.target.closest('[data-nav]'); if (navBtn) { if (navBtn.getAttribute('aria-disabled') === 'true') return; navigate(navBtn.dataset.nav); return; }
+  const themeBtn = e.target.closest('#themeCtrl button'); if (themeBtn) { setTheme(themeBtn.dataset.theme); return; }
+  const closeEl = e.target.closest('[data-close]');
+  if (closeEl && (closeEl === e.target || closeEl.tagName === 'BUTTON')) { closeOverlay(); return; }
+  const dr = e.target.closest('[data-drawer]'); if (dr) { OP2.drawerWho = dr.dataset.drawer; OP2.menu = null; navigate('op2-drawer'); return; }
+  const flt = e.target.closest('[data-filter]'); if (flt) { OP2.filter = flt.dataset.filter; OP2.menu = null; draw(); return; }
+  const menuBtn = e.target.closest('[data-menu]'); if (menuBtn) { OP2.menu = OP2.menu === menuBtn.dataset.menu ? null : menuBtn.dataset.menu; draw(); if (OP2.menu) { const m = document.querySelector('.menu button'); if (m) m.focus(); } return; }
+  const actionEl = e.target.closest('[data-action]');
+  if (actionEl) {
+    const type = actionEl.dataset.action, who = actionEl.dataset.who; OP2.menu = null;
+    if (type === 'memo') { OP2.drawerWho = who; navigate('op2-drawer'); setTimeout(() => { const m = document.getElementById('memoInput'); if (m) m.focus(); }, 50); return; }
+    OP2.action = { type, who }; navigate('op2-action'); return;
+  }
+  if (!e.target.closest('.menu-wrap') && OP2.menu) { OP2.menu = null; draw(); }
+  const act = e.target.closest('[data-act]'); if (!act) return;
+  const a = act.dataset.act;
+  if (a === 'md-reset') { OP1.md = DEFAULT_MD; draw(); return; }
+  if (a === 'md-save') { toast('규칙을 게시했어요 · P11에 바로 반영 · 감사 로그 기록'); return; }
+  if (a === 'copy-link') { copyText(`https://challory.app/j/${CHALLENGE.code}`, '초대 링크를 복사했어요'); return; }
+  if (a === 'kakao-text') { OP1.kakaoOpen = !OP1.kakaoOpen; draw(); if (OP1.kakaoOpen) { const t = document.getElementById('kakaoText'); if (t) t.focus(); } return; }
+  if (a === 'copy-kakao') { const t = document.getElementById('kakaoText'); copyText(t ? t.value : '', '공유 문구를 복사했어요'); return; }
+  if (a === 'do-recruit') { OP1.recruiting = true; navigate('op1'); toast('모집을 시작했어요 · 초대코드 활성화 · 감사 로그 기록', 'campaign'); return; }
+  if (a === 'back-draft') { OP1.recruiting = false; draw(); toast('초안으로 되돌렸어요 · 초대코드 비활성'); return; }
+  if (a === 'cancel-ch') { toast('취소는 프로토타입에서 생략 · 참가자 공지(N-03) + 사진 즉시 파기', 'info'); return; }
+  if (a === 'send-diag') { toast('P4 연결 진단 안내를 보냈어요 · 당사자에게만', 'send'); return; }
+  if (a === 'save-memo') { const m = document.getElementById('memoInput'); OP2.memo[act.dataset.who] = m ? m.value : ''; toast('메모를 저장했어요 · 감사 로그 기록'); return; }
+  if (a === 'open-review') { const q = QUEUE.find(x => x.who === act.dataset.who); if (q) { selectQueue(q.id); OP3.keepSel = true; } navigate('op3'); return; }
+  if (a === 'confirm-action') {
+    const { type, who } = OP2.action; const p = person(who);
+    if (type === 'exclude') p.status = 'excluded'; if (type === 'kick') p.status = 'kicked'; if (type === 'block') p.blocked = true;
+    const msg = ACTION_TEXT[type].toast; OP2.action = null; navigate('op2'); toast(msg); return;
+  }
+  if (a === 'sort') { toast('정렬은 프로토타입에서 생략 · 열 헤더 클릭으로 정렬', 'swap_vert'); return; }
+  if (a === 'sel-queue') { selectQueue(act.dataset.id); draw(); const h = document.querySelector('.h2'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  if (a === 'show-done') { toast('완료 12건 목록은 프로토타입에서 생략', 'info'); return; }
+  if (a === 'confirm-verdict') {
+    if (act.disabled) return;
+    OP3.decided[OP3.sel] = { verdict: OP3.verdict, tpl: OP3.tpl, at: '10.13 21:14', by: '민호' }; OP3.lastDecided = OP3.sel;
+    const q = QUEUE.find(x => x.id === OP3.sel); const p = person(q.who);
+    if (OP3.verdict === 'warn') p.warns = Math.min(3, p.warns + 1);
+    if (OP3.verdict === 'exclude' || (OP3.verdict === 'warn' && p.warns >= 3)) p.status = 'excluded';
+    else if (p.status === 'review' && !QUEUE.some(x => x.who === q.who && !OP3.decided[x.id])) p.status = 'ok';
+    navigate('op3-decided'); toast('판정을 저장했어요 · N-06 발송 · 감사 로그 기록', 'gavel'); return;
+  }
+  if (a === 'notice-preview') { OP4.noticePreview = true; draw(); const pv = document.getElementById('noticePreview'); if (pv) pv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+  if (a === 'notice-send') { if (act.disabled) return; OP4.sent = true; draw(); toast(`${CHALLENGE.joined}명에게 보냈어요 · N-03 · P5 배너·P12 공지 목록에 보관`, 'send'); return; }
+  if (a === 'csv') { OP4.csv[act.dataset.csv] = makeCsv(act.dataset.csv); draw(); toast(`${CSVS[act.dataset.csv].label} CSV를 생성했어요 · 건강 신호 미포함`, 'download_done'); return; }
+  if (a === 'final-go') { if (act.disabled) return; navigate('op4-published'); toast(`결과를 확정했어요 · ${CHALLENGE.joined}명에게 발표 · 이의 기간 ~${CHALLENGE.objectionUntil}`, 'verified'); return; }
+});
+document.addEventListener('change', (e) => {
+  if (e.target.name === 'verdict') { OP3.verdict = e.target.value; OP3.previewed = true; redrawForm(); const r = document.querySelector(`input[name="verdict"][value="${OP3.verdict}"]`); if (r) r.focus({ preventScroll: true }); return; }
+  if (e.target.id === 'tplSel') { OP3.tpl = e.target.value; redrawForm(); const s = document.getElementById('tplSel'); if (s) s.focus({ preventScroll: true }); return; }
+  if (e.target.id === 'finalChk') { OP4.finalChk = e.target.checked; const b = document.getElementById('finalGo'); if (b) b.disabled = !e.target.checked; return; }
+  if (e.target.id === 'destroyChk') { const b = document.getElementById('destroyBtn'); if (b) b.disabled = !e.target.checked; return; }
+});
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'mdInput') { OP1.md = e.target.value.slice(0, 2000); const pv = document.getElementById('p11preview'); if (pv) pv.innerHTML = p11Preview(OP1.md); const c = document.getElementById('mdCount'); if (c) c.textContent = `${OP1.md.length} / 2,000`; return; }
+  if (e.target.id === 'nTitle') { OP4.title = e.target.value; const c = document.getElementById('nTitleCount'); if (c) { c.textContent = `${OP4.title.length} / 40`; c.classList.toggle('over', OP4.title.length > 40); } return; }
+  if (e.target.id === 'nBody') { OP4.body = e.target.value; const c = document.getElementById('nBodyCount'); if (c) { c.textContent = `${OP4.body.length} / 500`; c.classList.toggle('over', OP4.body.length > 500); } return; }
+});
+document.addEventListener('toggle', (e) => { if (e.target.id === 'healthSec') OP2.healthOpen = e.target.open; }, true);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (OP2.menu) { OP2.menu = null; draw(); return; } if (document.querySelector('#overlay [role="dialog"]')) closeOverlay(); }
+});
+function setTheme(mode) {
+  if (mode === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', mode);
+  document.querySelectorAll('#themeCtrl button').forEach(b => b.setAttribute('aria-pressed', b.dataset.theme === mode));
+  try { localStorage.setItem('challory-theme', mode); } catch (_) {}
+}
+try { const saved = localStorage.getItem('challory-theme'); if (saved && saved !== 'system') setTheme(saved); } catch (_) {}
+window.showScreen = (hash) => navigate(String(hash).replace(/^#/, '')); // 스크린샷 도구용
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body>
+</html>
