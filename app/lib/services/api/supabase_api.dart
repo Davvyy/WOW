@@ -4,7 +4,10 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/engine/engine.dart';
+import '../../data/mock/mock_data.dart' show Leaderboard;
+import '../../data/models.dart';
 import 'challory_api.dart';
+import 'server_mapping.dart';
 
 /// Edge Functions(supabase/functions/*) + PostgREST(RLS) 구현.
 class SupabaseChalloryApi implements ChalloryApi {
@@ -61,6 +64,86 @@ class SupabaseChalloryApi implements ChalloryApi {
     try {
       final rows = await _client.from('participants').select('id').eq('user_id', uid).not('status', 'in', '(kicked,left)').limit(1);
       return rows.isNotEmpty;
+    } catch (e) {
+      throw ApiException(0, e.toString());
+    }
+  }
+
+  /// 로그인 사용자의 현재 참가(가장 최근). 강퇴·탈퇴 제외.
+  Future<Map<String, dynamic>> _me() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw const ApiException(401, '로그인이 필요해요');
+    final row = await _client.from('participants')
+        .select('id, nickname, challenge_id, rank_eligible, leaderboard_visible, status, challenges(start_date, status)')
+        .eq('user_id', uid).not('status', 'in', '(kicked,left)').order('joined_at', ascending: false).limit(1).maybeSingle();
+    if (row == null) throw const ApiException(404, '참가 중인 챌린지가 없어요');
+    return row;
+  }
+
+  Future<Map<String, dynamic>?> _latestSnapshot(String challengeId, String scope) => _client.from('leaderboard_snapshots')
+      .select('local_date, as_of, is_final, rows').eq('challenge_id', challengeId).eq('scope', scope)
+      .order('as_of', ascending: false).limit(1).maybeSingle();
+
+  @override
+  Future<Leaderboard> fetchLeaderboard() async {
+    try {
+      final me = await _me();
+      final cid = me['challenge_id'] as String;
+      final today = await _latestSnapshot(cid, 'today');
+      final cum = await _latestSnapshot(cid, 'cumulative');
+      final scores = await _client.from('daily_scores').select('local_date, s_d, is_final, is_counted, under_review').eq('participant_id', me['id']);
+      final todayDate = today?['local_date'] as String?;
+      double? myToday;
+      var myCum = 0.0;
+      var review = false;
+      for (final r in scores) {
+        if (r['local_date'] == todayDate) myToday = (r['s_d'] as num?)?.toDouble();
+        if (r['is_counted'] == true && r['is_final'] == true) myCum += (r['s_d'] as num?)?.toDouble() ?? 0;
+        review |= r['under_review'] == true;
+      }
+      return leaderboardFromServer(
+        todayRows: today?['rows'] as List? ?? const [],
+        cumulativeRows: cum?['rows'] as List? ?? const [],
+        myParticipantId: me['id'] as String,
+        myNickname: me['nickname'] as String,
+        myToday: myToday,
+        myCumulative: double.parse(myCum.toStringAsFixed(1)),
+        myUnderReview: review,
+        myRankEligible: me['rank_eligible'] == true && me['leaderboard_visible'] == true,
+        todayFinal: today?['is_final'] as bool? ?? false,
+        asOf: today?['as_of'] == null ? null : DateTime.parse(today!['as_of'] as String),
+      );
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(0, e.toString());
+    }
+  }
+
+  @override
+  Future<List<LedgerRow>> fetchLedger() async {
+    try {
+      final me = await _me();
+      final start = DateTime.parse((me['challenges'] as Map)['start_date'] as String);
+      final rows = await _client.from('daily_scores')
+          .select('id, local_date, bmr, a_d, i_d, f_p, d_d, s_d, is_counted, is_final, under_review, breakdown')
+          .eq('participant_id', me['id']).order('local_date');
+      final ids = [for (final r in rows) r['id'] as String];
+      final revs = ids.isEmpty ? <Map<String, dynamic>>[] : await _client.from('score_revisions')
+          .select('daily_score_id, prev_s_d, new_s_d, reason, review_id, created_at').inFilter('daily_score_id', ids).order('created_at');
+      final reviewIds = {for (final r in revs) if (r['review_id'] != null) r['review_id'] as String};
+      final types = <String, String>{};
+      if (reviewIds.isNotEmpty) {
+        for (final r in await _client.from('reviews').select('id, type').inFilter('id', reviewIds.toList())) {
+          types[r['id'] as String] = r['type'] as String;
+        }
+      }
+      return [
+        for (final r in rows)
+          ledgerRowFromServer(r, start, revisions: [for (final v in revs) if (v['daily_score_id'] == r['id']) v], reviewTypes: types),
+      ];
+    } on ApiException {
+      rethrow;
     } catch (e) {
       throw ApiException(0, e.toString());
     }

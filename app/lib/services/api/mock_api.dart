@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../../core/engine/engine.dart';
 import '../../data/mock/mock_data.dart';
+import '../../data/models.dart';
 import 'challory_api.dart';
 
 /// 서버 없이 같은 흐름을 돌리는 모의 구현(SUPABASE_URL 미설정 · 테스트).
@@ -62,6 +63,18 @@ class MockChalloryApi implements ChalloryApi {
   }
 
   bool participating = false;
+
+  @override
+  Future<Leaderboard> fetchLeaderboard() async {
+    calls.add('leaderboard');
+    return mockLeaderboard;
+  }
+
+  @override
+  Future<List<LedgerRow>> fetchLedger() async {
+    calls.add('ledger');
+    return mockLedger;
+  }
 
   @override
   Future<bool> hasParticipation() async => participating;

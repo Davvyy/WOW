@@ -50,5 +50,11 @@ if [ $ok = 1 ]; then
   runc "select jsonb_pretty(jsonb_build_object('_doc', 'score_simulate_from_inputs 실행 결과(supabase/tests/run.sh 가 생성). app/test/engine/golden_test.dart 가 Dart 결과와 비교한다.', 'results', tests.golden_dump(pg_read_file('/tmp/challory_golden_cases.json')::jsonb)))" > "$HERE/golden_sql_results.json" \
     && echo "[OK] golden_sql_results.json" || { echo "[FAIL] golden dump"; ok=0; }
 fi
+# 앱 매핑 테스트 픽스처(서버 JSON → Dart 모델)
+if [ $ok = 1 ] && [ -d "$ROOT/../app/test" ]; then
+  mkdir -p "$ROOT/../app/test/fixtures"
+  runc "select jsonb_pretty(tests.app_fixture())" > "$ROOT/../app/test/fixtures/server_ledger.json" \
+    && echo "[OK] app/test/fixtures/server_ledger.json" || { echo "[FAIL] app fixture"; ok=0; }
+fi
 [ -z "${KEEP_DB:-}" ] && admin "drop database if exists $DB" >/dev/null
 if [ $ok = 1 ]; then echo "[OK] all"; exit 0; else echo "[FAIL] see above"; exit 1; fi

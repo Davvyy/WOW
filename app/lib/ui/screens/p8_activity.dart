@@ -6,6 +6,7 @@ import '../../core/config.dart';
 import '../../core/engine/engine.dart';
 import '../../core/format.dart';
 import '../../data/mock/mock_data.dart';
+import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
@@ -131,9 +132,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           ]),
         );
 
-    // 최근 7일 막대(D2~D8, 오늘은 현재 계산값)
+    // 최근 7일 막대(오늘은 현재 계산값). 서버 모드는 내 장부, 모의는 프로토타입 장부
+    final ledger = watchLedger(ref) ?? const <LedgerRow>[];
     final week = [
-      for (final r in mockLedger.skip(1)) (r.date.split('.')[1], r.provisional ? a.aD : r.a, r.provisional),
+      for (final r in ledger.skip(ledger.length > 7 ? ledger.length - 7 : 0)) (r.date.split('.').last, r.provisional ? a.aD : r.a, r.provisional),
     ];
     final maxA = week.fold<double>(1, (m, w) => w.$2 > m ? w.$2 : m);
 

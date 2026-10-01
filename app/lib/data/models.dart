@@ -277,6 +277,7 @@ class LeaderRow {
     this.aggregating = false,
     this.gapToPrev,
     this.participantId,
+    this.underReview = false,
   });
   final int rank;
   final String name;
@@ -291,4 +292,7 @@ class LeaderRow {
 
   /// 서버 스냅샷 행의 participant_id(신고 대상). 모의 행·집계 중 행은 null.
   final String? participantId;
+
+  /// 본인 행만: 검토 중(잠정 유지, 타인에게는 '집계 중')
+  final bool underReview;
 }

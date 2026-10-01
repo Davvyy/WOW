@@ -260,10 +260,30 @@ double get mockCumulative => round1(mockLedger.where((x) => !x.check && !x.provi
 
 // ---------- 리더보드 ----------
 class Leaderboard {
-  const Leaderboard({required this.total, required this.cumulative, required this.today});
+  const Leaderboard({required this.total, required this.cumulative, required this.today, this.todayFinal = false, this.asOf});
   final int total;
   final List<LeaderRow> cumulative;
   final List<LeaderRow> today;
+
+  /// 오늘 탭이 확정 스냅샷인지(잠정이면 false)
+  final bool todayFinal;
+
+  /// 스냅샷 시각(서버). 모의는 null
+  final DateTime? asOf;
+
+  /// 내 행이 없으면 null(기록 모드·순위 비공개 등)
+  LeaderRow? meIn(List<LeaderRow> list) {
+    for (final r in list) {
+      if (r.me) return r;
+    }
+    return null;
+  }
+
+  /// 누적 3위(점수가 보이는 행 기준) 점수 — "3위까지 n점"
+  double? get thirdScore {
+    final shown = cumulative.where((r) => !r.aggregating && r.score != null).toList();
+    return shown.length >= 3 ? shown[2].score : null;
+  }
 }
 
 class WeeklyFeedback {

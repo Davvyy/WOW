@@ -44,7 +44,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   Widget _verdictSection(BuildContext context, String v) {
     final c = context.c;
     final m = fmtM(meM);
-    final r7 = mockLedger[6];
+    final r7 = mockLedger[6]; // 판정 변형(v=verdict-*)은 프로토타입 시나리오 화면
     switch (v) {
       case 'verdict-approve':
         final t = verdictText['approve']!;
@@ -139,6 +139,32 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     );
   }
 
+  Widget _loading(BuildContext context) {
+    final err = ref.watch(ledgerProvider).error;
+    return ChScaffold(title: '점수 장부', backFallback: R.home, children: [
+      ChCard(
+        child: Column(children: spaced([
+          Txt.title(err == null ? '장부를 불러오고 있어요' : '장부를 불러오지 못했어요'),
+          if (err != null) Txt.cap(apiErrorText(err), align: TextAlign.center),
+          if (err != null) ChButton('다시 불러오기', small: true, kind: BtnKind.quiet, onPressed: () => ref.invalidate(ledgerProvider)),
+        ], gap: 6)),
+      ),
+    ]);
+  }
+
+  Widget _mockHistory(String m) {
+    final r7 = mockLedger[6];
+    return ChCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Txt.title('변경 이력'),
+        const SizedBox(height: 4),
+        _HistoryRow(Icons.history_rounded, '10.12 저녁 무효 → 대체값 $m · ${fmtK1(r7.sBefore!)} → ${fmtK1(r7.s)}', '${reasonText['dup_photo']} · 운영자 판정(정정)'),
+        const _HistoryRow(Icons.edit_rounded, '10.10 점심 850 → 780 확정(본인)', 'AI 초안 수정 · 확정값만 반영'),
+        const _HistoryRow(Icons.sync_rounded, '10.9 걸음 재조회 +120보', '삼성헬스 지연 동기화 · 확정 전 반영'),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -146,10 +172,18 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     final todaySim = ref.watch(todayResultProvider);
     final act = ref.watch(activityProvider);
     final review = v == 'review';
+    final remote = ref.read(apiProvider).isRemote;
+    final loaded = watchLedger(ref);
+    if (loaded == null) return _loading(context);
+    final ledger = loaded;
+    final cumulative = round1(ledger.where((x) => !x.check && !x.provisional).fold(0.0, (a, x) => a + x.s));
 
-    // 오늘 값: 라이브 상태(끼니 확정 즉시 반영), 검토 시나리오는 걸음 26,000
-    final pastRow = (widget.day != null && widget.day! < mockChallenge.dayIndex && widget.day! >= 1) ? mockLedger[widget.day! - 1] : null;
-    final SimulateResult t = pastRow != null
+    // 서버 모드: 선택한 날(없으면 오늘 잠정 행)을 서버 값 그대로 보여준다. 모의: 엔진으로 다시 계산(라이브 반영)
+    final dayRow = widget.day == null ? null : ledger.where((r) => r.d == widget.day).firstOrNull;
+    final pastRow = remote ? (dayRow ?? ledger.lastOrNull) : ((dayRow != null && !dayRow.provisional) ? dayRow : null);
+    final SimulateResult t = remote && pastRow != null
+        ? resultFromLedgerRow(pastRow)
+        : pastRow != null
         ? engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: pastRow.steps, meals: pastRow.meals))
         : review
         ? engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: reviewStepsCase, meals: ref.watch(mealsProvider).map((m) => m.toInput()).toList(), skipsUsedThisWeek: ref.watch(skipsUsedProvider)))
@@ -167,7 +201,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       const ChChip('체중 비례 목표 시 —점 [미결]'),
     ];
 
-    LedgerRow live(LedgerRow r) => !r.provisional
+    LedgerRow live(LedgerRow r) => !r.provisional || remote
         ? r
         : LedgerRow(
             d: r.d,
@@ -241,16 +275,19 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       );
     }
 
-    final r7 = mockLedger[6];
-    final history = ChCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Txt.title('변경 이력'),
-        const SizedBox(height: 4),
-        _HistoryRow(Icons.history_rounded, '10.12 저녁 무효 → 대체값 $m · ${fmtK1(r7.sBefore!)} → ${fmtK1(r7.s)}', '${reasonText['dup_photo']} · 운영자 판정(정정)'),
-        const _HistoryRow(Icons.edit_rounded, '10.10 점심 850 → 780 확정(본인)', 'AI 초안 수정 · 확정값만 반영'),
-        const _HistoryRow(Icons.sync_rounded, '10.9 걸음 재조회 +120보', '삼성헬스 지연 동기화 · 확정 전 반영'),
-      ]),
-    );
+    final revised = ledger.where((r) => r.history.isNotEmpty).toList().reversed.toList();
+    final history = remote
+        ? ChCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Txt.title('변경 이력'),
+              const SizedBox(height: 4),
+              if (revised.isEmpty) const Txt.cap('아직 정정된 날이 없어요'),
+              for (final r in revised)
+                _HistoryRow(r.revisionReason != null ? Icons.history_rounded : Icons.edit_rounded, '${r.date} ${r.history}',
+                    r.revisionReason != null ? '${reasonText[r.revisionReason] ?? '운영자 판정'} · 운영자 판정(정정)' : '확정 후 수정 · 정정으로 기록'),
+            ]),
+          )
+        : _mockHistory(m);
 
     return ChScaffold(
       title: '점수 장부',
@@ -261,7 +298,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
         ChCard(
           color: c.brandSoft,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
-            Txt.cap(pastRow != null ? '${pastRow.date} · 확정${pastRow.check ? ' · 점검 기간(누적 미반영)' : ''}' : '오늘 ${mockChallenge.today.month}.${mockChallenge.today.day} · 잠정${review ? ' · 검토 중(걸음 ${fmtInt(reviewStepsCase)} 잠정 반영)' : ''}', color: c.brand, weight: FontWeight.w600),
+            Txt.cap(pastRow != null ? '${pastRow.date} · ${pastRow.provisional ? '잠정' : '확정'}${pastRow.check ? ' · 점검 기간(누적 미반영)' : ''}${pastRow.note.contains('검토 중') ? ' · 검토 중' : ''}' : '오늘 ${mockChallenge.today.month}.${mockChallenge.today.day} · 잠정${review ? ' · 검토 중(걸음 ${fmtInt(reviewStepsCase)} 잠정 반영)' : ''}', color: c.brand, weight: FontWeight.w600),
             Semantics(
               label: '기초대사 ${fmtInt(t.bmr)} 더하기 활동 ${fmtInt(t.activity.aD)} 빼기 섭취 ${fmtInt(iEff)} 는 순적자 ${fmtInt(t.score.dD)}, 점수 ${fmtK1(t.score.sD)}점',
               child: ExcludeSemantics(
@@ -277,7 +314,15 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
         Wrap(spacing: 6, runSpacing: 6, children: ruleChips),
         ChCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [const Txt.title('일별 장부 '), const Txt.cap('추정 kcal 기준'), const Spacer(), Txt.cap('누적 ${fmtK1(mockCumulative)}점 (확정분)')]),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                const Row(mainAxisSize: MainAxisSize.min, children: [Txt.title('일별 장부 '), Txt.cap('추정 kcal 기준')]),
+                Txt.cap('누적 ${fmtK1(cumulative)}점 (확정분)'),
+              ],
+            ),
             const SizedBox(height: 6),
             Semantics(
               header: true,
@@ -290,7 +335,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 Expanded(flex: 12, child: Txt('점수 S', size: 11, color: c.fg2, align: TextAlign.right)),
               ]),
             ),
-            for (final r in mockLedger) tableRow(live(r)),
+            if (ledger.isEmpty) const Txt.cap('아직 기록된 날이 없어요'),
+            for (final r in ledger) tableRow(live(r)),
             const SizedBox(height: 6),
             const Txt.cap('첫 3일(10.6~10.8)은 점검 기간으로 누적에 들어가지 않아요. 오늘·정정된 날(10.12) 행을 누르면 그날 홈으로 이동해요.'),
           ]),

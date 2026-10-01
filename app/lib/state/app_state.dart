@@ -110,6 +110,33 @@ class OnboardingNotifier extends Notifier<OnboardingDraft> {
 
 final onboardingProvider = NotifierProvider<OnboardingNotifier, OnboardingDraft>(OnboardingNotifier.new);
 
+/// 리더보드(최신 스냅샷)·내 점수 장부. 서버 모드는 PostgREST, 모의 모드는 프로토타입 값.
+final leaderboardProvider = FutureProvider<Leaderboard>((ref) => ref.watch(apiProvider).fetchLeaderboard());
+final ledgerProvider = FutureProvider<List<LedgerRow>>((ref) => ref.watch(apiProvider).fetchLedger());
+
+/// 화면용: 값이 아직 없으면 모의 모드는 프로토타입 값으로 바로 그리고, 서버 모드는 null(로딩·오류 표시)
+Leaderboard? watchLeaderboard(WidgetRef ref) =>
+    ref.watch(leaderboardProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLeaderboard);
+List<LedgerRow>? watchLedger(WidgetRef ref) => ref.watch(ledgerProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLedger);
+
+/// 서버 장부 한 줄 → 화면용 결과(분해값은 서버 값 그대로, M_p 는 BMR 로 계산)
+SimulateResult resultFromLedgerRow(LedgerRow r) => SimulateResult(
+      bmr: r.bmr,
+      bmrRaw: null,
+      activity: ActivityResult(stepsOut: r.steps, stepsNetKcal: 0, sessionsNetKcal: 0, floorsKcal: 0, aRaw: r.a, aD: r.a, aCapped: false, sessionMets: const []),
+      intake: IntakeResult(iD: r.i, mP: engine.m(r.bmr), mainMealCount: 0, snackCount: 0, substituteSlots: r.substituted, draftSlots: const [],
+          pendingSlots: const [], skipsToday: 0, skipOver: false),
+      score: ScoreResult(fP: r.f, floorApplied: r.floorApplied, dD: r.dd, sD: r.s, ratio: r.dd / engine.rules.t),
+    );
+
+/// 장부 확정분으로 계산한 주간 피드백(06 P9: 하드코딩 금지)
+WeeklyFeedback? weeklyFrom(List<LedgerRow> ledger) {
+  final rows = ledger.where((x) => !x.check && !x.provisional).toList();
+  if (rows.isEmpty) return null;
+  final avg = round1(rows.fold(0.0, (a, x) => a + x.s) / rows.length);
+  return WeeklyFeedback(rows.length, avg, rows.where((x) => !x.substituted.contains(MealSlot.dinner)).length / rows.length);
+}
+
 final mealUploaderProvider = Provider<MealUploader>((ref) => MealUploader(ref.watch(apiProvider), prepare: preparePhoto));
 
 String todayKst() => kstDateString(toKstWall(DateTime.now()));
@@ -300,6 +327,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
       }
       if (!ref.mounted) return null;
       _put(of(slot).copyWith(serverId: r.mealId, version: r.version, kcal: r.confirmedKcal));
+      if (api.isRemote) ref.invalidate(ledgerProvider); // 서버가 잠정 점수를 다시 계산함
       return null;
     } catch (e) {
       if (ref.mounted) _put(prev);
@@ -314,7 +342,9 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     final prev = of(slot);
     _put(prev.copyWith(status: MealStatus.skipped, kcal: 0, items: const [], title: ''));
     try {
-      final r = await ref.read(apiProvider).skipMeal(todayKst(), slot, idempotencyKey: newUuidV4());
+      final api = ref.read(apiProvider);
+      final r = await api.skipMeal(todayKst(), slot, idempotencyKey: newUuidV4());
+      if (api.isRemote && ref.mounted) ref.invalidate(ledgerProvider);
       if (r.overLimit && ref.mounted) return '이번 주 건너뜀 한도를 넘어 대체값으로 계산돼요';
       return null;
     } catch (e) {

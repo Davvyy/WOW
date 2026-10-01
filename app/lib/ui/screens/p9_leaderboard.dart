@@ -54,6 +54,33 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     showChSheet<void>(context, builder: (_) => _ReportSheet(target: target.name, participantId: target.participantId));
   }
 
+  /// 서버 모드에서 스냅샷을 아직 못 받았을 때(로딩·오류)
+  Widget _loadingScaffold(BuildContext context, String meta) {
+    final c = context.c;
+    final err = ref.watch(leaderboardProvider).error;
+    return Scaffold(
+      backgroundColor: c.bg,
+      body: SafeArea(
+        bottom: false,
+        child: Column(children: [
+          ChAppBar(title: '순위', meta: meta),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: ChCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 36),
+              child: Column(children: spaced([
+                Icon(err == null ? Icons.hourglass_top_rounded : Icons.cloud_off_rounded, color: c.fg2),
+                Txt.title(err == null ? '순위를 불러오고 있어요' : '순위를 불러오지 못했어요'),
+                if (err != null) Txt.cap(apiErrorText(err), align: TextAlign.center),
+                if (err != null) ChButton('다시 불러오기', small: true, kind: BtnKind.quiet, onPressed: () => ref.invalidate(leaderboardProvider)),
+              ], gap: 6)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -62,11 +89,18 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     final hearted = ref.watch(heartedTodayProvider);
     final visible = ref.watch(rankVisibleProvider);
     final act = ref.watch(activityProvider);
-    final reviewMe = act.stepsTotal > AppConfig.stepsSpikeAbs;
-    final lb = mockLeaderboard;
+    final remote = ref.read(apiProvider).isRemote;
+    final loaded = watchLeaderboard(ref);
+    if (loaded == null) return _loadingScaffold(context, ch.name);
+    final lb = loaded;
     final today = _today;
     final list = today ? lb.today : lb.cumulative;
-    final me = list.firstWhere((r) => r.me);
+    final me = lb.meIn(list) ?? LeaderRow(rank: 0, name: mockMe.nickname, me: true);
+    // 검토 중: 서버는 내 장부의 under_review, 모의는 걸음 급증 시나리오
+    final reviewMe = remote ? me.underReview : act.stepsTotal > AppConfig.stepsSpikeAbs;
+    final third = lb.thirdScore;
+    final weekly = weeklyFrom(watchLedger(ref) ?? const []);
+    String rankText(int rank) => rank == 0 ? '—' : '$rank';
 
     Widget rowW(LeaderRow r, {bool pinned = false}) {
       if (r.aggregating) {
@@ -74,7 +108,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           constraints: const BoxConstraints(minHeight: 56),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(children: [
-            SizedBox(width: 32, child: Center(child: NumText('${r.rank}', size: 17, weight: FontWeight.w700, color: c.fg2))),
+            SizedBox(width: 32, child: Center(child: NumText(rankText(r.rank), size: 17, weight: FontWeight.w700, color: c.fg2))),
             const SizedBox(width: 10),
             Icon(Icons.hourglass_top_rounded, size: 18, color: c.review),
             const SizedBox(width: 6),
@@ -93,7 +127,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       final locked = hearted != null && !isHearted;
       final fillPct = r.fill * 25;
       final cells = [for (var i = 0; i < 4; i++) i < r.fill];
-      final semantics = '${r.rank}위${r.tie ? '(공동)' : ''} ${r.name}${mine ? '(나)' : ''} ${r.score == null ? '' : '${fmtK1(r.score!)}점'} 반영률 $fillPct%';
+      final semantics = '${r.rank == 0 ? '순위 제외' : '${r.rank}위'}${r.tie ? '(공동)' : ''} ${r.name}${mine ? '(나)' : ''} ${r.score == null ? '' : '${fmtK1(r.score!)}점'} 반영률 $fillPct%';
       return Semantics(
         label: semantics,
         button: mine,
@@ -111,7 +145,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               SizedBox(
                 width: 32,
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  NumText('${r.rank}', size: 17, weight: FontWeight.w700, color: c.fg2),
+                  NumText(rankText(r.rank), size: 17, weight: FontWeight.w700, color: c.fg2),
                   if (r.tie) Txt('공동', size: 11, color: c.fg2),
                 ]),
               ),
@@ -132,8 +166,14 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                     if (mine && r.delta > 0) Semantics(label: '${r.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${r.delta}', size: 11, color: c.good))),
                     if (mine && reviewMe && today) InkWell(onTap: () => context.push('${R.ledger}?v=review'), child: Txt('소명하기', size: 11, weight: FontWeight.w600, color: c.brand)),
                   ]),
-                  if (pinned && mine)
-                    Txt(today ? '위 순위까지 ${fmtK1(r.gapToPrev ?? 0)}점' : '3위까지 ${fmtK1(lb.cumulative[2].score! - r.score!)}점', size: 11, weight: FontWeight.w600, color: c.brand),
+                  if (pinned && mine && r.rank != 1 && r.rank != 0)
+                    Txt(
+                        today || third == null || (r.score ?? 0) >= third
+                            ? '위 순위까지 ${fmtK1(r.gapToPrev ?? 0)}점'
+                            : '3위까지 ${fmtK1(third - (r.score ?? 0))}점',
+                        size: 11,
+                        weight: FontWeight.w600,
+                        color: c.brand),
                 ]),
               ),
               NumText(fmtK1(r.score ?? 0), size: 19, weight: FontWeight.w700),
@@ -231,14 +271,18 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: 76, color: c.bg, child: rowW(me, pinned: true))));
         slivers.add(SliverList(delegate: SliverChildListDelegate([for (final r in rest) rowW(r)])));
         addBox(Center(child: Txt.cap('전체 ${lb.total}명 · 20명씩 더 보기')), bottom: 10);
-        addBox(ChCard(
-          outline: true,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
-            Row(children: [const Txt.title('내 기록 피드백 '), Txt.cap('점검 기간 뒤 확정 ${mockWeekly.days}일')]),
-            Txt('하루 평균 약 ${fmtK1(mockWeekly.avg)}점 · 저녁 확정률 ${fmtPct(mockWeekly.dinnerConfirmRate)}'),
-            const Txt.cap('순위와 무관한 내 기록이에요. 저녁을 확정하는 날이 늘면 반영률이 올라가요.'),
-          ], gap: 4)),
-        ), bottom: 4);
+        if (weekly != null) {
+          addBox(ChCard(
+            outline: true,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
+              Row(children: [const Txt.title('내 기록 피드백 '), Txt.cap('점검 기간 뒤 확정 ${weekly.days}일')]),
+              Txt('하루 평균 약 ${fmtK1(weekly.avg)}점 · 저녁 확정률 ${fmtPct(weekly.dinnerConfirmRate)}'),
+              const Txt.cap('순위와 무관한 내 기록이에요. 저녁을 확정하는 날이 늘면 반영률이 올라가요.'),
+            ], gap: 4)),
+          ), bottom: 4);
+        } else if (list.isEmpty || list.every((r) => r.me)) {
+          addBox(centerCard(Icons.hourglass_empty_rounded, '아직 확정된 점수가 없어요', '점검 기간이 끝나고 첫 확정(다음 날 09:00) 뒤에 순위가 보여요.'));
+        }
         addBox(const Disclaimer('점수는 추정 kcal 기준이에요 · 의료 조언이 아니에요'), bottom: 0);
     }
 
@@ -255,12 +299,27 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 PopupMenuButton<String>(
                   tooltip: '더보기',
                   icon: Icon(Icons.more_vert_rounded, color: c.fg),
-                  onSelected: (_) => _report(list.firstWhere((r) => !r.me && !r.aggregating)),
+                  onSelected: (_) {
+                    final target = list.where((r) => !r.me && !r.aggregating).firstOrNull;
+                    if (target != null) _report(target);
+                  },
                   itemBuilder: (_) => const [PopupMenuItem(value: 'report', child: Text('익명으로 신고'))],
                 ),
             ],
           ),
-          Expanded(child: CustomScrollView(slivers: [SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), sliver: SliverMainAxisGroup(slivers: slivers))])),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(ledgerProvider);
+                ref.invalidate(leaderboardProvider);
+                await ref.read(leaderboardProvider.future);
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), sliver: SliverMainAxisGroup(slivers: slivers))],
+              ),
+            ),
+          ),
         ]),
       ),
     );

@@ -57,6 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final meals = ref.watch(mealsProvider);
     final act = ref.watch(activityProvider);
 
+    final remote = ref.read(apiProvider).isRemote;
     // ---- 선택한 날의 계산 ----
     late final SimulateResult sim;
     late final List<MealRecord> dayMeals;
@@ -67,13 +68,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       dayMeals = meals;
       steps = act.stepsTotal;
     } else {
-      row = mockLedger[day - 1];
-      steps = row.steps;
-      sim = engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: steps, meals: row.meals));
+      // 지난 날: 서버 모드는 서버 장부 값 그대로, 모의 모드는 프로토타입 장부를 엔진으로 재계산
+      final ledger = watchLedger(ref) ?? const <LedgerRow>[];
+      row = ledger.where((r) => r.d == day).firstOrNull ?? (remote ? null : mockLedger[day - 1]);
+      steps = row?.steps ?? 0;
+      sim = row == null
+          ? engine.simulate(SimulateInput(profile: mockMe.profile))
+          : remote
+          ? resultFromLedgerRow(row)
+          : engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: steps, meals: row.meals));
       dayMeals = [
         for (final s in MealSlot.values)
           () {
-            final mi = row!.meals.where((m) => m.slot == s);
+            final mi = (row?.meals ?? const <MealInput>[]).where((m) => m.slot == s);
             return mi.isEmpty ? MealRecord(slot: s) : MealRecord(slot: s, status: mi.first.status, kcal: mi.first.kcal);
           }(),
       ];
@@ -84,8 +91,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final appTitle = ch.name;
     final meta = lifecycle ? null : 'D+$day/${ch.days}';
 
-    final cumMe = mockLeaderboard.cumulative.firstWhere((r) => r.me);
-    final reviewing = isToday && steps > AppConfig.stepsSpikeAbs;
+    final lb = watchLeaderboard(ref);
+    final cumMe = lb?.meIn(lb.cumulative) ?? LeaderRow(rank: 0, name: mockMe.nickname, me: true, score: 0);
+    final todayMe = lb?.meIn(lb.today);
+    final reviewing = isToday && (remote ? (todayMe?.underReview ?? false) : steps > AppConfig.stepsSpikeAbs);
     final provisional = isToday;
 
     String? caption;
@@ -296,7 +305,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Txt('최종 ${mockFinal.firstWhere((r) => r.me).rank}위 · ${mockLeaderboard.total - 2}명')
                 else
                   Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
-                    Txt('잠정 ${cumMe.rank}위'),
+                    Txt(cumMe.rank == 0 ? '순위 제외 · 점수만 보여요' : '잠정 ${cumMe.rank}위'),
                     if (cumMe.delta > 0) Semantics(label: '${cumMe.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${cumMe.delta}', color: c.good))),
                     if (reviewing) Txt('· 검토 중', color: c.fg2),
                   ]),
@@ -414,6 +423,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 final meals = ref.read(mealsProvider.notifier);
                 await Future.wait([ref.read(activityProvider.notifier).refresh(), meals.retryPendingUploads()]);
                 await meals.loadToday();
+                ref.invalidate(ledgerProvider);
+                ref.invalidate(leaderboardProvider);
               },
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
