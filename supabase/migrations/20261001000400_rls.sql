@@ -23,6 +23,11 @@ create or replace function operates_participant(p_participant uuid) returns bool
     where p.id = p_participant and c.operator_id = auth.uid())
 $$;
 
+create or replace function participant_in_challenge(p_participant uuid, p_challenge uuid) returns boolean
+  language sql stable security definer set search_path = public as $$
+  select exists (select 1 from participants where id = p_participant and challenge_id = p_challenge and status not in ('kicked', 'left'))
+$$;
+
 -- ---------------------------------------------------------------- 권한 기본값
 revoke all on all tables in schema public from anon, authenticated;
 grant select on all tables in schema public to authenticated;
@@ -48,7 +53,6 @@ begin
   for t in select tablename from pg_tables where schemaname = 'public'
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('alter table %I force row level security', t);
   end loop;
 end $$;
 
@@ -180,7 +184,7 @@ create policy cheers_read on cheers for select to authenticated
 create policy cheers_insert on cheers for insert to authenticated
   with check (owns_participant(from_participant_id)
     and challenge_id = (select challenge_id from participants where id = from_participant_id)
-    and exists (select 1 from participants t where t.id = to_participant_id and t.challenge_id = cheers.challenge_id)
+    and participant_in_challenge(to_participant_id, challenge_id)
     and local_date = kst_date());
 
 -- ---------------------------------------------------------------- 검토·소명·건강 알림
@@ -297,7 +301,7 @@ begin
 
   insert into participants (challenge_id, user_id, nickname, sex, birth_year, age, height_cm, weight_locked, bmr_locked, status, rank_eligible)
   values (ch.id, v_uid, p ->> 'nickname', (p ->> 'sex')::sex_type, (p ->> 'birth_year')::int, v_age, (p ->> 'height_cm')::numeric,
-    (p ->> 'weight_kg')::numeric, v_bmr, case when v_reason is null then 'active' else 'record_mode' end, v_reason is null)
+    (p ->> 'weight_kg')::numeric, v_bmr, (case when v_reason is null then 'active' else 'record_mode' end)::participant_status, v_reason is null)
   on conflict (challenge_id, user_id) do update set nickname = excluded.nickname
   returning * into v_part;
 
@@ -350,7 +354,7 @@ grant execute on function
   intake_kcal(int, jsonb, int, challenge_rules), score_simulate(int, numeric, numeric, int, challenge_rules),
   score_simulate_from_inputs(jsonb), meal_item_kcal(numeric, numeric, int, boolean, numeric, challenge_rules),
   kst_date(timestamptz), kst_at(date, time), challenge_open_review_count(uuid),
-  is_challenge_operator(uuid), is_challenge_member(uuid), owns_participant(uuid), operates_participant(uuid),
+  is_challenge_operator(uuid), is_challenge_member(uuid), owns_participant(uuid), operates_participant(uuid), participant_in_challenge(uuid, uuid),
   join_challenge(jsonb), food_search(text), map_food_candidates(text[]),
   apply_verdict(uuid, verdict_type, boolean, uuid, text, timestamptz), transition_challenge(uuid, challenge_status, uuid, timestamptz),
   reason_sentence(text), verdict_message(text, verdict_type, jsonb), format_k1(numeric), format_signed1(numeric), format_md(date), josa_ro(text),

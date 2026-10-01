@@ -31,10 +31,10 @@ begin
   end;
   raise exception 'FAIL %: no error', p_label;
 end $$;
-create or replace function tests.pid(p_nick text) returns uuid language sql stable as $$
+create or replace function tests.pid(p_nick text) returns uuid language sql stable security definer set search_path = public as $$
   select id from participants where nickname = p_nick
 $$;
-create or replace function tests.uid(p_nick text) returns uuid language sql stable as $$
+create or replace function tests.uid(p_nick text) returns uuid language sql stable security definer set search_path = public as $$
   select user_id from participants where nickname = p_nick
 $$;
 -- RLS 테스트용: 해당 사용자로 전환
