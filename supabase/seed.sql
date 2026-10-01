@@ -31,7 +31,6 @@ insert into food_db_cache (food_code, name_kr, category, serving_g, kcal) values
   ('D000051', '조미김', '반찬류', 5, 70),
   ('D000052', '김부각', '반찬류', 20, 120),
   ('D000060', '곰탕', '국·탕류', 600, 330),
-  ('D000061', '설렁탕', '국·탕류', 600, 350),
   ('D000062', '갈비탕', '국·탕류', 600, 420),
   ('D000070', '김밥', '밥류', 230, 420),
   ('D000071', '비빔밥', '밥류', 450, 600),
@@ -44,7 +43,7 @@ insert into food_db_cache (food_code, name_kr, category, serving_g, kcal) values
   ('D000085', '카페라떼', '음료류', 355, 180);
 insert into food_synonyms (alias, food_code) values
   ('설렁탕', 'D000060'),
-  ('곰탕', 'D000061'),
+  ('사골곰탕', 'D000060'),
   ('공기밥', 'D000001'),
   ('쌀밥', 'D000001'),
   ('밥', 'D000001'),
@@ -1487,8 +1486,8 @@ select run_finalize('2026-10-11 09:00+09');
 select run_finalize('2026-10-12 09:00+09');
 select run_finalize('2026-10-13 09:00+09');
 select compute_daily_score(id, '2026-10-13', 'provisional') from participants where challenge_id = '6a026e42-81f4-4b9f-a040-223f93f99180';
-select build_leaderboard('6a026e42-81f4-4b9f-a040-223f93f99180', 'today', '2026-10-13', false);
-select build_leaderboard('6a026e42-81f4-4b9f-a040-223f93f99180', 'cumulative', '2026-10-13', false);
+select build_leaderboard('6a026e42-81f4-4b9f-a040-223f93f99180', 'today', '2026-10-13', false, '2026-10-13 21:00+09');
+select build_leaderboard('6a026e42-81f4-4b9f-a040-223f93f99180', 'cumulative', '2026-10-13', false, '2026-10-13 21:00+09');
 insert into health_alerts (participant_id, challenge_id, type, local_date, detail) values
   ('d36c7a3f-56a1-4551-a21c-f6ff5aeb8edf', '6a026e42-81f4-4b9f-a040-223f93f99180', 'low_intake_3d', '2026-10-11', '{"from":"2026-10-09","to":"2026-10-11","nudge_at":"2026-10-12 09:10"}'::jsonb),
   ('d4eafb39-08aa-4c7d-a9e1-cc677ac36c3a', '6a026e42-81f4-4b9f-a040-223f93f99180', 'high_activity_3d', '2026-10-12', '{"from":"2026-10-10","to":"2026-10-12","nudge_at":"2026-10-13 09:10"}'::jsonb);

@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "check": "deno check _shared/**/*.ts analyze-meal/*.ts sync-activity/*.ts verdict/*.ts notify/*.ts",
+    "test": "deno test --allow-env --allow-read"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2"
+  },
+  "compilerOptions": { "strict": true },
+  "fmt": { "lineWidth": 120, "singleQuote": true }
+}

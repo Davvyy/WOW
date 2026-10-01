@@ -83,6 +83,7 @@ begin
   perform tests.eq((select count(*)::int from health_alerts), 2, '운영자: 건강 알림 비공개 섹션 2건');
   perform tests.eq((select count(*)::int from participant_notes), 1, '운영자: 메모');
   perform tests.eq((select count(*)::int from review_reporters), 1, '운영자: 신고 내용');
+  perform tests.eq((select record_mode_reason::text from profiles where user_id = tests.uid('새벽커피')), 'bmi', '운영자: 기록 모드 사유(드로어 운영자 전용)');
   perform tests.ok((select count(*) from daily_scores) >= 96, '운영자: 전체 장부');
   perform tests.ok((select count(*) from v_challenge_summary) = 2, '운영자: OP0 요약 뷰');
   perform tests.eq((select open_reviews from v_challenge_summary where id = ch), 3, '운영자: 미결 3건');

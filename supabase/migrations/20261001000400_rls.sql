@@ -59,6 +59,13 @@ end $$;
 -- ---------------------------------------------------------------- 계정
 create policy users_self on users for all to authenticated using (id = auth.uid()) with check (id = auth.uid());
 create policy profiles_self on profiles for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+-- 기록 모드 사유는 OP2 드로어 "운영자만 열람" 영역에서만(06 OP2). 타인 참가자는 볼 수 없다.
+create or replace function operates_user(p_user uuid) returns boolean
+  language sql stable security definer set search_path = public as $$
+  select exists (select 1 from participants p join challenges c on c.id = p.challenge_id
+    where p.user_id = p_user and c.operator_id = auth.uid())
+$$;
+create policy profiles_operator on profiles for select to authenticated using (operates_user(user_id));
 create policy consents_self on consents for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy devices_self on devices for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -328,9 +335,9 @@ create or replace function map_food_candidates(p_candidates text[]) returns json
 declare v_best record; v_chips jsonb;
 begin
   select x.food_code, x.name_kr, x.kcal, x.score into v_best from (
-    select r.*, row_number() over (order by r.score desc) rn from unnest(p_candidates) with ordinality c(name, ord),
+    select r.*, c.ord from unnest(p_candidates) with ordinality c(name, ord),
       lateral food_search(c.name) r) x
-  order by x.score desc limit 1;
+  order by x.score desc, x.ord, x.food_code limit 1;
   select coalesce(jsonb_agg(jsonb_build_object('food_code', z.food_code, 'name', z.name_kr, 'kcal', z.kcal, 'score', z.score)), '[]')
   into v_chips from (
     select distinct on (r.food_code) r.* from unnest(p_candidates) c(name), lateral food_search(c.name) r
@@ -354,7 +361,7 @@ grant execute on function
   intake_kcal(int, jsonb, int, challenge_rules), score_simulate(int, numeric, numeric, int, challenge_rules),
   score_simulate_from_inputs(jsonb), meal_item_kcal(numeric, numeric, int, boolean, numeric, challenge_rules),
   kst_date(timestamptz), kst_at(date, time), challenge_open_review_count(uuid),
-  is_challenge_operator(uuid), is_challenge_member(uuid), owns_participant(uuid), operates_participant(uuid), participant_in_challenge(uuid, uuid),
+  is_challenge_operator(uuid), is_challenge_member(uuid), owns_participant(uuid), operates_participant(uuid), participant_in_challenge(uuid, uuid), operates_user(uuid),
   join_challenge(jsonb), food_search(text), map_food_candidates(text[]),
   apply_verdict(uuid, verdict_type, boolean, uuid, text, timestamptz), transition_challenge(uuid, challenge_status, uuid, timestamptz),
   reason_sentence(text), verdict_message(text, verdict_type, jsonb), format_k1(numeric), format_signed1(numeric), format_md(date), josa_ro(text),
