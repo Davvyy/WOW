@@ -60,24 +60,38 @@ final deviceIdStoreProvider = Provider<DeviceIdStore>((_) => AppConfig.hasSupaba
     ? FileDeviceIdStore(() async => File('${(await getApplicationSupportDirectory()).path}/push_device_id'))
     : MemoryDeviceIdStore());
 
-/// 분석 완료 푸시를 반영한 결과. [opened] 면 알림을 눌러 들어온 것(P7 로 이동), 아니면 화면에 떠 있을 때 받은 것(안내만).
-class DraftReady {
-  const DraftReady(this.slot, {required this.opened});
-  final MealSlot slot;
+/// 푸시를 반영한 결과. [opened] 면 알림을 눌러 들어온 것(해당 화면으로 이동), 아니면 화면에 떠 있을 때 받은 것(안내만).
+sealed class PushEvent {
+  const PushEvent({required this.opened});
   final bool opened;
 }
 
+/// N-04 분석 완료 → 그 끼니가 초안이 됨(P7)
+class DraftReady extends PushEvent {
+  const DraftReady(this.slot, {required super.opened});
+  final MealSlot slot;
+}
+
+/// N-06 판정 결과 → 장부·검토 카드·순위를 다시 읽음(P10)
+class VerdictReady extends PushEvent {
+  const VerdictReady(this.reviewId, this.message, {this.verdict, required super.opened});
+  final String reviewId;
+  final String message;
+  final String? verdict;
+}
+
 /// 기기 등록(토큰·권한 → register_device)과 N-04 처리.
-/// N-04 를 받으면 그 끼니를 서버에서 다시 읽어 초안으로 바꾸고 [draftReady] 로 알린다(화면 이동·안내는 앱 셸이 한다).
+/// N-04 를 받으면 그 끼니를 서버에서 다시 읽어 초안으로 바꾸고, N-06 을 받으면 장부·검토·순위를 다시 읽게 한 뒤
+/// [events] 로 알린다(화면 이동·안내는 앱 셸이 한다).
 class PushController {
   PushController(this._ref);
   final Ref _ref;
   final _subs = <StreamSubscription<Object?>>[];
-  final _ready = StreamController<DraftReady>.broadcast();
+  final _ready = StreamController<PushEvent>.broadcast();
   bool _started = false;
   String? _lastToken;
 
-  Stream<DraftReady> get draftReady => _ready.stream;
+  Stream<PushEvent> get events => _ready.stream;
   bool get started => _started;
 
   PushService get _push => _ref.read(pushServiceProvider);
@@ -142,11 +156,27 @@ class PushController {
   /// 마지막으로 서버에 올린 토큰(테스트·점검용)
   String? get registeredToken => _lastToken;
 
-  /// 받은 푸시 처리. N-04 만 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
+  /// 받은 푸시 처리. N-04·N-06 만 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
   Future<void> handle(PushMessage m, {required bool opened}) async {
-    if (!m.isAnalysisDone) return;
-    final slot = await _ref.read(mealsProvider.notifier).applyAnalysisPush(m.mealId!, hint: m.slot);
-    if (slot != null && !_ready.isClosed) _ready.add(DraftReady(slot, opened: opened));
+    if (m.isAnalysisDone) {
+      final slot = await _ref.read(mealsProvider.notifier).applyAnalysisPush(m.mealId!, hint: m.slot);
+      if (slot != null) _emit(DraftReady(slot, opened: opened));
+    } else if (m.isVerdict) {
+      _applyVerdict(m.verdict);
+      _emit(VerdictReady(m.reviewId!, m.body ?? '판정 결과가 나왔어요', verdict: m.verdict, opened: opened));
+    }
+  }
+
+  /// 판정은 점수(무효면 그날 대체값으로 재계산)·검토 상태·순위를 바꾼다. 경고·순위 제외는 참가 상태도 바뀌므로 세션까지.
+  void _applyVerdict(String? verdict) {
+    _ref.invalidate(myReviewsProvider);
+    _ref.invalidate(ledgerProvider);
+    _ref.invalidate(leaderboardProvider);
+    if (verdict == 'warn' || verdict == 'exclude') _ref.invalidate(sessionProvider);
+  }
+
+  void _emit(PushEvent e) {
+    if (!_ready.isClosed) _ready.add(e);
   }
 
   void dispose() {

@@ -28,40 +28,45 @@ class _ChalloryAppState extends ConsumerState<ChalloryApp> {
     }
   });
 
-  StreamSubscription<DraftReady>? _drafts;
+  StreamSubscription<PushEvent>? _pushEvents;
 
   @override
   void initState() {
     super.initState();
     _lifecycle; // 등록
     final push = ref.read(pushControllerProvider);
-    _drafts = push.draftReady.listen(_onDraftReady);
+    _pushEvents = push.events.listen(_onPush);
     // 참가 세션이 준비되면 푸시 수신 시작(이미 허용했으면 토큰 등록, 알림으로 실행됐으면 그 끼니로)
     ref.listenManual(sessionProvider, (_, next) {
       if (next.value != null) push.start();
     }, fireImmediately: true);
   }
 
-  /// 분석 완료(N-04): 알림을 눌러 들어왔으면 P7, 앱을 보고 있었으면 안내 + 확인하기
-  void _onDraftReady(DraftReady d) {
+  /// 알림을 눌러 들어왔으면 해당 화면으로, 앱을 보고 있었으면 하단 안내 + 바로가기
+  ///  - N-04 분석 완료 → P7(그 끼니) · N-06 판정 결과 → P10 장부(판정 배너·정정 이력)
+  void _onPush(PushEvent e) {
     final router = ref.read(routerProvider);
-    if (d.opened) {
-      router.push(R.meal(d.slot));
+    final (route, text, label, secs) = switch (e) {
+      DraftReady(:final slot) => (R.meal(slot), '${slotLabel[slot]} 분석이 끝났어요', '확인하기', 4),
+      VerdictReady(:final message) => (R.ledger, message, '장부 보기', 8),
+    };
+    if (e.opened) {
+      router.push(route);
       return;
     }
     final m = rootMessengerKey.currentState;
     if (m == null) return;
     m.hideCurrentSnackBar();
     m.showSnackBar(SnackBar(
-      content: Text('${slotLabel[d.slot]} 분석이 끝났어요'),
-      duration: const Duration(seconds: 4),
-      action: SnackBarAction(label: '확인하기', onPressed: () => router.push(R.meal(d.slot))),
+      content: Text(text),
+      duration: Duration(seconds: secs),
+      action: SnackBarAction(label: label, onPressed: () => router.push(route)),
     ));
   }
 
   @override
   void dispose() {
-    _drafts?.cancel();
+    _pushEvents?.cancel();
     _lifecycle.dispose();
     super.dispose();
   }

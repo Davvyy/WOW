@@ -1,5 +1,5 @@
 import { assertEquals } from '@std/assert';
-import { dispatch, FcmPushSender, LogPushSender, pushData } from './push.ts';
+import { dispatch, FcmPushSender, LogPushSender, pushData, sendNow } from './push.ts';
 
 Deno.test('N-04 데이터: meal_id·slot 이 문자열로 실리고 type·id 는 덮어쓰지 못함', () => {
   const d = pushData({ id: 'n1', type: 'N-04', title: '분석 완료', body: '점심 분석이 끝났어요', payload: { meal_id: 'm1', slot: 'lunch', n: 3, type: 'x' }, push_tokens: [] });
@@ -25,4 +25,23 @@ Deno.test('FCM v1 요청: data 와 안드로이드 높은 우선순위', async (
   const m = (body as any).message;
   assertEquals(m.data, { type: 'N-04', meal_id: 'm1' });
   assertEquals(m.android, { priority: 'HIGH' });
+});
+
+Deno.test('바로 보내기: 한 건씩 집고, 집기 오류는 건너뜀(워커가 이어서)', async () => {
+  const push = new LogPushSender();
+  const claimed: string[] = [];
+  const db = {
+    rpc(_fn: 'claim_notification', { p_id }: { p_id: string }) {
+      claimed.push(p_id);
+      if (p_id === 'bad') return Promise.resolve({ data: null, error: { message: 'x' } });
+      return Promise.resolve({
+        data: [{ id: p_id, type: 'N-06', title: '판정 결과', body: '10.12 저녁 기록은 승인됐어요', payload: { review_id: 'r1', verdict: 'approve' }, push_tokens: ['t'] }],
+        error: null,
+      });
+    },
+  };
+  const sent = await sendNow(db, ['n1', 'bad'], push);
+  assertEquals(claimed, ['n1', 'bad']);
+  assertEquals(sent, 1);
+  assertEquals(push.sent[0].data, { review_id: 'r1', verdict: 'approve', type: 'N-06', id: 'n1' });
 });

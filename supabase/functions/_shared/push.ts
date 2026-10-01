@@ -76,3 +76,22 @@ export async function dispatch(rows: ClaimedNotification[], push: PushSender): P
   }
   return sent;
 }
+
+/** claim_notification 만 부를 수 있으면 되는 최소 DB 모양(테스트에서 가짜로 대신) */
+export interface ClaimRpc {
+  rpc(fn: 'claim_notification', args: { p_id: string }): PromiseLike<{ data: unknown; error: unknown }>;
+}
+
+/**
+ * transactional 알림(N-04·N-06)을 워커 주기(1~5분)를 기다리지 않고 바로 보낸다.
+ * 한 건씩 집으므로(claim_notification) 워커와 겹쳐도 두 번 가지 않고, 토큰 없음·권한 미허용이면 no_push 로 남는다.
+ */
+export async function sendNow(db: ClaimRpc, ids: string[], push: PushSender): Promise<number> {
+  let sent = 0;
+  for (const id of ids) {
+    const { data, error } = await db.rpc('claim_notification', { p_id: id });
+    if (error) continue; // 남은 건 워커가 보낸다
+    sent += await dispatch((data ?? []) as ClaimedNotification[], push);
+  }
+  return sent;
+}

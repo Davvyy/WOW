@@ -10,6 +10,9 @@ import 'package:challory/state/push_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+PushMessage n06(String verdict, {String body = '10.12 저녁 기록은 같은 사진으로 확인돼 무효로 처리했어요. 이날 점수는 41.2 → 12.7점이에요.'}) =>
+    PushMessage(data: {'type': 'N-06', 'id': 'n2', 'review_id': 'r-0415', 'verdict': verdict}, title: '판정 결과', body: body);
+
 PushMessage n04(String mealId, [MealSlot slot = MealSlot.lunch]) =>
     PushMessage(data: {'type': 'N-04', 'id': 'n1', 'meal_id': mealId, 'slot': slot.name}, title: '분석 완료', body: '점심 분석이 끝났어요');
 
@@ -57,7 +60,7 @@ void main() {
     final n = c.read(mealsProvider.notifier);
     n.reset([for (final s in MealSlot.values) s == meal.slot ? MealRecord(slot: s, status: MealStatus.captured, serverId: meal.mealId) : MealRecord(slot: s)]);
     final ctl = c.read(pushControllerProvider);
-    final ready = ctl.draftReady.first;
+    final ready = ctl.events.first.then((e) => e as DraftReady);
     push.current = PushPermission.granted;
     await ctl.start();
     push.emitForeground(n04(meal.mealId));
@@ -75,7 +78,7 @@ void main() {
       ..current = PushPermission.granted
       ..launch = n04('meal-unknown', MealSlot.dinner);
     final ctl = c.read(pushControllerProvider);
-    final ready = ctl.draftReady.first;
+    final ready = ctl.events.first.then((e) => e as DraftReady);
     await ctl.start();
     final d = await ready;
     expect(d.slot, MealSlot.dinner);
@@ -98,6 +101,76 @@ void main() {
     expect(api.devices, isEmpty);
     expect(await c.read(deviceIdStoreProvider).read(), isNull);
     expect(ctl.started, isFalse);
+  });
+
+  test('N-06 판정 결과 → 장부·검토·순위를 다시 읽고 통지 문장으로 알림', () async {
+    // 화면이 보고 있는 상태처럼 구독해 둔다
+    final subs = [
+      c.listen(ledgerProvider, (_, _) {}),
+      c.listen(myReviewsProvider, (_, _) {}),
+      c.listen(leaderboardProvider, (_, _) {}),
+    ];
+    await c.read(ledgerProvider.future);
+    await c.read(myReviewsProvider.future);
+    await c.read(leaderboardProvider.future);
+    int count(String k) => api.calls.where((x) => x == k).length;
+    final before = {for (final k in ['ledger', 'reviews', 'leaderboard']) k: count(k)};
+
+    final ctl = c.read(pushControllerProvider);
+    final ev = ctl.events.first;
+    await ctl.handle(n06('void'), opened: false);
+    final e = await ev as VerdictReady;
+    expect(e.reviewId, 'r-0415');
+    expect(e.verdict, 'void');
+    expect(e.message, contains('41.2 → 12.7'));
+    expect(e.opened, isFalse);
+    await c.read(ledgerProvider.future);
+    await c.read(myReviewsProvider.future);
+    await c.read(leaderboardProvider.future);
+    expect(count('ledger'), before['ledger']! + 1);
+    expect(count('reviews'), before['reviews']! + 1);
+    expect(count('leaderboard'), before['leaderboard']! + 1);
+    for (final s in subs) {
+      s.close();
+    }
+  });
+
+  test('N-06 순위 제외·경고는 세션(참가 상태)까지 다시 읽음 · 알림을 눌러 들어오면 opened', () async {
+    var rebuilt = 0;
+    final sub = c.listen(sessionProvider, (_, _) => rebuilt++);
+    await c.read(sessionProvider.future);
+    rebuilt = 0;
+    final ctl = c.read(pushControllerProvider);
+    var ev = ctl.events.first;
+    await ctl.handle(n06('approve'), opened: false);
+    await ev;
+    await c.read(sessionProvider.future);
+    expect(rebuilt, 0, reason: '승인은 참가 상태가 그대로');
+    ev = ctl.events.first;
+    await ctl.handle(n06('exclude'), opened: true);
+    expect((await ev).opened, isTrue);
+    await c.read(sessionProvider.future);
+    expect(rebuilt, greaterThan(0));
+    sub.close();
+  });
+
+  test('review_id 없는 N-06 은 무시', () async {
+    final ctl = c.read(pushControllerProvider);
+    var got = false;
+    final sub = ctl.events.listen((_) => got = true);
+    await ctl.handle(const PushMessage(data: {'type': 'N-06', 'id': 'x'}), opened: false);
+    await pumpEventQueue();
+    expect(got, isFalse);
+    await sub.cancel();
+  });
+
+  testWidgets('앱 셸: 화면에 떠 있을 때 받은 N-06 은 통지 문장 + "장부 보기"', (tester) async {
+    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const ChalloryApp()));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => c.read(pushControllerProvider).handle(n06('approve', body: '10.12 걸음 기록은 확인 결과 그대로 인정했어요.'), opened: false));
+    await tester.pump();
+    expect(find.text('10.12 걸음 기록은 확인 결과 그대로 인정했어요.'), findsOneWidget);
+    expect(find.text('장부 보기'), findsOneWidget);
   });
 
   testWidgets('앱 셸: 화면에 떠 있을 때 받은 N-04 는 "점심 분석이 끝났어요 · 확인하기" 안내', (tester) async {

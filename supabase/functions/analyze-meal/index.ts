@@ -4,7 +4,7 @@
 import { analyzeMeal, type AnalyzeDeps, type FoodMatch } from '../_shared/analyze.ts';
 import { selectAdapter } from '../_shared/ai/select.ts';
 import { handle, HttpError, json } from '../_shared/http.ts';
-import { dispatch, selectPushSender, type ClaimedNotification } from '../_shared/push.ts';
+import { selectPushSender, sendNow } from '../_shared/push.ts';
 import { env, serviceClient } from '../_shared/supabase.ts';
 
 const BUCKET = 'meal-photos';
@@ -69,8 +69,7 @@ Deno.serve((req) =>
         });
         if (e4 || !nid) return;
         // transactional: 워커 주기(1~5분)를 기다리지 않고 바로 보낸다. 토큰 없음·권한 미허용이면 no_push 로 남고 앱이 홈에서 다시 읽는다.
-        const { data: rows } = await db.rpc('claim_notification', { p_id: nid });
-        await dispatch((rows ?? []) as ClaimedNotification[], selectPushSender(env));
+        await sendNow(db, [nid as string], selectPushSender(env));
       },
     };
     const out = await analyzeMeal(meal_id, deps);

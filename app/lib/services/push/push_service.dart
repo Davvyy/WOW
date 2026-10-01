@@ -12,7 +12,7 @@ enum PushPermission {
   final String wire;
 }
 
-/// 받은 푸시 한 건. 서버 notify·analyze-meal 이 data 에 type·id(알림)와 payload(N-04: meal_id·slot)를 싣는다.
+/// 받은 푸시 한 건. 서버 notify·analyze-meal·verdict 가 data 에 type·id(알림)와 payload(N-04: meal_id·slot, N-06: review_id·verdict)를 싣는다.
 class PushMessage {
   const PushMessage({required this.data, this.title, this.body});
   final Map<String, String> data;
@@ -23,8 +23,16 @@ class PushMessage {
   String? get mealId => data['meal_id'];
   MealSlot? get slot => MealSlot.values.where((s) => s.name == data['slot']).firstOrNull;
 
+  String? get reviewId => data['review_id'];
+
+  /// approve · warn · void · exclude
+  String? get verdict => data['verdict'];
+
   /// N-04 분석 완료
   bool get isAnalysisDone => type == 'N-04' && mealId != null;
+
+  /// N-06 판정 결과(통지 문장 = 알림 본문: 사유 + 판정 + 점수 영향)
+  bool get isVerdict => type == 'N-06' && reviewId != null;
 }
 
 /// 푸시 수신 계약. [FirebasePushService](FCM) · [NoPushService](설정 없음) · [MockPushService](테스트).

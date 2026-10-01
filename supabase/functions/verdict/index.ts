@@ -3,7 +3,8 @@
 // 확정(dry_run=false)은 Idempotency-Key 필수. 통지 문장은 사유+판정+점수 영향 템플릿 조합만(SQL verdict_message).
 import { handle, HttpError, json, fromDbError } from '../_shared/http.ts';
 import { withIdempotency } from '../_shared/idempotency.ts';
-import { PgIdempotencyStore, requireUser, serviceClient } from '../_shared/supabase.ts';
+import { selectPushSender, sendNow } from '../_shared/push.ts';
+import { env, PgIdempotencyStore, requireUser, serviceClient } from '../_shared/supabase.ts';
 
 const VERDICTS = new Set(['approve', 'warn', 'void', 'exclude']);
 
@@ -21,7 +22,14 @@ Deno.serve((req) =>
       return { status: 200, body: data };
     };
     if (body.dry_run !== false) return json((await call()).body);
-    const out = await withIdempotency(new PgIdempotencyStore(serviceClient()), user.id, req.headers.get('idempotency-key'), 'verdict', body, call);
+    const db = serviceClient();
+    const out = await withIdempotency(new PgIdempotencyStore(db), user.id, req.headers.get('idempotency-key'), 'verdict', body, call);
+    if (!out.replayed && out.status === 200) {
+      // N-06 판정 결과(transactional): apply_verdict 가 큐에 넣은 당사자 알림을 바로 보낸다. 실패해도 워커가 이어서 보낸다.
+      const { data: pending } = await db.from('notifications').select('id')
+        .eq('type', 'N-06').is('sent_at', null).is('skipped_reason', null).contains('payload', { review_id: body.review_id });
+      await sendNow(db, (pending ?? []).map((n: { id: string }) => n.id), selectPushSender(env));
+    }
     return json(out.body, out.status, out.replayed ? { 'idempotent-replayed': 'true' } : {});
   })
 );
