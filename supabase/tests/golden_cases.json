@@ -1,0 +1,127 @@
+{
+  "_doc": "점수 엔진 골든 케이스. SQL(score_simulate_from_inputs)·Dart(ChalloryEngine)·프로토타입(data.js)이 같은 입력으로 같은 값을 내야 한다. 근거: docs/02 §5, docs/04 §6·§9, prototype/data.js. 허용 오차 ±0.05.",
+  "cases": [
+    {
+      "id": "G1", "desc": "폰만 70 kg 남 175 cm 30세, 걸음 9,000, 3끼 확정 1,800 (02 §5 예1, 04 G1)",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 420}, {"slot": "lunch", "status": "confirmed", "kcal": 780}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"bmr": 1650, "m_p": 742.5, "f_p": 1320, "steps_net_kcal": 294.0, "a_d": 294.0, "i_d": 1800.0, "d_d": 144.0, "s_d": 28.8, "main_meal_count": 3}
+    },
+    {
+      "id": "G2", "desc": "워치 58 kg 여 163 cm 30세, 걸음 12,000 중 4,500보는 30분 9 km/h 달리기 세션, 3끼 1,350 (02 §5 예2, 04 G2)",
+      "input": {"sex": "F", "weight_kg": 58, "height_cm": 163, "age": 30, "steps_total": 12000, "floors": 0,
+        "sessions": [{"type": "running", "minutes": 30, "distance_m": 4500, "steps_in_range": 4500}],
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 380}, {"slot": "lunch", "status": "confirmed", "kcal": 520}, {"slot": "dinner", "status": "confirmed", "kcal": 450}]},
+      "expect": {"bmr": 1290, "f_p": 1200, "steps_net_kcal": 203.0, "sessions_net_kcal": 217.5, "a_d": 420.5, "i_d": 1350.0, "d_d": 360.5, "s_d": 72.1, "main_meal_count": 3}
+    },
+    {
+      "id": "G3", "desc": "예1 인물이 1끼(저녁 600)만 확정, 나머지 미기록 → I=600+2×742.5 (02 §5 검증)",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"bmr": 1650, "a_d": 294.0, "i_d": 2085.0, "d_d": -141.0, "s_d": 0.0, "main_meal_count": 1}
+    },
+    {
+      "id": "G3b", "desc": "04 §6 예3: 저녁 600 확정, 간식 커피 100, 점심 AI 850 미확정(잠정 1,105), 아침 미촬영",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "dinner", "status": "confirmed", "kcal": 600}, {"slot": "snack", "status": "confirmed", "kcal": 100}, {"slot": "lunch", "status": "draft", "ai_kcal": 850}]},
+      "expect": {"i_d": 2547.5, "d_d": -603.5, "s_d": 0.0, "main_meal_count": 2}
+    },
+    {
+      "id": "T24", "desc": "예1 + 간식 커피 100 확정 → I 1,900, D 44, S 8.8",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 420}, {"slot": "lunch", "status": "confirmed", "kcal": 780}, {"slot": "dinner", "status": "confirmed", "kcal": 600}, {"slot": "snack", "status": "confirmed", "kcal": 100}]},
+      "expect": {"i_d": 1900.0, "d_d": 44.0, "s_d": 8.8, "main_meal_count": 3}
+    },
+    {
+      "id": "L1012", "desc": "장부 D7(10.12) 정정 전: 걸음 10,898, 3끼 420/780/600 → 41.2",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 10898, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 420}, {"slot": "lunch", "status": "confirmed", "kcal": 780}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"a_d": 356.0, "i_d": 1800.0, "d_d": 206.0, "s_d": 41.2}
+    },
+    {
+      "id": "L1012v", "desc": "장부 D7(10.12) 저녁 무효(dup_photo) → 대체값 742.5 → 12.7",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 10898, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 420}, {"slot": "lunch", "status": "confirmed", "kcal": 780}, {"slot": "dinner", "status": "void"}]},
+      "expect": {"i_d": 1942.5, "d_d": 63.5, "s_d": 12.7, "main_meal_count": 2}
+    },
+    {
+      "id": "SKIP", "desc": "건너뜀 초과: 저녁 600 확정 + 아침·점심 건너뜀(1일 1회 한도) → 두 번째 건너뜀은 대체값 → 120.3",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "skipped"}, {"slot": "lunch", "status": "skipped"}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"i_d": 1342.5, "d_d": 601.5, "s_d": 120.3, "main_meal_count": 1, "skip_over": true}
+    },
+    {
+      "id": "SKIPW", "desc": "주 4회째 건너뜀(이번 주 3회 사용) → 대체값 적용 (04 T12)",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0, "skips_used_this_week": 3,
+        "meals": [{"slot": "breakfast", "status": "skipped"}, {"slot": "lunch", "status": "confirmed", "kcal": 780}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"i_d": 2122.5, "s_d": 0.0, "skip_over": true}
+    },
+    {
+      "id": "EX4", "desc": "04 §6 예4: 75 kg 남 180/30, 걸음 41,000, 60분 11 km 달리기(9,000보), 72층, 3끼 2,100 → A 상한 1,000 → 126.0",
+      "input": {"sex": "M", "weight_kg": 75, "height_cm": 180, "age": 30, "steps_total": 41000, "floors": 72,
+        "sessions": [{"type": "running", "minutes": 60, "distance_m": 11000, "steps_in_range": 9000}],
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 700}, {"slot": "lunch", "status": "confirmed", "kcal": 700}, {"slot": "dinner", "status": "confirmed", "kcal": 700}]},
+      "expect": {"bmr": 1730, "steps_net_kcal": 1050.0, "sessions_net_kcal": 622.5, "floors_kcal": 105.7, "a_raw": 1778.2, "a_d": 1000.0, "a_capped": true, "i_d": 2100.0, "d_d": 630.0, "s_d": 126.0}
+    },
+    {
+      "id": "T02", "desc": "걸음 35,000 70 kg → steps_out 30,000, net 980.0",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 35000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 420}, {"slot": "lunch", "status": "confirmed", "kcal": 780}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"steps_out": 30000, "steps_net_kcal": 980.0, "a_d": 980.0}
+    },
+    {
+      "id": "T03a", "desc": "30분 4.8 km(9.6 km/h) → MET 8.5 → (8.5−1)×70×0.5 = 262.5",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 0, "floors": 0,
+        "sessions": [{"type": "running", "minutes": 30, "distance_m": 4800, "steps_in_range": 0}], "meals": []},
+      "expect": {"sessions_net_kcal": 262.5, "s_d": 0.0, "main_meal_count": 0}
+    },
+    {
+      "id": "T03b", "desc": "30분 4.825 km(9.65 km/h, 경계 사이) → 8.5",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 0, "floors": 0,
+        "sessions": [{"type": "running", "minutes": 30, "distance_m": 4825, "steps_in_range": 0}], "meals": []},
+      "expect": {"sessions_net_kcal": 262.5}
+    },
+    {
+      "id": "T03c", "desc": "30분 4.85 km(9.7 km/h, 경계) → 9.3 → 290.5",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 0, "floors": 0,
+        "sessions": [{"type": "running", "minutes": 30, "distance_m": 4850, "steps_in_range": 0}], "meals": []},
+      "expect": {"sessions_net_kcal": 290.5}
+    },
+    {
+      "id": "T04", "desc": "걷기 세션 40분 → 세션 net 0, 걸음 차감 없음",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "floors": 0,
+        "sessions": [{"type": "walking", "minutes": 40, "distance_m": 3200, "steps_in_range": 4000}], "meals": []},
+      "expect": {"steps_out": 9000, "sessions_net_kcal": 0.0, "a_d": 294.0}
+    },
+    {
+      "id": "T05", "desc": "MANUAL_ENTRY 달리기 → 제외, 차감 없음",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "floors": 0,
+        "sessions": [{"type": "running", "minutes": 30, "distance_m": 4500, "steps_in_range": 4500, "recording_method": "MANUAL_ENTRY"}], "meals": []},
+      "expect": {"steps_out": 9000, "sessions_net_kcal": 0.0, "a_d": 294.0}
+    },
+    {
+      "id": "T10a", "desc": "149 kcal 3건 → 끼니 0개 → S=0 (I는 447+3×742.5)",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 30000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 149}, {"slot": "lunch", "status": "confirmed", "kcal": 149}, {"slot": "dinner", "status": "confirmed", "kcal": 149}]},
+      "expect": {"i_d": 2674.5, "main_meal_count": 0, "s_d": 0.0}
+    },
+    {
+      "id": "T11", "desc": "점심 AI 초안 400 → 잠정 max(742.5, 520) = 742.5, 끼니 슬롯 충족",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 420}, {"slot": "lunch", "status": "draft", "ai_kcal": 400}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"i_d": 1762.5, "main_meal_count": 3, "d_d": 181.5, "s_d": 36.3}
+    },
+    {
+      "id": "T14", "desc": "클램프: 걸음 30,000 + 하한(섭취 1,000 < F 1,320) → D 1,310 → 150.0",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 30000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 300}, {"slot": "lunch", "status": "confirmed", "kcal": 400}, {"slot": "dinner", "status": "confirmed", "kcal": 300}]},
+      "expect": {"i_d": 1000.0, "f_p": 1320, "floor_applied": true, "d_d": 1310.0, "s_d": 150.0}
+    },
+    {
+      "id": "T23", "desc": "잠정: 점심 초안 AI 850(그 외 확정 420/600) → 잠정 I에 1,105 산입",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "confirmed", "kcal": 420}, {"slot": "lunch", "status": "draft", "ai_kcal": 850}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"i_d": 2125.0, "main_meal_count": 3, "s_d": 0.0}
+    }
+  ]
+}
