@@ -72,6 +72,13 @@ class DraftReady extends PushEvent {
   final MealSlot slot;
 }
 
+/// N-05 검토 안내 → 검토 카드(소명 72h)·장부('검토 중')·순위를 다시 읽음(P10 소명)
+class ReviewNotice extends PushEvent {
+  const ReviewNotice(this.reviewId, this.message, {required super.opened});
+  final String? reviewId;
+  final String message;
+}
+
 /// N-06 판정 결과 → 장부·검토 카드·순위를 다시 읽음(P10)
 class VerdictReady extends PushEvent {
   const VerdictReady(this.reviewId, this.message, {this.verdict, required super.opened});
@@ -81,7 +88,7 @@ class VerdictReady extends PushEvent {
 }
 
 /// 기기 등록(토큰·권한 → register_device)과 N-04 처리.
-/// N-04 를 받으면 그 끼니를 서버에서 다시 읽어 초안으로 바꾸고, N-06 을 받으면 장부·검토·순위를 다시 읽게 한 뒤
+/// N-04 를 받으면 그 끼니를 서버에서 다시 읽어 초안으로 바꾸고, N-05·N-06 을 받으면 장부·검토·순위를 다시 읽게 한 뒤
 /// [events] 로 알린다(화면 이동·안내는 앱 셸이 한다).
 class PushController {
   PushController(this._ref);
@@ -156,11 +163,14 @@ class PushController {
   /// 마지막으로 서버에 올린 토큰(테스트·점검용)
   String? get registeredToken => _lastToken;
 
-  /// 받은 푸시 처리. N-04·N-06 만 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
+  /// 받은 푸시 처리. N-04·N-05·N-06 만 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
   Future<void> handle(PushMessage m, {required bool opened}) async {
     if (m.isAnalysisDone) {
       final slot = await _ref.read(mealsProvider.notifier).applyAnalysisPush(m.mealId!, hint: m.slot);
       if (slot != null) _emit(DraftReady(slot, opened: opened));
+    } else if (m.isReviewNotice) {
+      _refreshReviews();
+      _emit(ReviewNotice(m.reviewId, m.body ?? '기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요', opened: opened));
     } else if (m.isVerdict) {
       _applyVerdict(m.verdict);
       _emit(VerdictReady(m.reviewId!, m.body ?? '판정 결과가 나왔어요', verdict: m.verdict, opened: opened));
@@ -169,10 +179,15 @@ class PushController {
 
   /// 판정은 점수(무효면 그날 대체값으로 재계산)·검토 상태·순위를 바꾼다. 경고·순위 제외는 참가 상태도 바뀌므로 세션까지.
   void _applyVerdict(String? verdict) {
+    _refreshReviews();
+    if (verdict == 'warn' || verdict == 'exclude') _ref.invalidate(sessionProvider);
+  }
+
+  /// 검토가 생기거나(N-05: 그날 점수 '검토 중', 순위에서 집계 중) 끝나면(N-06) 바뀌는 것들
+  void _refreshReviews() {
     _ref.invalidate(myReviewsProvider);
     _ref.invalidate(ledgerProvider);
     _ref.invalidate(leaderboardProvider);
-    if (verdict == 'warn' || verdict == 'exclude') _ref.invalidate(sessionProvider);
   }
 
   void _emit(PushEvent e) {

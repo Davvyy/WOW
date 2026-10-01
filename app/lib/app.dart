@@ -43,11 +43,12 @@ class _ChalloryAppState extends ConsumerState<ChalloryApp> {
   }
 
   /// 알림을 눌러 들어왔으면 해당 화면으로, 앱을 보고 있었으면 하단 안내 + 바로가기
-  ///  - N-04 분석 완료 → P7(그 끼니) · N-06 판정 결과 → P10 장부(판정 배너·정정 이력)
+  ///  - N-04 분석 완료 → P7(그 끼니) · N-05 검토 안내 → P10(검토 카드·소명) · N-06 판정 결과 → P10 장부(판정 배너·정정 이력)
   void _onPush(PushEvent e) {
     final router = ref.read(routerProvider);
     final (route, text, label, secs) = switch (e) {
       DraftReady(:final slot) => (R.meal(slot), '${slotLabel[slot]} 분석이 끝났어요', '확인하기', 4),
+      ReviewNotice(:final message) => (R.ledger, message, '설명 남기기', 8),
       VerdictReady(:final message) => (R.ledger, message, '장부 보기', 8),
     };
     if (e.opened) {

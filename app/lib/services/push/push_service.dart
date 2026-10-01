@@ -12,7 +12,7 @@ enum PushPermission {
   final String wire;
 }
 
-/// 받은 푸시 한 건. 서버 notify·analyze-meal·verdict 가 data 에 type·id(알림)와 payload(N-04: meal_id·slot, N-06: review_id·verdict)를 싣는다.
+/// 받은 푸시 한 건. 서버 notify·analyze-meal·verdict 가 data 에 type·id(알림)와 payload(N-04: meal_id·slot, N-05: review_id, N-06: review_id·verdict)를 싣는다.
 class PushMessage {
   const PushMessage({required this.data, this.title, this.body});
   final Map<String, String> data;
@@ -30,6 +30,9 @@ class PushMessage {
 
   /// N-04 분석 완료
   bool get isAnalysisDone => type == 'N-04' && mealId != null;
+
+  /// N-05 검토 안내·소명 요청(신고·배치 플래그). 신고자·사유는 실리지 않는다.
+  bool get isReviewNotice => type == 'N-05';
 
   /// N-06 판정 결과(통지 문장 = 알림 본문: 사유 + 판정 + 점수 영향)
   bool get isVerdict => type == 'N-06' && reviewId != null;

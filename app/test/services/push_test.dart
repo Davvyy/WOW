@@ -154,6 +154,40 @@ void main() {
     sub.close();
   });
 
+  test('N-05 검토 안내 → 검토 카드·장부·순위를 다시 읽고 안내(신고자·사유 없이 서버 문장 그대로)', () async {
+    final subs = [c.listen(ledgerProvider, (_, _) {}), c.listen(myReviewsProvider, (_, _) {}), c.listen(leaderboardProvider, (_, _) {})];
+    await c.read(myReviewsProvider.future);
+    int count(String k) => api.calls.where((x) => x == k).length;
+    final reviews = count('reviews'), ledger = count('ledger'), lb = count('leaderboard');
+    final ctl = c.read(pushControllerProvider);
+    final ev = ctl.events.first;
+    await ctl.handle(const PushMessage(data: {'type': 'N-05', 'id': 'n3', 'review_id': 'r-1'}, title: '기록 확인 안내',
+        body: '기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요'), opened: true);
+    final e = await ev as ReviewNotice;
+    expect(e.reviewId, 'r-1');
+    expect(e.message, '기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요');
+    expect(e.opened, isTrue);
+    await c.read(myReviewsProvider.future);
+    await c.read(ledgerProvider.future);
+    await c.read(leaderboardProvider.future);
+    expect(count('reviews'), reviews + 1);
+    expect(count('ledger'), greaterThan(ledger));
+    expect(count('leaderboard'), greaterThan(lb));
+    for (final s in subs) {
+      s.close();
+    }
+  });
+
+  testWidgets('앱 셸: 화면에 떠 있을 때 받은 N-05 는 안내 + "설명 남기기"', (tester) async {
+    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const ChalloryApp()));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => c.read(pushControllerProvider)
+        .handle(const PushMessage(data: {'type': 'N-05', 'id': 'n3', 'review_id': 'r-1'}, body: '기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요'), opened: false));
+    await tester.pump();
+    expect(find.text('기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요'), findsOneWidget);
+    expect(find.text('설명 남기기'), findsOneWidget);
+  });
+
   test('review_id 없는 N-06 은 무시', () async {
     final ctl = c.read(pushControllerProvider);
     var got = false;

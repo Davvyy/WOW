@@ -2,6 +2,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { HttpError } from './http.ts';
 import type { IdempotencyStore, StoredResponse } from './idempotency.ts';
+import { selectPushSender, sendNow } from './push.ts';
 
 export function env(k: string): string | undefined {
   return Deno.env.get(k);
@@ -38,5 +39,24 @@ export class PgIdempotencyStore implements IdempotencyStore {
   }
   async put(userId: string, key: string, endpoint: string, v: StoredResponse) {
     await this.db.from('idempotency_keys').insert({ user_id: userId, key, endpoint, ...v });
+  }
+}
+
+/**
+ * 방금 큐에 들어간 알림을 워커(1~5분)를 기다리지 않고 보낸다: N-05(검토 안내)·N-06(판정 결과).
+ * [match] 는 user_id 또는 payload.review_id. 예약 시각이 아직이면(22~08시 생성 N-05) claim 이 건너뛰고 워커가 08:00 에 보낸다.
+ * 보내기에서 막혀도 요청은 성공으로 두고 워커가 이어서 보낸다.
+ */
+export async function sendPendingNow(db: SupabaseClient, type: 'N-05' | 'N-06', match: { user_id?: string; review_id?: string }) {
+  try {
+    let q = db.from('notifications').select('id').eq('type', type).is('sent_at', null).is('skipped_reason', null)
+      .lte('scheduled_at', new Date().toISOString());
+    if (match.user_id) q = q.eq('user_id', match.user_id);
+    if (match.review_id) q = q.contains('payload', { review_id: match.review_id });
+    const { data } = await q;
+    return await sendNow(db, (data ?? []).map((n: { id: string }) => n.id), selectPushSender(env));
+  } catch (e) {
+    console.warn('sendPendingNow', type, e);
+    return 0;
   }
 }

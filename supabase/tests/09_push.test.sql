@@ -37,6 +37,13 @@ begin
   n := enqueue_notification(jisu, ch, 'N-04', '분석 완료', '저녁 분석이 끝났어요.', '{}');
   perform tests.eq((select count(*)::int from claim_notification(n)), 0, '토큰 없음 → 발송 안 함');
   perform tests.eq((select skipped_reason from notifications where id = n), 'no_push', 'no_push 기록');
+  -- N-05(scheduled): 22~08시 생성분은 08:00 예약 → 바로 보내기(claim_notification)로도 집히지 않음
+  n := enqueue_notification(night, ch, 'N-05', '기록 확인 안내', '기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요',
+    jsonb_build_object('review_id', gen_random_uuid()), '2026-10-13 23:30+09');
+  perform tests.eq((select count(*)::int from claim_notification(n, '2026-10-13 23:31+09')), 0, 'N-05 밤 생성분은 바로 안 보냄');
+  perform tests.eq((select count(*)::int from claim_notification(n, '2026-10-14 08:00+09')), 1, 'N-05 08:00 에 보냄');
+  n := enqueue_notification(night, ch, 'N-05', '기록 확인 안내', '기록을 확인 중이에요.', '{}', '2026-10-13 12:00+09');
+  perform tests.eq((select scheduled_at from notifications where id = n), '2026-10-13 12:00+09'::timestamptz, 'N-05 낮 생성분은 즉시 예약');
   select array_agg(t) into toks from claim_due_notifications(now(), 200) c, unnest(c.push_tokens) t;
   perform tests.ok(toks is null or not ('tok-A' = any(toks)), '지워진 토큰으로는 안 보냄');
 end $$;
