@@ -7,6 +7,9 @@ import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/services/push/push_service.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/state/push_controller.dart';
+import 'package:challory/state/session.dart' show curChallenge;
+import 'package:challory/ui/screens/p10_ledger.dart' show LedgerScreen;
+import 'package:challory/ui/screens/p5_home.dart' show HomeScreen;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -186,6 +189,54 @@ void main() {
     await tester.pump();
     expect(find.text('기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요'), findsOneWidget);
     expect(find.text('설명 남기기'), findsOneWidget);
+  });
+
+  test('N-01 어제 결과 → 확정된 장부·순위를 다시 읽고 날짜·문장 전달', () async {
+    final subs = [c.listen(ledgerProvider, (_, _) {}), c.listen(leaderboardProvider, (_, _) {})];
+    await c.read(ledgerProvider.future);
+    await c.read(leaderboardProvider.future);
+    int count(String k) => api.calls.where((x) => x == k).length;
+    final ledger = count('ledger'), lb = count('leaderboard'), reviews = count('reviews');
+    final ctl = c.read(pushControllerProvider);
+    final ev = ctl.events.first;
+    await ctl.handle(const PushMessage(data: {'type': 'N-01', 'id': 'n4', 'local_date': '2026-10-12'}, body: '어제 41.2점, 누적 11위'), opened: false);
+    final e = await ev as DailyResult;
+    expect(e.localDate, DateTime(2026, 10, 12));
+    expect(e.message, '어제 41.2점, 누적 11위');
+    await c.read(ledgerProvider.future);
+    await c.read(leaderboardProvider.future);
+    expect(count('ledger'), ledger + 1);
+    expect(count('leaderboard'), lb + 1);
+    expect(count('reviews'), reviews, reason: '검토는 그대로');
+    for (final s in subs) {
+      s.close();
+    }
+  });
+
+  testWidgets('앱 셸: N-01 안내 + "장부 보기" → 그날 장부(P10 ?day)', (tester) async {
+    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const ChalloryApp()));
+    await tester.pumpAndSettle();
+    final day = DateTime(curChallenge.start.year, curChallenge.start.month, curChallenge.start.day).add(const Duration(days: 6));
+    final iso = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+    await tester.runAsync(() => c.read(pushControllerProvider)
+        .handle(PushMessage(data: {'type': 'N-01', 'id': 'n4', 'local_date': iso}, body: '어제 41.2점, 누적 11위'), opened: false));
+    await tester.pump();
+    expect(find.text('어제 41.2점, 누적 11위'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 600)); // 안내가 다 올라온 뒤 누름
+    await tester.tap(find.text('장부 보기'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LedgerScreen), findsOneWidget);
+    expect(tester.widget<LedgerScreen>(find.byType(LedgerScreen)).day, 7);
+  });
+
+  testWidgets('앱 셸: N-01 알림을 눌러 들어오면 P5 홈', (tester) async {
+    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const ChalloryApp()));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => c.read(pushControllerProvider)
+        .handle(const PushMessage(data: {'type': 'N-01', 'id': 'n4', 'local_date': '2026-10-12'}, body: '어제 41.2점'), opened: true));
+    await tester.pumpAndSettle();
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.text('어제 41.2점'), findsNothing, reason: '눌러서 들어온 경우는 안내 없이 이동만');
   });
 
   test('review_id 없는 N-06 은 무시', () async {

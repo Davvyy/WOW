@@ -66,6 +66,13 @@ sealed class PushEvent {
   final bool opened;
 }
 
+/// N-01 어제 확정 결과 → 장부·순위를 다시 읽음(P5 랜딩, 안내에서 그날 장부로)
+class DailyResult extends PushEvent {
+  const DailyResult(this.localDate, this.message, {required super.opened});
+  final DateTime? localDate;
+  final String message;
+}
+
 /// N-04 분석 완료 → 그 끼니가 초안이 됨(P7)
 class DraftReady extends PushEvent {
   const DraftReady(this.slot, {required super.opened});
@@ -88,7 +95,7 @@ class VerdictReady extends PushEvent {
 }
 
 /// 기기 등록(토큰·권한 → register_device)과 N-04 처리.
-/// N-04 를 받으면 그 끼니를 서버에서 다시 읽어 초안으로 바꾸고, N-05·N-06 을 받으면 장부·검토·순위를 다시 읽게 한 뒤
+/// N-04 를 받으면 그 끼니를 서버에서 다시 읽어 초안으로 바꾸고, N-01·N-05·N-06 을 받으면 장부·순위(·검토)를 다시 읽게 한 뒤
 /// [events] 로 알린다(화면 이동·안내는 앱 셸이 한다).
 class PushController {
   PushController(this._ref);
@@ -163,11 +170,16 @@ class PushController {
   /// 마지막으로 서버에 올린 토큰(테스트·점검용)
   String? get registeredToken => _lastToken;
 
-  /// 받은 푸시 처리. N-04·N-05·N-06 만 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
+  /// 받은 푸시 처리. N-01·N-04·N-05·N-06 만 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
   Future<void> handle(PushMessage m, {required bool opened}) async {
     if (m.isAnalysisDone) {
       final slot = await _ref.read(mealsProvider.notifier).applyAnalysisPush(m.mealId!, hint: m.slot);
       if (slot != null) _emit(DraftReady(slot, opened: opened));
+    } else if (m.isDailyResult) {
+      // 09:00 확정 배치가 어제 점수·누적·순위 스냅샷을 확정했으므로 잠정 값을 버린다
+      _ref.invalidate(ledgerProvider);
+      _ref.invalidate(leaderboardProvider);
+      _emit(DailyResult(m.localDate, m.body ?? '어제 결과가 확정됐어요', opened: opened));
     } else if (m.isReviewNotice) {
       _refreshReviews();
       _emit(ReviewNotice(m.reviewId, m.body ?? '기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요', opened: opened));

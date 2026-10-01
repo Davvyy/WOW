@@ -12,7 +12,7 @@ enum PushPermission {
   final String wire;
 }
 
-/// 받은 푸시 한 건. 서버 notify·analyze-meal·verdict 가 data 에 type·id(알림)와 payload(N-04: meal_id·slot, N-05: review_id, N-06: review_id·verdict)를 싣는다.
+/// 받은 푸시 한 건. 서버 notify·analyze-meal·verdict 가 data 에 type·id(알림)와 payload(N-01: local_date, N-04: meal_id·slot, N-05: review_id, N-06: review_id·verdict)를 싣는다.
 class PushMessage {
   const PushMessage({required this.data, this.title, this.body});
   final Map<String, String> data;
@@ -27,6 +27,17 @@ class PushMessage {
 
   /// approve · warn · void · exclude
   String? get verdict => data['verdict'];
+
+  /// N-01 대상 날짜(KST, payload local_date 'YYYY-MM-DD')
+  DateTime? get localDate {
+    final v = data['local_date'];
+    if (v == null) return null;
+    final d = DateTime.tryParse(v);
+    return d == null ? null : DateTime(d.year, d.month, d.day);
+  }
+
+  /// N-01 어제 확정 결과(09:30, 본문 "어제 32.4점, 누적 11위")
+  bool get isDailyResult => type == 'N-01';
 
   /// N-04 분석 완료
   bool get isAnalysisDone => type == 'N-04' && mealId != null;

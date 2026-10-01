@@ -9,6 +9,7 @@ import 'core/theme/theme.dart';
 import 'router.dart';
 import 'state/app_state.dart';
 import 'state/push_controller.dart';
+import 'state/session.dart' show curChallenge;
 
 /// 화면 밖(푸시 처리 등)에서 안내를 띄우는 루트 메신저
 final rootMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -43,10 +44,16 @@ class _ChalloryAppState extends ConsumerState<ChalloryApp> {
   }
 
   /// 알림을 눌러 들어왔으면 해당 화면으로, 앱을 보고 있었으면 하단 안내 + 바로가기
+  ///  - N-01 어제 결과 → P5 홈(06 랜딩), 안내의 "장부 보기"는 그날 장부
   ///  - N-04 분석 완료 → P7(그 끼니) · N-05 검토 안내 → P10(검토 카드·소명) · N-06 판정 결과 → P10 장부(판정 배너·정정 이력)
   void _onPush(PushEvent e) {
     final router = ref.read(routerProvider);
+    if (e is DailyResult && e.opened) {
+      router.go(R.home);
+      return;
+    }
     final (route, text, label, secs) = switch (e) {
+      DailyResult(:final localDate, :final message) => (_ledgerDay(localDate), message, '장부 보기', 6),
       DraftReady(:final slot) => (R.meal(slot), '${slotLabel[slot]} 분석이 끝났어요', '확인하기', 4),
       ReviewNotice(:final message) => (R.ledger, message, '설명 남기기', 8),
       VerdictReady(:final message) => (R.ledger, message, '장부 보기', 8),
@@ -63,6 +70,14 @@ class _ChalloryAppState extends ConsumerState<ChalloryApp> {
       duration: Duration(seconds: secs),
       action: SnackBarAction(label: label, onPressed: () => router.push(route)),
     ));
+  }
+
+  /// 그날 장부(P10 ?day=n, 챌린지 시작일이 1일째). 날짜를 모르면 최신 확정일.
+  static String _ledgerDay(DateTime? d) {
+    if (d == null) return R.ledger;
+    final s = curChallenge.start;
+    final n = d.difference(DateTime(s.year, s.month, s.day)).inDays + 1;
+    return n >= 1 ? '${R.ledger}?day=$n' : R.ledger;
   }
 
   @override
