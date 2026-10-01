@@ -10,7 +10,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/engine/engine.dart';
 import '../../data/models.dart';
 import '../../router.dart';
+import '../../services/push/push_service.dart' show PushPermission;
 import '../../state/app_state.dart';
+import '../../state/push_controller.dart';
 import '../shell.dart';
 import '../widgets/common.dart';
 
@@ -114,7 +116,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     }
   }
 
-  /// 첫 촬영 직후 1회 프리퍼미션 카드. OS 알림 권한 요청은 푸시 연동(FCM) 단계에서 연결한다.
+  /// 첫 촬영 직후 1회 프리퍼미션 카드. "알림 켜기"면 OS 권한 창을 띄우고 결과(허용·거부)를 서버 기기 정보에 남긴다.
   Future<void> _askNotification() async {
     await showChDialog<void>(
       context,
@@ -125,7 +127,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
               Navigator.of(ctx).pop();
               showToast(context, '홈 화면에서 결과를 알려드릴게요');
             })),
-        Builder(builder: (ctx) => ChButton('알림 켜기', onPressed: () => Navigator.of(ctx).pop())),
+        Builder(builder: (ctx) => ChButton('알림 켜기', onPressed: () async {
+              Navigator.of(ctx).pop();
+              final p = await ref.read(pushControllerProvider).enable();
+              if (p == PushPermission.denied && mounted) showToast(context, '알림이 꺼져 있어요. 홈 화면에서 결과를 알려드릴게요');
+            })),
       ],
     );
   }

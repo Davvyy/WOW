@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/config.dart';
+import 'services/push/firebase_push_service.dart';
+import 'state/push_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,5 +16,10 @@ Future<void> main() async {
   if (AppConfig.hasSupabase) {
     await Supabase.initialize(url: AppConfig.supabaseUrl, publishableKey: AppConfig.supabaseAnonKey);
   }
-  runApp(const ProviderScope(child: ChalloryApp()));
+  // 푸시(N-04 분석 완료 등): 서버 연결 + FCM 설정이 있을 때만. 초기화가 안 되면 푸시 없이(홈에서 다시 읽기) 동작한다.
+  final push = AppConfig.hasSupabase && AppConfig.pushEnabled ? await FirebasePushService.tryCreate() : null;
+  runApp(ProviderScope(
+    overrides: [if (push != null) pushServiceProvider.overrideWithValue(push)],
+    child: const ChalloryApp(),
+  ));
 }

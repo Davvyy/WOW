@@ -13,7 +13,9 @@ supabase/
 │   ├── 20261001000400_rls.sql           RLS·권한·뷰·공개 RPC(get_invite·join_challenge·food_search·map_food_candidates)
 │   ├── 20261001000500_cron.sql          pg_cron 스케줄(없으면 건너뜀)
 │   ├── 20261001000600_operator_rpc.sql  운영자 콘솔 RPC(전환·공지·CSV·사진 파기·감사 로그) + Storage 버킷
-│   └── 20261001000700_participant_writes.sql  사진 생성·재검증 · 끼니 생성(슬롯·지연 업로드·중복 해시) · 직접 입력 · 신고 · 계정 삭제
+│   ├── 20261001000700_participant_writes.sql  사진 생성·재검증 · 끼니 생성(슬롯·지연 업로드·중복 해시) · 직접 입력 · 신고 · 계정 삭제
+│   ├── 20261001000800~1100              식사 항목 후보 · 내 챌린지 요약 · 결과 이의 · 최근 음식
+│   └── 20261001001200_push_devices.sql  푸시 기기 등록(register_device) · 알림 한 건 즉시 집기(claim_notification)
 ├── functions/                           Edge Functions(Deno)
 │   ├── _shared/                         AI 어댑터(Gemini·Claude·모의) · 분석 파이프라인 · 멱등성 · 배치 검증 · 푸시 · CSV
 │   ├── photo-upload-url/  meals/  meal-manual/  meal-confirm/  meal-skip/  analyze-meal/  sync-activity/  reports/  account/
@@ -26,7 +28,7 @@ supabase/
     ├── golden_cases.json                골든 케이스(SQL·Dart·프로토타입 공용 입력)
     ├── golden_sql_results.json          SQL 실행 결과(앱 Dart 테스트가 필드별로 비교)
     ├── proto_check.mjs                  프로토타입 엔진으로 같은 케이스 검증
-    └── 00~05_*.test.sql                 헬퍼 · 골든 · 배치/판정/동기화 · RLS · 음식 매핑 · 참가자 쓰기 경로
+    └── 00~09_*.test.sql                 헬퍼 · 골든 · 배치/판정/동기화 · RLS · 음식 매핑 · 참가자 쓰기 경로 · 앱 픽스처 · 요약 · 응원/소명/이의 · 푸시
 ```
 
 ## 점수 엔진 — SQL 함수 하나로
@@ -79,7 +81,8 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 ```
 
 - pg_cron: Dashboard › Database › Extensions 에서 켠 뒤 `20261001000500_cron.sql` 을 다시 실행하면 스케줄이 등록된다(KST = UTC+9: 매시 잠정, 00:00 UTC = 09:00 KST 확정, 09:10 건강 신호, 09:30 N-01, 21:00 N-02, 00:00 KST 생명주기).
-- 알림 발송 워커 `notify` 는 pg_net 또는 외부 스케줄러가 1~5분마다 `x-cron-secret` 헤더로 호출한다.
+- 알림 발송 워커 `notify` 는 pg_net 또는 외부 스케줄러가 1~5분마다 `x-cron-secret` 헤더로 호출한다. 분석 완료(N-04)는 워커를 기다리지 않고 `analyze-meal` 이 큐에 넣은 직후 `claim_notification` 으로 그 한 건을 집어 바로 보낸다(같은 no_push 규칙).
+- 푸시 data 는 `type`·`id`(알림) + payload(N-04: `meal_id`·`slot`)를 문자열로 싣는다. 앱은 N-04 를 받으면 그 끼니를 다시 읽고, 알림을 눌렀으면 P7 로 연다.
 - 키가 없으면 `analyze-meal` 은 모의 어댑터(프로토타입 점심 초안 6항목)를, `notify` 는 로그 발송을 쓴다.
 - 음식 DB: 시드의 `food_db_cache` 30건은 **예시 값**이다. 실제 식약처 음식 표준데이터(15100070)는 CSV를 내려받아 `food_db_cache(food_code, name_kr, category, serving_g, kcal, ...)` 로 적재하고 동의어 100개를 `food_synonyms` 에 넣는다.
 
@@ -112,9 +115,9 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 
 | 호출자 | 할 수 있는 것 |
 |---|---|
-| 참가자(authenticated) | 본인 행 읽기, 표시 설정·체중·응원(1일 1회)·소명(1회·72h, 신고 검토 포함) 쓰기, `score_simulate_from_inputs`·`food_search`·`join_challenge` |
+| 참가자(authenticated) | 본인 행 읽기, 표시 설정·체중·응원(1일 1회)·소명(1회·72h, 신고 검토 포함) 쓰기, 본인 기기 행 삭제(로그아웃), `score_simulate_from_inputs`·`food_search`·`join_challenge`·`register_device` |
 | 운영자(challenges.operator_id) | 자기 챌린지 전체 읽기(건강 알림·메모·신고 내용·기록 모드 사유 포함), 참가자 상태·재가입 차단, 규칙(잠금 전), `apply_verdict_rpc`·`transition_challenge_rpc`·`announce_challenge`·`export_rows`·`purge_challenge_photos`·`log_operator_action` |
-| service_role(Edge Function·pg_cron) | `create_photo`·`verify_photo`·`create_meal`·`create_manual_meal`·`confirm_meal`·`skip_meal`·`submit_report`·`delete_account`·`ingest_activity_batch`·`run_*` 배치·`claim_due_notifications` |
+| service_role(Edge Function·pg_cron) | `create_photo`·`verify_photo`·`create_meal`·`create_manual_meal`·`confirm_meal`·`skip_meal`·`submit_report`·`delete_account`·`ingest_activity_batch`·`run_*` 배치·`claim_due_notifications`·`claim_notification` |
 | 익명 | `get_invite(code)` |
 
 PostgREST 오류: 함수가 SQLSTATE `PTnnn` 을 던지면 HTTP `nnn`(403·404·409·412·422)으로 나간다.

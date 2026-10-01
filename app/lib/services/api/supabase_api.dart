@@ -355,4 +355,25 @@ class SupabaseChalloryApi implements ChalloryApi {
     await _fn('account', {'confirm': confirm}, method: HttpMethod.delete);
     await _client.auth.signOut();
   }
+
+  @override
+  Future<String> registerDevice({String? deviceId, required String platform, String? token, required String permission, String? appVersion}) async {
+    final id = await _rpc('register_device', {
+      'p_device': deviceId,
+      'p_platform': platform,
+      'p_token': token,
+      'p_permission': permission,
+      'p_app_version': appVersion,
+    });
+    return id as String;
+  }
+
+  @override
+  Future<void> unregisterDevice(String deviceId) async {
+    try {
+      await _client.from('devices').delete().eq('id', deviceId);
+    } catch (e) {
+      throw _pg(e);
+    }
+  }
 }

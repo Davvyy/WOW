@@ -481,6 +481,21 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     }
   }
 
+  /// 분석 완료 푸시(N-04): 그 끼니가 지금 목록에 있으면 다시 읽고, 없으면(앱이 꺼져 있었음) 오늘 끼니를 통째로 읽는다.
+  /// 반영된 슬롯을 돌려준다(못 찾으면 [hint], 그것도 없으면 null).
+  Future<MealSlot?> applyAnalysisPush(String mealId, {MealSlot? hint}) async {
+    MealSlot? find() => state.where((m) => m.serverId == mealId).firstOrNull?.slot;
+    var slot = find();
+    if (slot == null) {
+      await loadToday();
+      if (!ref.mounted) return null;
+      slot = find();
+      return slot ?? hint;
+    }
+    await refreshMeal(slot, mealId);
+    return slot;
+  }
+
   /// 서버 끼니를 다시 읽어 초안·확정 상태를 반영. 분석이 끝났으면 true.
   Future<bool> refreshMeal(MealSlot slot, String mealId) async {
     final ServerMeal? m;

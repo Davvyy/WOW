@@ -88,6 +88,13 @@ abstract class ChalloryApi {
 
   /// API #22 계정 삭제(확인 문구 "삭제")
   Future<void> deleteAccount(String confirm);
+
+  /// 푸시 기기 등록(RPC register_device). [deviceId] 는 이전에 받은 값(없으면 새 행). 같은 토큰의 다른 행은 서버가 지운다.
+  /// [permission]: granted · denied · not_asked. 반환: 기기 행 id(기기에 저장해 다음에 넘긴다).
+  Future<String> registerDevice({String? deviceId, required String platform, String? token, required String permission, String? appVersion});
+
+  /// 로그아웃 때 이 기기 행을 지워 더는 이 계정 알림이 오지 않게 한다(RLS: 본인 행)
+  Future<void> unregisterDevice(String deviceId);
 }
 
 class InviteSummary {

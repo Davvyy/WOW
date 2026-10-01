@@ -238,6 +238,22 @@ class MockChalloryApi implements ChalloryApi {
     _maybeFail('account');
     if (confirm != '삭제') throw const ApiException(422, '확인을 위해 "삭제"를 입력해 주세요');
   }
+  /// 등록된 기기(id → 토큰·권한). 테스트가 확인한다.
+  final devices = <String, ({String platform, String? token, String permission})>{};
+
+  @override
+  Future<String> registerDevice({String? deviceId, required String platform, String? token, required String permission, String? appVersion}) async {
+    _maybeFail('register_device');
+    final id = deviceId != null && devices.containsKey(deviceId) ? deviceId : 'mock-device-${++_seq}';
+    devices[id] = (platform: platform, token: token, permission: permission);
+    return id;
+  }
+
+  @override
+  Future<void> unregisterDevice(String deviceId) async {
+    _maybeFail('unregister_device');
+    devices.remove(deviceId);
+  }
 }
 
 class _MockMeal {
@@ -267,4 +283,5 @@ MealSlot slotForKst(DateTime t) {
   if (m >= 10 * 60 + 30 && m < 15 * 60) return MealSlot.lunch;
   if (m >= 15 * 60 && m < 22 * 60) return MealSlot.dinner;
   return MealSlot.snack;
+
 }

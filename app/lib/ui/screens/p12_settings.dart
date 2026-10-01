@@ -7,6 +7,8 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../services/health/health_package_source.dart';
 import '../../state/app_state.dart';
+import '../../services/push/push_service.dart' show PushPermission;
+import '../../state/push_controller.dart';
 import '../widgets/common.dart';
 import '../../state/session.dart';
 
@@ -33,7 +35,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // 실제 OS 알림 권한: 거부 상태면 상단 배너(06 P12). 검수용 variant 는 그대로 둔다.
+      if (widget.variant == null) {
+        final p = await ref.read(pushServiceProvider).permission();
+        if (mounted && p == PushPermission.denied) setState(() => _osNotifOff = true);
+      }
       if (!mounted) return;
       switch (widget.variant) {
         case 'notices':
@@ -85,6 +93,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showChSheet<void>(context, builder: (ctx) => _NoticeList(notices: list, fresh: unreadIds));
   }
 
+  /// 배너 "알림 켜기": 권한 창을 다시 띄울 수 있으면 띄우고, OS 가 막았으면 설정 앱 안내
+  Future<void> _enablePush() async {
+    if (widget.variant == 'push-off') return setState(() => _osNotifOff = false); // 검수용
+    final p = await ref.read(pushControllerProvider).enable();
+    if (!mounted) return;
+    if (p == PushPermission.granted) {
+      setState(() => _osNotifOff = false);
+      showToast(context, '알림을 켰어요');
+    } else {
+      showToast(context, '설정 → 앱 → 챌로리 → 알림에서 켜 주세요');
+    }
+  }
+
+  /// 로그아웃: 이 기기의 알림 등록을 지우고(다른 계정 알림이 오지 않게) 로그인을 끝낸다.
+  Future<void> _logout() async {
+    await ref.read(pushControllerProvider).stop();
+    await ref.read(authServiceProvider).signOut();
+    if (mounted) context.go(R.p1);
+  }
+
   Future<void> _openDelete() async {
     final ctrl = TextEditingController();
     final ok = await showDialog<bool>(
@@ -117,6 +145,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       try {
         // 서버: 기록 즉시 삭제 · 일별 점수만 익명 보존 · 로그인 차단(05 API #22)
         await ref.read(apiProvider).deleteAccount('삭제');
+        await ref.read(pushControllerProvider).stop(); // 기기 행은 서버가 지움, 저장해 둔 id 만 정리
         if (!mounted) return;
         showToast(context, '계정을 삭제했어요');
         context.go(R.p1);
@@ -168,7 +197,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           InfoBanner(
             tone: Tone.warn,
             icon: Icons.notifications_off_rounded,
-            action: ChButton('알림 켜기', small: true, kind: BtnKind.quiet, onPressed: () => setState(() => _osNotifOff = false)),
+            action: ChButton('알림 켜기', small: true, kind: BtnKind.quiet, onPressed: _enablePush),
             child: boldThen(context, '알림이 꺼져 있어요', ' · 그동안 분석 결과는 홈 화면에서 알려드려요.', color: c.warn),
           ),
         ChCard(
@@ -244,7 +273,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ChCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const SectionTitle('계정'),
-            li(Icons.logout_rounded, '로그아웃', onTap: () => context.go(R.p1)),
+            li(Icons.logout_rounded, '로그아웃', onTap: _logout),
             li(Icons.delete_forever_rounded, '계정 삭제', sub: '사진·건강 기록이 즉시 삭제돼요', titleColor: c.critical, onTap: _openDelete),
           ]),
         ),

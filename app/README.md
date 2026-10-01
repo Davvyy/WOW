@@ -25,6 +25,7 @@ flutter run \
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | 둘 다 있으면 `Supabase.initialize` 후 `SupabaseChalloryApi`(Edge Functions) 와 P11 RPC `score_simulate_from_inputs` 를 씁니다. 없으면 `MockChalloryApi`·로컬 엔진. |
 | `KAKAO_NATIVE_APP_KEY` | 있으면 카카오 SDK(카카오톡 앱·카카오계정)로 로그인해 ID 토큰을 Supabase 에 넘깁니다. 없으면 카카오도 브라우저 OAuth. Android 는 같은 dart-define 을 매니페스트 스킴 `kakao{키}` 에도 씁니다. iOS 는 `ios/Flutter/Kakao.xcconfig`(예시 `Kakao.xcconfig.example`)에 같은 키를 넣어야 합니다. |
+| `FCM=true` | 푸시(FCM)를 켭니다. 서버 모드이고 Firebase 네이티브 설정이 들어간 빌드에서만 씁니다(아래 "푸시 알림"). 없거나 초기화가 안 되면 푸시 없이 동작합니다. |
 | `MOCK_HEALTH=true` | 실기기에서도 건강 데이터를 모의 값으로 강제합니다. |
 | `SCREEN_LIST=true` | 릴리스 빌드에서도 검수용 화면 목록(`/debug`)을 켭니다. 디버그 빌드에서는 항상 켜져 있습니다. |
 
@@ -110,6 +111,25 @@ lib/
 - `Info.plist`: `NSHealthShareUsageDescription`(읽기 전용 설명), `NSHealthUpdateUsageDescription`(쓰지 않음을 명시), `NSCameraUsageDescription`(한국어).
 - `Runner/Runner.entitlements`에 HealthKit(`com.apple.developer.healthkit`)을 넣고 Xcode 프로젝트에 연결했습니다. 서명 팀 설정은 직접 해야 합니다.
 
+## 푸시 알림 (`lib/services/push/`, `lib/state/push_controller.dart`)
+
+지금은 N-04(분석 완료)만 앱에서 처리합니다. 다른 알림은 OS 알림으로만 보이고, 화면에 들어올 때 서버에서 다시 읽습니다.
+
+```
+P6 첫 촬영 → 프리퍼미션 카드 "알림 켜기" → OS 권한 창(iOS requestAuthorization · Android 13+ POST_NOTIFICATIONS)
+  → RPC register_device(기기 id·플랫폼·FCM 토큰·granted/denied)   ← 기기 id 는 앱 전용 폴더 push_device_id 에 저장
+앱 시작(참가 세션 준비 뒤) → 이미 허용했으면 토큰 등록 · 토큰이 바뀌면 같은 기기 행 갱신
+analyze-meal 초안 저장 → N-04 큐 → 바로 발송(data: type=N-04, meal_id, slot)
+  앱을 보고 있을 때 → 그 끼니를 다시 읽어 '확인 필요'로 + 하단 안내 "점심 분석이 끝났어요 · 확인하기"
+  알림을 눌러 들어옴(백그라운드·종료 상태) → 오늘 끼니를 다시 읽고 P7(그 끼니)로
+로그아웃 → 이 기기 행 삭제(이후 이 계정 알림이 오지 않음) · 계정 삭제는 서버가 기기 행을 지움
+```
+
+- 권한을 거부했거나 FCM 설정이 없으면 서버가 N-04 를 `no_push` 로 건너뜁니다. 이때 앱은 지금처럼 촬영 직후 짧게(1.5초 간격 최대 10회) 확인하고, 홈에 들어올 때 다시 읽어 초안을 채웁니다(06 흐름 2 대체 경로).
+- FCM 설정(직접 해야 함): Firebase 프로젝트에 Android·iOS 앱을 추가하고 `flutterfire configure` 로 `android/app/google-services.json`·`ios/Runner/GoogleService-Info.plist` 와 Gradle 플러그인(`com.google.gms.google-services`)을 넣은 뒤 `--dart-define=FCM=true` 로 빌드합니다. iOS 는 Xcode 에서 Push Notifications 와 Background Modes › Remote notifications 를 켜고, Firebase 콘솔에 APNs 인증 키를 올립니다. 서버에는 `FCM_PROJECT_ID`·`FCM_ACCESS_TOKEN` 시크릿이 필요합니다(supabase/README.md).
+- P12 는 OS 알림 권한이 거부 상태면 상단에 "알림이 꺼져 있어요" 배너를 띄우고, "알림 켜기"로 권한 창을 다시 띄웁니다(OS 가 막았으면 설정 앱 안내).
+- Android 13+ 알림 권한(`POST_NOTIFICATIONS`)은 `firebase_messaging` 매니페스트에 들어 있습니다.
+
 ## 폰트와 라이선스
 
 | 서체 | 용도 | 출처 | 라이선스 |
@@ -147,7 +167,7 @@ P2 닉네임·성별·생년·키·체중·안전 체크·건강 정보 동의 �
 | 화면·동작 | 호출 | 비고 |
 |---|---|---|
 | P6 촬영 | `photo-upload-url` → 서명 URL PUT → `meals` | 기기에서 긴 변 ≤1,568 px·EXIF 제거·SHA-256(`photo_prep.dart`, isolate). 업로드는 기다리지 않고 홈으로(3초 복귀). 슬롯은 서버가 서버 시각으로 정하고 앱은 응답 슬롯으로 옮김 |
-| 분석 완료 | `meals` 행 조회(PostgREST, 본인 RLS) | 1.5초 간격 최대 10회 확인 → 초안 항목(후보 칩 kcal·국물 여부 포함) 반영. N-04 푸시 수신 처리는 남은 일 |
+| 분석 완료 | `meals` 행 조회(PostgREST, 본인 RLS) | N-04 푸시를 받으면 그 끼니를 다시 읽어 초안 항목(후보 칩 kcal·국물 여부 포함) 반영, 알림을 눌렀으면 P7. 푸시가 없을 때를 위해 촬영 직후 1.5초 간격 최대 10회 확인 |
 | P7 확정 | `meal-confirm` (If-Match: version, Idempotency-Key) | 화면은 바로 반영, 서버가 거절하면 되돌리고 안내(412: "다른 기기에서 먼저 바뀌었어요") |
 | P7 직접 입력·검색(사진 없음) | `meal-manual` | 빈 슬롯·분석 없음 끼니 |
 | P7 음식 검색 · 최근 음식 | RPC `food_search`(식약처 DB, 동의어 → pg_trgm, 상위 10) · RPC `recent_foods`(최근 30일 내가 확정한 음식 20개) | 입력이 비면 최근 음식, 입력하면 250 ms 뒤 검색(늦게 온 이전 응답은 버림). 고른 음식은 1인분 kcal·food_code 로 들어가고 확정 때 input_type=search |
@@ -161,6 +181,8 @@ P2 닉네임·성별·생년·키·체중·안전 체크·건강 정보 동의 �
 | P10 검토 카드·소명 | `reviews`(본인) + `appeals` insert(RLS: open·72h·1회) | 사유 문장·기한(SLA)·보낸 설명을 서버 값으로. 판정이 나면 서버 통지 문장(사유+판정+점수 영향)을 배너로 |
 | P10 결과 이의 | RPC `submit_objection`(발표 후 7일·1회) | 결과 발표(Published) 단계에서만 카드 노출 |
 | P10 장부 · P5 지난 날 · P8 7일 그래프 · P9 주간 피드백 | `daily_scores`(+`score_revisions`·`reviews` 유형) | 서버 분해값(BMR·A·I·F·D·S·대체값 슬롯·하한)을 그대로 표시, 정정 이력은 "판정 41.2→12.7점"처럼. 확정·건너뜀 뒤 다시 읽음 |
+| P6 알림 켜기 · 앱 시작 · 토큰 갱신 | RPC `register_device` | 기기 행 id 를 기기에 저장해 같은 행을 갱신. 같은 토큰이 다른 계정 행에 있으면 서버가 지움 |
+| P12 로그아웃 | `devices` 본인 행 delete → Auth 로그아웃 | |
 | P12 계정 삭제 | `account` (확인 문구 "삭제") → 로그아웃 | |
 
 - 모든 쓰기 호출에 `Idempotency-Key`(UUID). 오프라인·5xx 는 `MealUploader.pending` 큐에 넣고 같은 키로 재시도하며, 재시도는 `queued=true` 로 보내 서버가 촬영 시각 기준 지연 업로드 규칙을 적용합니다.
@@ -179,8 +201,8 @@ P2 닉네임·성별·생년·키·체중·안전 체크·건강 정보 동의 �
 - 모의 모드의 AI 초안(2초 뒤 `draft`)과 음식 검색 목록(`mockFoodDb`).
 
 알려진 공백
-- 서버 연동 남은 것: 실기기에서 카카오·Apple 로그인 확인(제공자 설정 필요), N-04 푸시로 초안 갱신.
-- 푸시 알림(FCM)과 OS 알림 권한 요청: P6 프리퍼미션 카드는 화면만 있고 실제 권한 요청은 없습니다.
+- 서버 연동 남은 것: 실기기에서 카카오·Apple 로그인 확인(제공자 설정 필요), 실기기에서 FCM 푸시 수신 확인(Firebase 설정 필요).
+- 푸시는 N-04 만 앱에서 처리합니다(N-06 판정 결과 등은 OS 알림만). P12 알림 설정 토글(N-01·02·04 끄기)은 서버에 저장하지 않습니다.
 - "설정 열기"·"삼성헬스 열기"·약관 링크처럼 외부 앱/URL을 여는 동작(`url_launcher`, `permission_handler` 미포함).
 - 볼륨 키 촬영(네이티브 구현), 백그라운드 동기화(WorkManager, `HKObserverQuery`), 딥링크·클립보드 초대코드 감지(P1 배너는 모의).
 - 건강 데이터 패키지 구현은 컴파일·단위 수준만 확인했고 실기기(삼성헬스 → Health Connect, Apple 건강)에서의 값은 검증하지 못했습니다. Android SDK·Xcode가 없는 환경이라 Android·iOS 빌드는 이 저장소에서 실행해 보지 못했습니다.
