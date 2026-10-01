@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,19 +13,6 @@ import '../../state/app_state.dart';
 import '../widgets/common.dart';
 import '../../state/session.dart';
 
-/// 식약처 식품영양성분 DB 검색 결과(모의). 실제는 서버 pg_trgm 검색(05 §6).
-const _foodDb = <(String, int)>[
-  ('김치찌개 백반', 780),
-  ('닭가슴살 샐러드', 380),
-  ('계란토스트', 320),
-  ('군고구마', 220),
-  ('비빔밥', 640),
-  ('된장찌개 백반', 600),
-  ('불고기덮밥', 720),
-  ('라면', 500),
-  ('바나나', 100),
-  ('아메리카노', 10),
-];
 
 /// P7 식사 확인·편집. 후보 칩(이름과 kcal이 함께 바뀜) · 분량(반 공기/1공기/곱빼기) · 국물 −40% ·
 /// 개수 스테퍼 · 먹은 것만 체크 · 실시간 합계. '확정'은 모의 상태를 갱신하고 P5가 엔진으로 다시 계산한다.
@@ -40,7 +29,6 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   late List<MealItem> _items;
   late double _aiTotal;
   late MealRecord _origin;
-  final _search = TextEditingController();
 
   @override
   void initState() {
@@ -57,7 +45,6 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
 
   @override
   void dispose() {
-    _search.dispose();
     super.dispose();
   }
 
@@ -72,52 +59,30 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
         ]);
   }
 
+  /// 음식 검색(식약처 DB) · 최근 음식 시트. 고른 음식은 1인분 kcal·food_code 로 항목에 들어간다(확정 시 input_type=search).
   Future<void> _openSearch({int? replaceIndex}) async {
-    _search.clear();
-    await showChSheet<void>(context, builder: (ctx) {
-      return StatefulBuilder(builder: (ctx, setSheet) {
-        final c = ctx.c;
-        final q = _search.text.trim();
-        final hits = _foodDb.where((f) => q.isEmpty || f.$1.contains(q)).toList();
-        void pick(String n, int k) {
-          if (replaceIndex != null) {
-            _update(replaceIndex, (it) => MealItem(id: it.id, candidates: [n], candKcal: [k], portion: '1인분', kind: ItemKind.count, confidence: Confidence.manual));
-          } else {
-            _addFood(n, k);
-          }
-          Navigator.of(ctx).pop();
-        }
-
-        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
-          const Txt.title('음식 검색'),
-          ChInput(controller: _search, numeric: false, hint: '음식 이름 검색 (식약처 DB)', leading: Icon(Icons.search_rounded, size: 20, color: c.fg2), onChanged: (_) => setSheet(() {})),
-          Txt.cap(q.isEmpty ? '최근 음식' : '검색 결과 ${hits.length}건', weight: FontWeight.w600),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            for (final (n, k) in hits)
-              InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: () => pick(n, k),
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 40),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(999), border: Border.all(color: c.border)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.history_rounded, size: 14, color: c.fg2),
-                    const SizedBox(width: 4),
-                    Txt('$n ', size: 13),
-                    NumText('$k', size: 14, color: c.fg2),
-                  ]),
-                ),
-              ),
-          ]),
-          ChButton('직접 입력 (이름·kcal)', kind: BtnKind.secondary, icon: Icons.edit_rounded, onPressed: () async {
-            Navigator.of(ctx).pop();
-            await _manualEntry();
-          }),
-        ], gap: 12));
-      });
-    });
+    final picked = await showChSheet<Object>(context, builder: (_) => const _FoodSearchSheet());
+    if (!mounted || picked == null) return;
+    if (picked == _FoodSearchSheet.manual) {
+      await _manualEntry();
+      return;
+    }
+    final hit = picked as FoodHit;
+    MealItem item(String id) => MealItem(
+          id: id,
+          candidates: [hit.name],
+          candKcal: [hit.kcal],
+          foodCodes: [hit.foodCode],
+          portion: '1인분',
+          kind: ItemKind.count,
+          confidence: Confidence.sure,
+          fromSearch: true,
+        );
+    if (replaceIndex != null) {
+      _update(replaceIndex, (it) => item(it.id));
+    } else {
+      setState(() => _items = [..._items, item('s${_items.length}_${hit.name}')]);
+    }
   }
 
   Future<void> _manualEntry() async {
@@ -444,5 +409,103 @@ class _ItemCard extends StatelessWidget {
         ),
       ], gap: 10)),
     );
+  }
+}
+
+/// 검색 시트: 입력이 비면 최근 음식, 입력하면 250 ms 뒤 서버 검색(food_search).
+class _FoodSearchSheet extends ConsumerStatefulWidget {
+  const _FoodSearchSheet();
+
+  /// "직접 입력" 선택 표시
+  static const manual = Object();
+
+  @override
+  ConsumerState<_FoodSearchSheet> createState() => _FoodSearchSheetState();
+}
+
+class _FoodSearchSheetState extends ConsumerState<_FoodSearchSheet> {
+  final _q = TextEditingController();
+  Timer? _debounce;
+  List<FoodHit> _hits = const [];
+  bool _loading = true;
+  String? _error;
+  int _seq = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load('');
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _q.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () => _load(v.trim()));
+    setState(() {});
+  }
+
+  Future<void> _load(String q) async {
+    final seq = ++_seq; // 늦게 온 이전 응답은 버린다
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = ref.read(apiProvider);
+      final hits = q.isEmpty ? await api.recentFoods() : await api.searchFoods(q);
+      if (!mounted || seq != _seq) return;
+      setState(() {
+        _hits = hits;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted || seq != _seq) return;
+      setState(() {
+        _hits = const [];
+        _loading = false;
+        _error = apiErrorText(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final q = _q.text.trim();
+    final label = _loading
+        ? (q.isEmpty ? '최근 음식을 불러오고 있어요' : '검색하고 있어요')
+        : _error ?? (q.isEmpty ? (_hits.isEmpty ? '최근 30일 동안 확정한 음식이 없어요' : '최근 음식') : (_hits.isEmpty ? '찾는 음식이 없어요 · 직접 입력해 주세요' : '검색 결과 ${_hits.length}건'));
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
+      const Txt.title('음식 검색'),
+      ChInput(controller: _q, numeric: false, hint: '음식 이름 검색 (식약처 DB)', leading: Icon(Icons.search_rounded, size: 20, color: c.fg2), onChanged: _onChanged),
+      Semantics(liveRegion: true, child: Txt.cap(label, weight: FontWeight.w600, color: _error != null ? c.critical : null)),
+      Wrap(spacing: 6, runSpacing: 6, children: [
+        for (final h in _hits)
+          InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () => Navigator.of(context).pop(h),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(999), border: Border.all(color: c.border)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(h.recent ? Icons.history_rounded : Icons.restaurant_rounded, size: 14, color: c.fg2),
+                const SizedBox(width: 4),
+                Txt('${h.name} ', size: 13),
+                NumText('${h.kcal}', size: 14, color: c.fg2),
+              ]),
+            ),
+          ),
+      ]),
+      const Txt.cap('kcal 은 1인분 추정치예요. 고른 뒤 분량·개수를 바꿀 수 있어요.'),
+      ChButton('직접 입력 (이름·kcal)', kind: BtnKind.secondary, icon: Icons.edit_rounded, onPressed: () => Navigator.of(context).pop(_FoodSearchSheet.manual)),
+    ], gap: 12));
   }
 }

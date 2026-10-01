@@ -118,6 +118,19 @@ class SupabaseChalloryApi implements ChalloryApi {
     }
   }
 
+  @override
+  Future<List<FoodHit>> searchFoods(String q) async {
+    if (q.trim().isEmpty) return const [];
+    final rows = await _rpc('food_search', {'q': q.trim()}) as List? ?? const [];
+    return [for (final r in rows) foodHitFromServer(Map<String, dynamic>.from(r as Map))];
+  }
+
+  @override
+  Future<List<FoodHit>> recentFoods() async {
+    final rows = await _rpc('recent_foods', const {}) as List? ?? const [];
+    return [for (final r in rows) foodHitFromServer(Map<String, dynamic>.from(r as Map), recent: true)];
+  }
+
   /// 테이블 직접 쓰기(RLS) 오류 → ApiException
   ApiException _pg(Object e, {String? conflict, String? denied}) {
     if (e is PostgrestException) {

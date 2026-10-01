@@ -92,6 +92,18 @@ class MockChalloryApi implements ChalloryApi {
     }
   }
 
+  @override
+  Future<List<FoodHit>> searchFoods(String q) async {
+    calls.add('food_search:$q');
+    return [for (final (n, k) in mockFoodDb) if (n.contains(q.trim())) FoodHit(name: n, kcal: k)];
+  }
+
+  @override
+  Future<List<FoodHit>> recentFoods() async {
+    calls.add('recent_foods');
+    return [for (final (n, k) in mockFoodDb.take(6)) FoodHit(name: n, kcal: k, recent: true)];
+  }
+
   String? cheeredTo;
   final reviews = <MyReview>[];
   final appeals = <String, String>{};

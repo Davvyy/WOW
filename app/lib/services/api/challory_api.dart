@@ -44,6 +44,12 @@ abstract class ChalloryApi {
   /// API #34 결과 이의(발표 후 7일·1회)
   Future<void> submitObjection(String text);
 
+  /// API #14 음식 검색(식약처 DB, 동의어 → pg_trgm, 상위 10)
+  Future<List<FoodHit>> searchFoods(String q);
+
+  /// 최근 음식(30일 내 내가 확정한 음식, 최신순)
+  Future<List<FoodHit>> recentFoods();
+
   /// API #17 리더보드: 최신 스냅샷(오늘·누적) + 내 행(본인 점수는 내 장부에서)
   Future<Leaderboard> fetchLeaderboard();
 

@@ -335,3 +335,12 @@ class MyReview {
   bool get open => status == 'open';
   bool get decided => status == 'decided';
 }
+
+/// 음식 검색·최근 음식 한 건(1인분 kcal). 서버: food_search(식약처 DB, pg_trgm) / recent_foods(30일 확정)
+class FoodHit {
+  const FoodHit({required this.name, required this.kcal, this.foodCode, this.recent = false});
+  final String name;
+  final int kcal;
+  final String? foodCode;
+  final bool recent;
+}
