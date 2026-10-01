@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../../core/engine/engine.dart';
 import '../../data/mock/mock_data.dart' show Leaderboard;
 import '../../data/models.dart';
+import '../../state/session.dart' show ChallengeSession;
 
 /// 서버 호출 계약(supabase/functions/* · docs/05 API). 화면·상태는 이 인터페이스만 쓴다.
 /// [SupabaseChalloryApi] 는 Edge Function·PostgREST, [MockChalloryApi] 는 서버 없이 같은 응답 모양을 흉내 낸다.
@@ -18,6 +19,9 @@ abstract class ChalloryApi {
 
   /// 로그인한 사용자가 이미 참가 중인 챌린지가 있는지(재설치·재로그인 시 온보딩 건너뛰기)
   Future<bool> hasParticipation();
+
+  /// API #33 내 챌린지 세션(요약·규칙 상수·잠긴 프로필·최근 공지). 참가 중이 아니면 null.
+  Future<ChallengeSession?> fetchSession();
 
   /// API #17 리더보드: 최신 스냅샷(오늘·누적) + 내 행(본인 점수는 내 장부에서)
   Future<Leaderboard> fetchLeaderboard();

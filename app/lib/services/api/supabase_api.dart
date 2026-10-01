@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/engine/engine.dart';
 import '../../data/mock/mock_data.dart' show Leaderboard;
 import '../../data/models.dart';
+import '../../state/session.dart' show ChallengeSession;
 import 'challory_api.dart';
 import 'server_mapping.dart';
 
@@ -83,6 +85,14 @@ class SupabaseChalloryApi implements ChalloryApi {
   Future<Map<String, dynamic>?> _latestSnapshot(String challengeId, String scope) => _client.from('leaderboard_snapshots')
       .select('local_date, as_of, is_final, rows').eq('challenge_id', challengeId).eq('scope', scope)
       .order('as_of', ascending: false).limit(1).maybeSingle();
+
+  @override
+  Future<ChallengeSession?> fetchSession() async {
+    final j = await _rpc('my_challenge_summary', const {});
+    if (j == null) return null;
+    return sessionFromSummary(Map<String, dynamic>.from(j as Map),
+        platformLabel: defaultTargetPlatform == TargetPlatform.iOS ? 'Apple 건강' : 'Health Connect');
+  }
 
   @override
   Future<Leaderboard> fetchLeaderboard() async {

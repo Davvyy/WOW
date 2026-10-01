@@ -10,6 +10,7 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 /// P8 활동 상세: 소비 분해(BMR+걸음+세션+층수), 검증 상태, 문제 해결.
 /// 플랫폼 활동 칼로리는 '참고값'으로만 보여주고 점수에는 쓰지 않는다. 수동 입력 걸음은 어디에도 입력할 수 없다.
@@ -26,13 +27,13 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final ch = mockChallenge;
+    final ch = curChallenge;
     final act = ref.watch(activityProvider);
     final mySim = ref.watch(todayResultProvider);
 
     final SimulateResult sim = _watch ? watchToday() : mySim;
     final a = sim.activity;
-    final who = _watch ? mockWatchProfile : mockMe.profile;
+    final who = _watch ? mockWatchProfile : curMe.profile;
     final steps = _watch ? 12000 : act.stepsTotal;
     final src = _watch ? 'Apple 건강' : act.source;
     final ios = !_watch && act.stepsManual > 0;

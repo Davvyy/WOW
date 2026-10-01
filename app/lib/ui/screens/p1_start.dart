@@ -7,12 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../router.dart';
 import '../../services/api/challory_api.dart';
 import '../../services/auth/auth_service.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 /// P1 시작·초대코드·로그인.
 /// 6자리가 되면 서버 get_invite 로 챌린지를 확인하고(모의: K7Q2MD 유효 · FULL00 모집 마감 · BLOCK0 참가 단계에서 거절),
@@ -130,7 +130,7 @@ class _StartScreenState extends ConsumerState<StartScreen> {
 
   void _paste() {
     setState(() {
-      _ctrl.text = mockChallenge.code;
+      _ctrl.text = curChallenge.code;
       _clipboardBanner = false;
     });
     _lookup();
@@ -173,7 +173,7 @@ class _StartScreenState extends ConsumerState<StartScreen> {
                 icon: Icons.content_paste_rounded,
                 action: ChButton('붙여넣기', small: true, kind: BtnKind.quiet, onPressed: _paste),
                 onClose: () => setState(() => _clipboardBanner = false),
-                child: boldThen(context, '복사한 초대코드 ${mockChallenge.code}를 붙여넣을까요?', '', color: c.brand),
+                child: boldThen(context, '복사한 초대코드 ${curChallenge.code}를 붙여넣을까요?', '', color: c.brand),
               ),
               const SizedBox(height: 12),
             ],

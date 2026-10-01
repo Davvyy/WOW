@@ -9,6 +9,7 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 /// P10 점수 장부·소명: "왜 이 점수인가"를 숫자로. 산식 대입 카드 · 일별 표 · 적용 규칙 칩 · 변경 이력 ·
 /// 검토·소명(당사자만). 모든 값은 엔진 계산값이다. 판정 문구는 docs/06 §6 템플릿만 쓴다.
@@ -86,7 +87,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           color: c.brandSoft,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
             const Txt.title('최종 결과에 이의 남기기'),
-            Txt.cap('이의 기간 ~${mockChallenge.objectionUntil} · 1회만 남길 수 있어요. 운영자가 확인하고 정정 여부를 알려드려요.'),
+            Txt.cap('이의 기간 ~${curChallenge.objectionUntil} · 1회만 남길 수 있어요. 운영자가 확인하고 정정 여부를 알려드려요.'),
             TextField(
               minLines: 4,
               maxLines: 6,
@@ -184,9 +185,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     final SimulateResult t = remote && pastRow != null
         ? resultFromLedgerRow(pastRow)
         : pastRow != null
-        ? engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: pastRow.steps, meals: pastRow.meals))
+        ? engine.simulate(SimulateInput(profile: curMe.profile, stepsTotal: pastRow.steps, meals: pastRow.meals))
         : review
-        ? engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: reviewStepsCase, meals: ref.watch(mealsProvider).map((m) => m.toInput()).toList(), skipsUsedThisWeek: ref.watch(skipsUsedProvider)))
+        ? engine.simulate(SimulateInput(profile: curMe.profile, stepsTotal: reviewStepsCase, meals: ref.watch(mealsProvider).map((m) => m.toInput()).toList(), skipsUsedThisWeek: ref.watch(skipsUsedProvider)))
         : todaySim;
     final steps = review ? reviewStepsCase : act.stepsTotal;
     final iEff = t.intake.iD > t.score.fP ? t.intake.iD : t.score.fP;
@@ -298,7 +299,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
         ChCard(
           color: c.brandSoft,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
-            Txt.cap(pastRow != null ? '${pastRow.date} · ${pastRow.provisional ? '잠정' : '확정'}${pastRow.check ? ' · 점검 기간(누적 미반영)' : ''}${pastRow.note.contains('검토 중') ? ' · 검토 중' : ''}' : '오늘 ${mockChallenge.today.month}.${mockChallenge.today.day} · 잠정${review ? ' · 검토 중(걸음 ${fmtInt(reviewStepsCase)} 잠정 반영)' : ''}', color: c.brand, weight: FontWeight.w600),
+            Txt.cap(pastRow != null ? '${pastRow.date} · ${pastRow.provisional ? '잠정' : '확정'}${pastRow.check ? ' · 점검 기간(누적 미반영)' : ''}${pastRow.note.contains('검토 중') ? ' · 검토 중' : ''}' : '오늘 ${curChallenge.today.month}.${curChallenge.today.day} · 잠정${review ? ' · 검토 중(걸음 ${fmtInt(reviewStepsCase)} 잠정 반영)' : ''}', color: c.brand, weight: FontWeight.w600),
             Semantics(
               label: '기초대사 ${fmtInt(t.bmr)} 더하기 활동 ${fmtInt(t.activity.aD)} 빼기 섭취 ${fmtInt(iEff)} 는 순적자 ${fmtInt(t.score.dD)}, 점수 ${fmtK1(t.score.sD)}점',
               child: ExcludeSemantics(

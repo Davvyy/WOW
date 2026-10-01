@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/engine/engine.dart';
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 /// P11 챌린지 규칙: 규칙 카드 4장 · 상수 블록(EngineRules에서 자동) · 시간 · 판정 · 내 숫자 시뮬레이터.
 /// 시뮬레이터는 [ScoreSimulator] 인터페이스로 계산한다(모의=로컬 엔진, 서버=RPC score_simulate_from_inputs).
@@ -55,7 +55,8 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
     // 3끼 확정 가정: 섭취를 세 끼에 균등 분할(끼니 최소 간식 기준 이상으로 보정)
     final per = (_n(_intake) / 3).clamp(engine.rules.snackKcal, 100000).toDouble();
     return SimulateInput(
-      profile: mockMe.profile,
+      bmr: curMe.bmr, // 잠긴 BMR(서버 participants.bmr_locked)
+      weightKg: curMe.weightKg,
       stepsTotal: _n(_steps),
       sessions: run > 0
           ? [SessionInput(type: SessionType.running, minutes: run.toDouble(), distanceM: _runKmh * 1000 / 60 * run, stepsInRange: run * _runStepsPerMin)]
@@ -86,11 +87,13 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
     final c = context.c;
     final r = engine.rules;
     final m = fmtM(meM);
+    final ss = currentSession; // 서버 challenge_rules·rules_md (모의: 프로토타입 값)
+    final (bs, be, le, de) = ss.slotStarts;
     final cards = [
       ('①', '먹은 걸 찍어요', '세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 $m kcal로, 간식은 찍은 만큼 더해져요.', '대체값 $m · 간식 ${fmtInt(r.snackKcal)} 미만', const Color(0xFF0B6E70)),
       ('②', '움직여요', '걸음·달리기·계단 자동 기록만 인정. 하루 활동 최대 ${fmtInt(r.c)} kcal.', '활동 상한 ${fmtInt(r.c)} · 걸음 ${fmtInt(r.stepsCap)}', const Color(0xFF1F5E8F)),
       ('③', '점수는 이렇게', '(기초대사 + 활동) − 섭취 = 순적자. ${fmtInt(r.t)} kcal면 100점, 최대 ${fmtInt(r.sMax)}점.', 'T ${fmtInt(r.t)} · 최대 ${fmtInt(r.sMax)}점', const Color(0xFF4A3F8A)),
-      ('④', '공정하게', '폰이든 워치든 같은 공식. 이상 기록은 조용히 확인하고 설명 기회를 드려요.', '소명 1회 · 72시간', const Color(0xFF3E6B3A)),
+      ('④', '공정하게', '폰이든 워치든 같은 공식. 이상 기록은 조용히 확인하고 설명 기회를 드려요.', '소명 1회 · ${ss.appealHours}시간', const Color(0xFF3E6B3A)),
     ];
 
     final s = _result;
@@ -110,7 +113,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          ChAppBar(title: '규칙', meta: mockChallenge.name),
+          ChAppBar(title: '규칙', meta: curChallenge.name),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -176,16 +179,17 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                     const Txt.title('시간'),
                     Wrap(spacing: 6, runSpacing: 6, children: [
                       const ChChip('매시간 잠정', icon: Icons.schedule_rounded),
-                      const ChChip('D+1 09:00 확정', tone: Tone.good, icon: Icons.check_rounded),
+                      ChChip('D+1 ${ss.finalizeTime} 확정', tone: Tone.good, icon: Icons.check_rounded),
                       ChChip('점검 첫 ${r.checkDays}일'),
-                      const ChChip('수정 48시간'),
+                      ChChip('수정 ${ss.editWindowHours}시간'),
+                      ChChip('아침 $bs~$be · 점심 ~$le · 저녁 ~$de · 그 외 간식'),
                     ]),
                   ], gap: 6)),
                 ),
                 ChCard(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
                     const Txt.title('판정'),
-                    const Txt('검토 중 → 소명 1회(72h) → 승인 · 경고 · 무효 · 순위 제외(경고 3회)'),
+                    Txt('검토 중 → 소명 1회(${ss.appealHours}h) → 승인 · 경고 · 무효 · 순위 제외(경고 3회)'),
                     const Txt.cap('검토 중인 기록은 다른 참가자에게 "집계 중"으로만 보여요. 자동 차단과 공개 지목은 없어요.'),
                   ], gap: 6)),
                 ),
@@ -214,6 +218,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                     ChLink('오늘 실제값과 비교', onTap: () => context.push(R.ledger)),
                   ], gap: 10)),
                 ),
+                if (ss.rulesMd.trim().isNotEmpty) _OperatorRules(ss.rulesMd),
                 const InlineNote(Icons.info_rounded, '일부만 찍는 기록은 완전히 막을 수 없어요. 신고와 운영자 확인으로 보완해요.'),
                 const Disclaimer('모든 수치는 추정이에요 · 의료 조언이 아니에요'),
               ])),
@@ -221,6 +226,58 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
           ),
         ]),
       ),
+    );
+  }
+}
+
+/// 운영자 추가 규칙(challenges.rules_md). 콘솔 OP1 미리보기와 같은 최소 Markdown: `## 제목`, `- 목록`, `**굵게**`, 문단.
+class _OperatorRules extends StatelessWidget {
+  const _OperatorRules(this.md);
+  final String md;
+
+  static List<Widget> render(BuildContext context, String md) {
+    final c = context.c;
+    InlineSpan inline(String line) {
+      final spans = <TextSpan>[];
+      final re = RegExp(r'\*\*(.+?)\*\*');
+      var last = 0;
+      for (final m in re.allMatches(line)) {
+        if (m.start > last) spans.add(TextSpan(text: line.substring(last, m.start)));
+        spans.add(TextSpan(text: m.group(1), style: const TextStyle(fontWeight: FontWeight.w700)));
+        last = m.end;
+      }
+      if (last < line.length) spans.add(TextSpan(text: line.substring(last)));
+      return TextSpan(style: T.body(c), children: spans);
+    }
+
+    final out = <Widget>[];
+    for (final raw in md.split('\n')) {
+      final l = raw.trimRight();
+      if (l.trim().isEmpty) continue;
+      if (l.startsWith('## ')) {
+        out.add(Txt.title(l.substring(3).trim()));
+      } else if (RegExp(r'^[-*]\s+').hasMatch(l)) {
+        out.add(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Txt('·  ', color: c.fg2),
+          Expanded(child: Text.rich(inline(l.replaceFirst(RegExp(r'^[-*]\s+'), '')))),
+        ]));
+      } else {
+        out.add(Text.rich(inline(l)));
+      }
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final body = render(context, md);
+    return ChCard(
+      outline: true,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
+        if (body.isEmpty || body.first is! Txt) const Txt.title('운영자 추가 규칙'),
+        ...body,
+        const Txt.cap('운영자가 정한 규칙이에요. 점수 산식과 상수는 위 카드와 같아요.'),
+      ], gap: 6)),
     );
   }
 }

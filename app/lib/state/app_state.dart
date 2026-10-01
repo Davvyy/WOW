@@ -20,6 +20,7 @@ import '../services/auth/auth_service.dart';
 import '../services/photo/meal_uploader.dart';
 import '../services/photo/photo_prep.dart';
 import '../services/score_simulator.dart';
+import 'session.dart';
 
 /// 서버 호출 계층. SUPABASE_URL 이 있으면 Edge Functions, 없으면 같은 흐름의 모의 구현.
 final apiProvider = Provider<ChalloryApi>((_) {
@@ -100,7 +101,10 @@ class OnboardingNotifier extends Notifier<OnboardingDraft> {
       final r = await api.joinChallenge(JoinRequest(
             code: d.code, nickname: d.nickname, sex: d.sex, birthYear: d.birthYear!, heightCm: d.heightCm!, weightKg: d.weightKg!,
             pregnancy: d.pregnancy, eatingDisorder: d.eatingDisorder, terms: terms, sensitiveHealth: d.sensitiveHealth, overseasAi: overseasAi));
-      if (ref.mounted) state = state.copyWith(join: r);
+      if (ref.mounted) {
+        state = state.copyWith(join: r);
+        ref.invalidate(sessionProvider); // 새 참가 정보로 세션 다시 읽기
+      }
       return null;
     } catch (e) {
       return apiErrorText(e);
@@ -118,6 +122,13 @@ final ledgerProvider = FutureProvider<List<LedgerRow>>((ref) => ref.watch(apiPro
 Leaderboard? watchLeaderboard(WidgetRef ref) =>
     ref.watch(leaderboardProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLeaderboard);
 List<LedgerRow>? watchLedger(WidgetRef ref) => ref.watch(ledgerProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLedger);
+
+/// 최종 결과(Published): 서버는 발표 때 만든 확정 누적 스냅샷(transition_challenge), 모의는 프로토타입 최종 순위
+List<LeaderRow> watchFinalRows(WidgetRef ref) =>
+    ref.read(apiProvider).isRemote ? (watchLeaderboard(ref)?.cumulative ?? const []) : mockFinal;
+
+/// 최종 결과의 내 행(순위 제외면 null)
+LeaderRow? myFinalRow(List<LeaderRow> rows) => rows.where((r) => r.me).firstOrNull;
 
 /// 서버 장부 한 줄 → 화면용 결과(분해값은 서버 값 그대로, M_p 는 BMR 로 계산)
 SimulateResult resultFromLedgerRow(LedgerRow r) => SimulateResult(
@@ -171,12 +182,43 @@ final scoreSimulatorProvider = Provider<ScoreSimulator>((_) {
   return const LocalScoreSimulator();
 });
 
-/// 챌린지 생명주기(03 §7). 기본은 진행 중.
+/// 챌린지 생명주기(03 §7). 서버 모드는 challenges.status 에서, 모의 모드는 진행 중(검수 화면에서 바꿀 수 있음).
 enum ChallengePhase { recruiting, active, closing, published }
+
+ChallengePhase phaseOfStatus(String status) => switch (status) {
+      'draft' || 'recruiting' => ChallengePhase.recruiting,
+      'closing' => ChallengePhase.closing,
+      'published' || 'archived' => ChallengePhase.published,
+      _ => ChallengePhase.active, // checking · running (cancelled 은 참가자에게 보이지 않음)
+    };
+
+/// 로그인 상태 변화(로그인·로그아웃마다 세션을 다시 읽는다)
+final authChangesProvider = StreamProvider<bool>((ref) => ref.watch(authServiceProvider).changes);
+
+/// 현재 챌린지 세션. 서버 모드는 my_challenge_summary, 모의 모드는 프로토타입 값.
+/// 값을 받으면 [applySession] 으로 curChallenge·curMe·engine 접근자를 바꾼다.
+final sessionProvider = FutureProvider<ChallengeSession?>((ref) async {
+  ref.watch(authChangesProvider);
+  final api = ref.watch(apiProvider);
+  if (!api.isRemote) {
+    applySession(ChallengeSession.mock);
+    return ChallengeSession.mock;
+  }
+  if (!ref.read(authServiceProvider).isSignedIn) {
+    resetSession();
+    return null;
+  }
+  final s = await api.fetchSession();
+  if (s != null) applySession(s);
+  return s;
+});
 
 class PhaseNotifier extends Notifier<ChallengePhase> {
   @override
-  ChallengePhase build() => ChallengePhase.active;
+  ChallengePhase build() {
+    final s = ref.watch(sessionProvider).value;
+    return s == null ? ChallengePhase.active : phaseOfStatus(s.status);
+  }
   void set(ChallengePhase p) => state = p;
 }
 
@@ -457,8 +499,10 @@ final todayResultProvider = Provider<SimulateResult>((ref) {
   final meals = ref.watch(mealsProvider);
   final act = ref.watch(activityProvider);
   final skips = ref.watch(skipsUsedProvider);
+  ref.watch(sessionProvider); // 규칙·잠긴 BMR 이 바뀌면 다시 계산
   return engine.simulate(SimulateInput(
-    profile: mockMe.profile,
+    bmr: curMe.bmr, // 서버가 잠근 BMR(시작 후 프로필 변경 없음)
+    weightKg: curMe.weightKg,
     stepsTotal: act.stepsTotal,
     sessions: act.sessions,
     floors: act.floors,
@@ -470,8 +514,8 @@ final todayResultProvider = Provider<SimulateResult>((ref) {
 // ---------- 날짜 선택(1~8, 8=오늘) ----------
 class DayNotifier extends Notifier<int> {
   @override
-  int build() => mockChallenge.dayIndex;
-  void set(int d) => state = d.clamp(1, mockChallenge.dayIndex);
+  int build() => curChallenge.dayIndex;
+  void set(int d) => state = d.clamp(1, curChallenge.dayIndex);
 }
 
 final selectedDayProvider = NotifierProvider<DayNotifier, int>(DayNotifier.new);

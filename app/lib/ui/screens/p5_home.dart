@@ -12,6 +12,7 @@ import '../../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/meal_slot_card.dart';
 import '../widgets/ring.dart';
+import '../../state/session.dart';
 
 /// P5 홈(오늘): 링 하나 + 숫자 셋, 점수·순위 → '점수 계산 보기', 반영률 4칸, 끼니 슬롯 4개, 활동 카드.
 /// 모든 숫자는 엔진(`engine.simulate`)으로 계산한다. 링 카드를 좌우로 스와이프하면 날짜가 바뀐다.
@@ -37,7 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  DateTime _dateOf(int day) => mockChallenge.start.add(Duration(days: day - 1));
+  DateTime _dateOf(int day) => curChallenge.start.add(Duration(days: day - 1));
 
   void _swipe(DragEndDetails d) {
     final v = d.primaryVelocity ?? 0;
@@ -50,7 +51,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final ch = mockChallenge;
+    final ch = curChallenge;
     final phase = ref.watch(phaseProvider);
     final day = ref.watch(selectedDayProvider);
     final isToday = day == ch.dayIndex;
@@ -73,10 +74,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       row = ledger.where((r) => r.d == day).firstOrNull ?? (remote ? null : mockLedger[day - 1]);
       steps = row?.steps ?? 0;
       sim = row == null
-          ? engine.simulate(SimulateInput(profile: mockMe.profile))
+          ? engine.simulate(SimulateInput(profile: curMe.profile))
           : remote
           ? resultFromLedgerRow(row)
-          : engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: steps, meals: row.meals));
+          : engine.simulate(SimulateInput(profile: curMe.profile, stepsTotal: steps, meals: row.meals));
       dayMeals = [
         for (final s in MealSlot.values)
           () {
@@ -92,7 +93,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final meta = lifecycle ? null : 'D+$day/${ch.days}';
 
     final lb = watchLeaderboard(ref);
-    final cumMe = lb?.meIn(lb.cumulative) ?? LeaderRow(rank: 0, name: mockMe.nickname, me: true, score: 0);
+    final finalRows = watchFinalRows(ref);
+    final myFinal = myFinalRow(finalRows) ?? cumFallback(finalRows);
+    // 누적(확정분, 점검 기간 제외) = 내 장부 합계. 장부를 아직 못 받았으면 순위표의 내 누적
+    final ledgerNow = watchLedger(ref);
+    final cumulative = ledgerNow != null
+        ? round1(ledgerNow.where((x) => !x.check && !x.provisional).fold(0.0, (a, x) => a + x.s))
+        : (lb?.meIn(lb.cumulative)?.score ?? 0);
+    final cumMe = lb?.meIn(lb.cumulative) ?? LeaderRow(rank: 0, name: curMe.nickname, me: true, score: 0);
     final todayMe = lb?.meIn(lb.today);
     final reviewing = isToday && (remote ? (todayMe?.underReview ?? false) : steps > AppConfig.stepsSpikeAbs);
     final provisional = isToday;
@@ -117,7 +125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // 건강 안내(확정 섭취, 대체값 제외 < 남 1,500 / 여 1,200)
     final confirmedKcal = dayMeals.where(confirmed).fold<double>(0, (a, m) => a + m.kcal);
-    final nudgeMin = mockMe.sex == Sex.m ? engine.rules.nudgeMinM : engine.rules.nudgeMinF;
+    final nudgeMin = curMe.sex == Sex.m ? engine.rules.nudgeMinM : engine.rules.nudgeMinF;
     final showNudge = !lifecycle && inn.mainMealCount > 0 && confirmedKcal < nudgeMin;
 
     final d = sim.score.dD;
@@ -137,7 +145,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ringLabel = '최종 집계 중, 링 잠금';
       ringCenter = Column(mainAxisSize: MainAxisSize.min, children: [Txt('잠금', size: 26, weight: FontWeight.w700, color: c.fg), const Txt.cap('운영자 확인 후 발표돼요')]);
     } else if (phase == ChallengePhase.published) {
-      final f = mockFinal.firstWhere((r) => r.me);
+      final f = myFinal;
       ringEmpty = true;
       ringLabel = '최종 ${f.rank}위, 누적 ${fmtK1(f.score!)}점';
       ringCenter = Column(mainAxisSize: MainAxisSize.min, children: [NumText(fmtK1(f.score!), size: 44, weight: FontWeight.w700, unit: '점'), Txt.cap('28일 누적 · 최종 ${f.rank}위')]);
@@ -247,7 +255,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: c.brandSoft,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
                   Txt.title('최종 결과 · 이의 기간 ~${ch.objectionUntil}'),
-                  Txt.cap('최종 ${mockFinal.firstWhere((r) => r.me).rank}위 · 누적 ${fmtK1(mockFinal.firstWhere((r) => r.me).score!)}점. 결과에 이의가 있으면 점수 장부에서 1회 남길 수 있어요.'),
+                  Txt.cap('최종 ${myFinal.rank == 0 ? '순위 제외' : '${myFinal.rank}위'} · 누적 ${fmtK1(myFinal.score ?? 0)}점. 결과에 이의가 있으면 점수 장부에서 1회 남길 수 있어요.'),
                   ChLink('최종 순위 보기', onTap: () => context.go(R.rank)),
                 ], gap: 6)),
               ),
@@ -289,7 +297,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               if (phase == ChallengePhase.published)
                 Text.rich(TextSpan(children: [
                   TextSpan(text: '최종 누적 ', style: T.body(c, size: 17, w: FontWeight.w600)),
-                  TextSpan(text: fmtK1(mockFinal.firstWhere((r) => r.me).score!), style: T.num(c.fg, size: 21, w: FontWeight.w700)),
+                  TextSpan(text: fmtK1(myFinal.score ?? 0), style: T.num(c.fg, size: 21, w: FontWeight.w700)),
                   TextSpan(text: '점', style: T.body(c, size: 17, w: FontWeight.w600)),
                 ]))
               else
@@ -297,25 +305,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   TextSpan(text: isToday ? '오늘 ' : '${date.month}.${date.day} ', style: T.body(c, size: 17, w: FontWeight.w600)),
                   TextSpan(text: scoreToday, style: T.num(c.fg, size: 21, w: FontWeight.w700)),
                   TextSpan(text: '점 · 누적 ', style: T.body(c, size: 17, w: FontWeight.w600)),
-                  TextSpan(text: fmtK1(mockCumulative), style: T.num(c.fg, size: 21, w: FontWeight.w700)),
+                  TextSpan(text: fmtK1(cumulative), style: T.num(c.fg, size: 21, w: FontWeight.w700)),
                   TextSpan(text: '점', style: T.body(c, size: 17, w: FontWeight.w600)),
                 ])),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 if (phase == ChallengePhase.published)
-                  Txt('최종 ${mockFinal.firstWhere((r) => r.me).rank}위 · ${mockLeaderboard.total - 2}명')
+                  Txt('최종 ${myFinal.rank == 0 ? '순위 제외' : '${myFinal.rank}위'} · ${finalRows.where((r) => !r.aggregating).length}명')
                 else
-                  Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
-                    Txt(cumMe.rank == 0 ? '순위 제외 · 점수만 보여요' : '잠정 ${cumMe.rank}위'),
-                    if (cumMe.delta > 0) Semantics(label: '${cumMe.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${cumMe.delta}', color: c.good))),
-                    if (reviewing) Txt('· 검토 중', color: c.fg2),
-                  ]),
+                  Flexible(
+                    child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
+                      Txt(cumMe.rank == 0 ? '순위 제외 · 점수만 보여요' : '잠정 ${cumMe.rank}위'),
+                      if (cumMe.delta > 0) Semantics(label: '${cumMe.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${cumMe.delta}', color: c.good))),
+                      if (reviewing) Txt('· 검토 중', color: c.fg2),
+                    ]),
+                  ),
                 ChLink('점수 계산 보기', onTap: () => context.push('${R.ledger}?day=$day')),
               ]),
             ], gap: 6)),
           );
 
     final body = <Widget>[
-      if (_noticeOpen && !lifecycle)
+      if (_noticeOpen && !lifecycle && ch.noticeTitle.isNotEmpty)
         InfoBanner(
           tone: Tone.neutral,
           icon: Icons.campaign_rounded,
@@ -481,3 +491,6 @@ class _NoticeSheet extends StatelessWidget {
         ChButton('닫기', kind: BtnKind.quiet, onPressed: () => Navigator.of(context).pop()),
       ]));
 }
+
+/// 최종 순위표에 내 행이 없을 때(순위 제외)
+LeaderRow cumFallback(List<LeaderRow> rows) => LeaderRow(rank: 0, name: curMe.nickname, me: true, score: 0);

@@ -4,12 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config.dart';
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
 import '../../services/health/health_source.dart' show newUuidV4;
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 const _avatarColors = [Color(0xFFB85C2A), Color(0xFF2F6E8F), Color(0xFF5E7A2F), Color(0xFF7A4F9A), Color(0xFF9A4F6E), Color(0xFF4F6E9A)];
 Color _avatarColor(String name) => _avatarColors[name.runes.fold<int>(0, (a, r) => a + r) % _avatarColors.length];
@@ -84,7 +84,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final ch = mockChallenge;
+    final ch = curChallenge;
     final phase = ref.watch(phaseProvider);
     final hearted = ref.watch(heartedTodayProvider);
     final visible = ref.watch(rankVisibleProvider);
@@ -95,7 +95,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     final lb = loaded;
     final today = _today;
     final list = today ? lb.today : lb.cumulative;
-    final me = lb.meIn(list) ?? LeaderRow(rank: 0, name: mockMe.nickname, me: true);
+    final me = lb.meIn(list) ?? LeaderRow(rank: 0, name: curMe.nickname, me: true);
     // 검토 중: 서버는 내 장부의 under_review, 모의는 걸음 급증 시나리오
     final reviewMe = remote ? me.underReview : act.stepsTotal > AppConfig.stepsSpikeAbs;
     final third = lb.thirdScore;
@@ -249,10 +249,12 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         addBox(centerCard(Icons.hourglass_top_rounded, '최종 집계 중', '11.3 09:00 확정 · 미결 검토가 끝나면 발표돼요. 발표 뒤 7일 동안 이의를 남길 수 있어요.'));
       case ChallengePhase.published:
         addBox(Align(alignment: Alignment.centerLeft, child: ChChip('최종 결과 · 이의 기간 ~${ch.objectionUntil}', tone: Tone.good, icon: Icons.verified_rounded)));
-        addBox(podium(mockFinal.take(3).toList()));
-        slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: 68, color: c.bg, child: rowW(mockFinal[3], pinned: false))));
-        slivers.add(SliverList(delegate: SliverChildListDelegate([for (final r in mockFinal.skip(4)) rowW(r)])));
-        addBox(Center(child: Txt.cap('최종 ${lb.total - 2}명 · 결과 이의는 점수 장부에서 1회')), bottom: 0);
+        final fin = watchFinalRows(ref);
+        final finMe = myFinalRow(fin);
+        addBox(podium(fin.where((r) => !r.aggregating).take(3).toList()));
+        if (finMe != null) slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: 68, color: c.bg, child: rowW(finMe, pinned: false))));
+        slivers.add(SliverList(delegate: SliverChildListDelegate([for (final r in fin.skip(3)) if (!r.me) rowW(r)])));
+        addBox(Center(child: Txt.cap('최종 ${ref.read(apiProvider).isRemote ? fin.where((r) => !r.aggregating).length : lb.total - 2}명 · 결과 이의는 점수 장부에서 1회')), bottom: 0);
       case ChallengePhase.active:
         if (!visible) {
           addBox(Align(alignment: Alignment.centerLeft, child: const ChChip('순위 비공개 중 · 내 행만 보여요', icon: Icons.visibility_off_rounded)));

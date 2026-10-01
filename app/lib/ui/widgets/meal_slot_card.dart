@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/engine/engine.dart';
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import 'common.dart';
+import '../../state/session.dart';
 
 /// 식사 카드(슬롯) — docs/06 §5.4. 썸네일 56 · 끼니명 · kcal · 상태 배지.
 /// 05 meals.status 매핑: 분석 중=captured · 확정 대기=captured(noAnalysis)/failed · 초안=draft ·
@@ -77,7 +77,7 @@ class MealSlotCard extends StatelessWidget {
         if (isSnack) {
           desc = 'AI 초안 약 ${fmtInt(ai)} kcal · 확정하면 반영돼요';
         } else {
-          final prov = engine.autoConfirmValue(mockMe.bmr, ai);
+          final prov = engine.autoConfirmValue(curMe.bmr, ai);
           desc = 'AI 초안 약 ${fmtInt(ai)} kcal · ${fmtInt(prov)} kcal로 잠정 계산 중';
           right = kcalRight(fmtInt(prov), '잠정');
         }

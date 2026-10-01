@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/engine/engine.dart';
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 /// P2 프로필·안전 체크. 4항목(성별·생년·키·체중)으로 BMR을 즉시 계산한다(엔진 사용).
 /// 입력값은 온보딩 초안(onboardingProvider)에 담아 P3 참가 신청(join_challenge)에 쓴다.
@@ -36,17 +36,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final mock = !ref.read(apiProvider).isRemote;
     String init(num? v, num fallback) => v != null ? '${v.round()}' : (mock ? '${fallback.round()}' : '');
     _consent = d.sensitiveHealth || mock;
-    _sex = d.birthYear != null ? d.sex : mockMe.sex;
-    _nick = TextEditingController(text: d.nickname.isNotEmpty ? d.nickname : (mock ? mockMe.nickname : ''));
-    _birth = TextEditingController(text: init(d.birthYear, mockMe.birthYear));
-    _height = TextEditingController(text: init(d.heightCm, mockMe.heightCm));
-    _weight = TextEditingController(text: init(d.weightKg, mockMe.weightKg));
+    _sex = d.birthYear != null ? d.sex : curMe.sex;
+    _nick = TextEditingController(text: d.nickname.isNotEmpty ? d.nickname : (mock ? curMe.nickname : ''));
+    _birth = TextEditingController(text: init(d.birthYear, curMe.birthYear));
+    _height = TextEditingController(text: init(d.heightCm, curMe.heightCm));
+    _weight = TextEditingController(text: init(d.weightKg, curMe.weightKg));
     _pregnant = d.pregnancy;
     _eatingDisorder = d.eatingDisorder;
   }
 
   /// 시작일(나이 기준): 초대코드로 받은 챌린지, 없으면 예시 챌린지
-  DateTime get _start => ref.read(onboardingProvider).invite?.startDate ?? mockChallenge.start;
+  DateTime get _start => ref.read(onboardingProvider).invite?.startDate ?? curChallenge.start;
 
   bool get _nickOk => _nick.text.trim().length >= 2 && _nick.text.trim().length <= 12;
 

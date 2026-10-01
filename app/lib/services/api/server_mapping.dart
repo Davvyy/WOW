@@ -2,6 +2,7 @@ import '../../core/engine/engine.dart';
 import '../../core/format.dart';
 import '../../data/mock/mock_data.dart' show Leaderboard;
 import '../../data/models.dart';
+import '../../state/session.dart' show ChallengeSession;
 
 /// 서버 행(PostgREST JSON) → 앱 모델. 네트워크와 분리해 단위 테스트한다.
 
@@ -129,3 +130,100 @@ Leaderboard leaderboardFromServer({
       myUnderReview: myUnderReview, myRankEligible: myRankEligible);
   return Leaderboard(total: cumulativeRows.length, today: today, cumulative: cum, todayFinal: todayFinal, asOf: asOf);
 }
+
+String _hhmm(Object? t) {
+  final s = (t as String?) ?? '';
+  return s.length >= 5 ? s.substring(0, 5) : s;
+}
+
+int _hours(Object? interval, int fallback) {
+  // Postgres interval 의 JSON 표기("48:00:00" 또는 "2 days")
+  final s = (interval as String?) ?? '';
+  final hm = RegExp(r'^(\d+):').firstMatch(s);
+  if (hm != null) return int.parse(hm.group(1)!);
+  final days = RegExp(r'(\d+) day').firstMatch(s);
+  final hours = RegExp(r'(\d+):\d+:\d+').firstMatch(s.replaceFirst(RegExp(r'^\d+ days? '), ''));
+  if (days != null) return int.parse(days.group(1)!) * 24 + (hours != null ? int.parse(hours.group(1)!) : 0);
+  return fallback;
+}
+
+/// RPC my_challenge_summary → 세션. [platformLabel] 은 이 기기의 건강 플랫폼 이름("Health Connect"/"Apple 건강").
+ChallengeSession sessionFromSummary(Map<String, dynamic> j, {String platformLabel = 'Health Connect', DateTime? today}) {
+  final ch = Map<String, dynamic>.from(j['challenge'] as Map);
+  final p = Map<String, dynamic>.from(j['participant'] as Map);
+  final rulesJson = Map<String, dynamic>.from(j['rules'] as Map? ?? const {});
+  final notice = j['notice'] == null ? null : Map<String, dynamic>.from(j['notice'] as Map);
+  final start = DateTime.parse(ch['start_date'] as String);
+  final end = DateTime.parse(ch['end_date'] as String);
+  final days = end.difference(start).inDays + 1;
+  final now = today ?? DateTime.parse(j['today'] as String);
+  final dayIndex = (now.difference(start).inDays + 1).clamp(1, days);
+  final published = ch['published_at'] == null ? null : DateTime.parse(ch['published_at'] as String).toUtc().add(const Duration(hours: 9));
+  // 이의 기간: 발표 후 7일(03 §7). 발표 전이면 예상치(종료 다음 날 확정 + 7일)
+  final objection = published != null ? published.add(const Duration(days: 7)) : end.add(const Duration(days: 8));
+  String two(int v) => v.toString().padLeft(2, '0');
+  final synced = p['last_synced_at'] == null ? null : DateTime.parse(p['last_synced_at'] as String).toUtc().add(const Duration(hours: 9));
+  final noticeAt = notice?['created_at'] == null ? null : DateTime.parse(notice!['created_at'] as String).toUtc().add(const Duration(hours: 9));
+
+  final sex = p['sex'] == 'F' ? Sex.f : Sex.m;
+  final age = (p['age'] as num?)?.toInt() ?? 0;
+  final h = (p['height_cm'] as num?)?.toDouble() ?? 0;
+  final w = (p['weight_locked'] as num?)?.toDouble() ?? 0;
+  final raw = ChalloryEngine.bmr(Profile(sex: sex, weightKg: w, heightCm: h, age: age)).raw;
+
+  return ChallengeSession(
+    challenge: ChallengeInfo(
+      name: ch['name'] as String,
+      code: (ch['invite_code'] as String?) ?? '',
+      start: start,
+      end: end,
+      days: days,
+      capacity: (ch['capacity'] as num).toInt(),
+      joined: (j['joined'] as num?)?.toInt() ?? 0,
+      today: DateTime(now.year, now.month, now.day),
+      dayIndex: dayIndex,
+      syncTime: synced == null ? '—' : '${two(synced.hour)}:${two(synced.minute)}',
+      source: _sourceLabel(p['last_sync_source'] as String?),
+      platform: platformLabel,
+      noticeTitle: (notice?['title'] as String?) ?? '',
+      noticeBody: (notice?['body'] as String?) ?? '',
+      noticeDate: noticeAt == null ? '' : fmtMd(noticeAt),
+      objectionUntil: fmtMd(objection),
+    ),
+    me: MeInfo(
+      nickname: p['nickname'] as String,
+      sex: sex,
+      birthYear: (p['birth_year'] as num?)?.toInt() ?? 0,
+      heightCm: h,
+      weightKg: w,
+      age: age,
+      bmr: (p['bmr_locked'] as num?)?.toInt() ?? 0, // 서버가 잠근 값(시작 후 변경 없음)
+      bmrRaw: raw,
+    ),
+    rules: rulesJson.isEmpty ? EngineRules.defaults : EngineRules.fromJson(rulesJson),
+    status: ch['status'] as String,
+    participantId: p['id'] as String?,
+    rulesMd: (ch['rules_md'] as String?) ?? '',
+    slotStarts: (
+      _hhmm(rulesJson['breakfast_start'] ?? '04:00'),
+      _hhmm(rulesJson['breakfast_end'] ?? '10:30'),
+      _hhmm(rulesJson['lunch_end'] ?? '15:00'),
+      _hhmm(rulesJson['dinner_end'] ?? '22:00'),
+    ),
+    finalizeTime: _hhmm(rulesJson['finalize_time'] ?? '09:00'),
+    editWindowHours: _hours(rulesJson['edit_window'], 48),
+    appealHours: _hours(rulesJson['appeal_window'], 72),
+    rankEligible: p['rank_eligible'] as bool? ?? true,
+  );
+}
+
+/// 출처(dataOrigin/HKSource) → 화면 이름
+String _sourceLabel(String? origin) => switch (origin) {
+      null => '—',
+      'com.sec.android.app.shealth' => '삼성헬스',
+      'com.apple.health' || 'com.apple.health.watch' => 'Apple 건강',
+      'com.google.android.apps.healthdata' || 'android' => 'Health Connect',
+      'com.garmin.android.apps.connectmobile' => 'Garmin',
+      'com.fitbit.FitbitMobile' => 'Fitbit',
+      _ => origin,
+    };

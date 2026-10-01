@@ -8,6 +8,82 @@
             "type": "dup_photo"
         }
     ],
+    "summary": {
+        "rules": {
+            "c": 1000,
+            "t": 500,
+            "f_min": 1200,
+            "m_min": 700,
+            "s_max": 150,
+            "f_ratio": 0.8,
+            "m_ratio": 0.45,
+            "step_met": 3.8,
+            "locked_at": "2026-10-05T15:00:00+00:00",
+            "lunch_end": "15:00:00",
+            "stair_met": 6.8,
+            "steps_cap": 30000,
+            "check_days": 3,
+            "dinner_end": "22:00:00",
+            "floors_cap": 50,
+            "snack_kcal": 150,
+            "edit_window": "48:00:00",
+            "nudge_min_f": 1200,
+            "nudge_min_m": 1500,
+            "auto_confirm": 1.3,
+            "broth_factor": 0.6,
+            "skip_per_day": 1,
+            "appeal_window": "72:00:00",
+            "breakfast_end": "10:30:00",
+            "finalize_time": "09:00:00",
+            "sec_per_floor": 17.5,
+            "skip_per_week": 3,
+            "breakfast_start": "04:00:00",
+            "steps_spike_abs": 25000,
+            "origin_whitelist": [
+                "com.apple.health",
+                "com.sec.android.app.shealth",
+                "android",
+                "com.google.android.apps.healthdata",
+                "com.garmin.android.apps.connectmobile",
+                "com.fitbit.FitbitMobile",
+                "com.huami.watch.hmwatchmanager",
+                "com.xiaomi.wearable"
+            ],
+            "steps_spike_ratio": 2.5,
+            "late_upload_window": "12:00:00"
+        },
+        "today": "2026-10-01",
+        "joined": 12,
+        "notice": null,
+        "challenge": {
+            "id": "6a026e42-81f4-4b9f-a040-223f93f99180",
+            "name": "가을 걷기 챌린지",
+            "status": "running",
+            "capacity": 60,
+            "end_date": "2026-11-02",
+            "rules_md": "## 운영자 추가 규칙\n- 회식 날(10.17)은 저녁 자동 확정 대신 대체값 적용을 요청할 수 있어요(운영자에게 메시지).\n- 상품은 상위 3명 + 반영률 100% 달성자 추첨 2명.",
+            "start_date": "2026-10-06",
+            "invite_code": "K7Q2MD",
+            "published_at": null
+        },
+        "participant": {
+            "id": "64e704c4-7aa0-4e4f-a943-f1955ce2a795",
+            "age": 30,
+            "sex": "M",
+            "status": "active",
+            "nickname": "지수",
+            "height_cm": 175.0,
+            "birth_year": 1996,
+            "bmr_locked": 1650,
+            "rank_eligible": true,
+            "warning_count": 0,
+            "weight_locked": 70.0,
+            "last_synced_at": null,
+            "last_sync_source": null,
+            "grade_badge_public": false,
+            "leaderboard_visible": true
+        }
+    },
     "nickname": "지수",
     "revisions": [
         {
@@ -15,13 +91,13 @@
             "new_s_d": 12.7,
             "prev_s_d": 41.2,
             "review_id": "0b296258-ab4c-48da-a3df-304c3ecbf46f",
-            "daily_score_id": "c8538196-4021-479e-8692-1213a9052044"
+            "daily_score_id": "214478b6-7a5b-43b2-ba76-e88be5dec1cb"
         }
     ],
     "start_date": "2026-10-06",
     "daily_scores": [
         {
-            "id": "4a2ec9ba-4464-4380-b1fd-0f333865d497",
+            "id": "05da03cb-537a-4328-88b7-2c5f01bbba2b",
             "a_d": 309.7,
             "bmr": 1650,
             "d_d": 199.7,
@@ -104,7 +180,7 @@
             "under_review": false
         },
         {
-            "id": "1ddeae67-c9d2-4d20-af18-3a6a4f970580",
+            "id": "74705216-5b0d-4e84-8035-9eaab7aad2d2",
             "a_d": 365.9,
             "bmr": 1650,
             "d_d": 215.9,
@@ -187,7 +263,7 @@
             "under_review": false
         },
         {
-            "id": "bdc0326e-345d-4f63-823e-5e5ad3317e75",
+            "id": "13392f21-cf28-432b-94b8-04bc25f0a82f",
             "a_d": 300.5,
             "bmr": 1650,
             "d_d": -222.0,
@@ -265,7 +341,7 @@
             "under_review": false
         },
         {
-            "id": "38af8e4b-f446-4217-bed2-d2fcdc01f6b4",
+            "id": "3f775f1a-b683-40c3-8704-3a0b11a323ad",
             "a_d": 353.0,
             "bmr": 1650,
             "d_d": 443.0,
@@ -348,7 +424,7 @@
             "under_review": false
         },
         {
-            "id": "da493b5a-6a96-43fe-a2ff-f0548fc01455",
+            "id": "b0b5250b-394e-4eed-9cab-4ba1e48afa74",
             "a_d": 402.5,
             "bmr": 1650,
             "d_d": 432.5,
@@ -431,7 +507,7 @@
             "under_review": false
         },
         {
-            "id": "4100f10f-eda3-43e4-9ee2-f11c1889b40f",
+            "id": "84f659b5-e5f9-4404-9138-d70ba1cdf85f",
             "a_d": 294.0,
             "bmr": 1650,
             "d_d": 624.0,
@@ -514,7 +590,7 @@
             "under_review": false
         },
         {
-            "id": "c8538196-4021-479e-8692-1213a9052044",
+            "id": "214478b6-7a5b-43b2-ba76-e88be5dec1cb",
             "a_d": 356.0,
             "bmr": 1650,
             "d_d": 63.5,
@@ -598,7 +674,7 @@
             "under_review": false
         },
         {
-            "id": "89ba460f-8ea0-400a-a75d-6fc907d506d6",
+            "id": "fbe4204c-526e-4dd1-8dc6-2ae8d525bdfd",
             "a_d": 294.0,
             "bmr": 1650,
             "d_d": 144.0,

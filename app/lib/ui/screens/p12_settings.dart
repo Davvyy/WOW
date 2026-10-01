@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../router.dart';
 import '../../services/health/health_package_source.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 /// P12 설정: 프로필(잠금) · 체중 기록(참고) · 연결 진단 · 알림 · 공지 · 공개 · 동의/데이터 · 계정.
 /// variant(검수용): disconnected | push-off | notices | delete | weight-read
@@ -78,7 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _openNotices() {
-    final ch = mockChallenge;
+    final ch = curChallenge;
     setState(() => _noticeRead = true);
     showChSheet<void>(context, builder: (ctx) {
       final c = ctx.c;
@@ -91,9 +91,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           );
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Txt.title('공지'),
-        item(ch.noticeTitle, '${ch.noticeDate} · 읽음'),
-        item('점검 기간이 끝났어요 · 10.9부터 누적 반영', '10.9 · 읽음'),
-        item('가을 걷기 챌린지가 시작됐어요', '10.6 · 읽음'),
+        if (ch.noticeTitle.isEmpty) const Txt.cap('아직 공지가 없어요'),
+        if (ch.noticeTitle.isNotEmpty) item(ch.noticeTitle, '${ch.noticeDate} · 읽음'),
+        // 서버 모드는 최근 공지 1건(my_challenge_summary), 모의는 프로토타입 공지 목록
+        if (!ref.read(apiProvider).isRemote) ...[
+          item('점검 기간이 끝났어요 · 10.9부터 누적 반영', '10.9 · 읽음'),
+          item('가을 걷기 챌린지가 시작됐어요', '10.6 · 읽음'),
+        ],
         const SizedBox(height: 8),
         ChButton('닫기', kind: BtnKind.quiet, onPressed: () => Navigator.of(ctx).pop()),
       ]);
@@ -144,7 +148,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final ch = mockChallenge;
+    final ch = curChallenge;
     final act = ref.watch(activityProvider);
     final visible = ref.watch(rankVisibleProvider);
     final aiConsent = ref.watch(aiConsentProvider);
@@ -187,8 +191,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ChCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const SectionTitle('프로필'),
-            li(Icons.person_rounded, mockMe.nickname, sub: '닉네임 · 순위에는 닉네임만 보여요', onTap: () {}),
-            li(Icons.lock_rounded, '체중 ${mockMe.weightKg.round()} kg · 키 ${mockMe.heightCm.round()} cm', sub: '시작 시 잠금 · 변경은 운영자 문의', trailing: const ChChip('잠금', icon: Icons.lock_rounded)),
+            li(Icons.person_rounded, curMe.nickname, sub: '닉네임 · 순위에는 닉네임만 보여요', onTap: () {}),
+            li(Icons.lock_rounded, '체중 ${curMe.weightKg.round()} kg · 키 ${curMe.heightCm.round()} cm', sub: '시작 시 잠금 · 변경은 운영자 문의', trailing: const ChChip('잠금', icon: Icons.lock_rounded)),
           ]),
         ),
         ChCard(
@@ -204,8 +208,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Builder(builder: (_) {
                 final w = double.tryParse(_weight.text);
                 if (w == null) return const SizedBox.shrink();
-                final d = w - mockMe.weightKg;
-                return ChChip('시작 ${mockMe.weightKg.toStringAsFixed(1)} → ${w.toStringAsFixed(1)} (${d >= 0 ? '+' : '−'}${d.abs().toStringAsFixed(1)})', icon: Icons.trending_down_rounded);
+                final d = w - curMe.weightKg;
+                return ChChip('시작 ${curMe.weightKg.toStringAsFixed(1)} → ${w.toStringAsFixed(1)} (${d >= 0 ? '+' : '−'}${d.abs().toStringAsFixed(1)})', icon: Icons.trending_down_rounded);
               }),
             ]),
             const Txt.cap('점수·BMR에는 반영되지 않아요. 추세 확인용이에요.'),
@@ -227,7 +231,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             toggle('저녁 리마인드', '21:00 · 미확정·미동기화일 때만', _evening, (v) => setState(() => _evening = v)),
             toggle('분석 완료', '사진 분석이 끝났을 때', _analysis, (v) => setState(() => _analysis = v)),
             const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Txt.cap('공지·검토·판정·건강 안내 알림은 끌 수 없어요.')),
-            li(Icons.campaign_rounded, '공지', sub: '${ch.noticeTitle} · ${_noticeRead ? '모두 읽음' : '읽지 않음 1'}', trailing: Row(mainAxisSize: MainAxisSize.min, children: [if (!_noticeRead) Container(width: 8, height: 8, decoration: BoxDecoration(color: c.critical, shape: BoxShape.circle)), Icon(Icons.chevron_right_rounded, color: c.fg2)]), onTap: _openNotices),
+            li(Icons.campaign_rounded, '공지', sub: ch.noticeTitle.isEmpty ? '아직 공지가 없어요' : '${ch.noticeTitle} · ${_noticeRead ? '모두 읽음' : '읽지 않음 1'}', trailing: Row(mainAxisSize: MainAxisSize.min, children: [if (!_noticeRead) Container(width: 8, height: 8, decoration: BoxDecoration(color: c.critical, shape: BoxShape.circle)), Icon(Icons.chevron_right_rounded, color: c.fg2)]), onTap: _openNotices),
           ]),
         ),
         ChCard(

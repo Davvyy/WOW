@@ -7,7 +7,9 @@ import 'package:challory/data/models.dart';
 import 'package:challory/router.dart';
 import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/services/api/server_mapping.dart';
+import 'package:challory/services/auth/auth_service.dart';
 import 'package:challory/state/app_state.dart';
+import 'package:challory/state/session.dart';
 import 'package:challory/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,9 +18,16 @@ import 'package:flutter_test/flutter_test.dart';
 final _f = jsonDecode(File('test/fixtures/server_ledger.json').readAsStringSync()) as Map<String, dynamic>;
 
 class _RemoteFake extends MockChalloryApi {
+  _RemoteFake({this.noSession = false});
+  final bool noSession;
   final reported = <String?>[];
   @override
   bool get isRemote => true;
+  @override
+  Future<ChallengeSession?> fetchSession() async => noSession
+      ? null
+      : sessionFromSummary(Map<String, dynamic>.from(_f['summary'] as Map), today: DateTime(2026, 10, 13));
+
   @override
   Future<Leaderboard> fetchLeaderboard() async => leaderboardFromServer(
         todayRows: _f['snapshot_today'] as List,
@@ -50,8 +59,9 @@ Future<void> _pump(WidgetTester tester, String location, _RemoteFake api) async 
   addTearDown(tester.view.reset);
   final router = buildRouter(initialLocation: location);
   addTearDown(router.dispose);
+  addTearDown(resetSession);
   await tester.pumpWidget(ProviderScope(
-    overrides: [apiProvider.overrideWithValue(api)],
+    overrides: [apiProvider.overrideWithValue(api), authServiceProvider.overrideWithValue(MockAuthService(true))],
     child: MaterialApp.router(theme: buildTheme(Brightness.light), routerConfig: router),
   ));
   await tester.pumpAndSettle();
@@ -86,5 +96,25 @@ void main() {
     expect(find.textContaining('누적 312.6점'), findsOneWidget);
     expect(find.textContaining('판정 41.2→12.7점'), findsOneWidget);
     expect(find.textContaining('같은 사진이 두 번 이상 사용됐어요'), findsOneWidget);
+  });
+
+  testWidgets('P11 규칙: 서버 시간 규칙·끼니 경계·운영자 추가 규칙', (tester) async {
+    await _pump(tester, R.rules, _RemoteFake());
+    expect(find.text('D+1 09:00 확정'), findsOneWidget);
+    expect(find.text('아침 04:00~10:30 · 점심 ~15:00 · 저녁 ~22:00 · 그 외 간식'), findsOneWidget);
+    expect(find.text('운영자 추가 규칙'), findsOneWidget);
+    expect(find.textContaining('상위 3명'), findsOneWidget);
+  });
+
+  testWidgets('P5 머리글: 서버 챌린지 이름·D+n', (tester) async {
+    await _pump(tester, R.home, _RemoteFake());
+    expect(find.text('가을 걷기 챌린지'), findsWidgets);
+    expect(find.textContaining('D+8/28'), findsWidgets);
+  });
+
+  testWidgets('참가 중인 챌린지가 없으면 초대코드 안내', (tester) async {
+    await _pump(tester, R.home, _RemoteFake(noSession: true));
+    expect(find.text('참가 중인 챌린지가 없어요'), findsOneWidget);
+    expect(find.text('초대코드 입력'), findsOneWidget);
   });
 }

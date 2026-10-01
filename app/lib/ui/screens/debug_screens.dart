@@ -8,6 +8,7 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 /// 검수용 화면 목록(디버그 빌드 또는 --dart-define=SCREEN_LIST=true).
 /// P1~P12로 바로 이동하고, 모의 상태(끼니·활동·생명주기)를 바꿔 변형을 확인한다.
@@ -78,7 +79,7 @@ class DebugScreenList extends ConsumerWidget {
           }),
           scenario('점심 자동 확정', () {
             final m = buildTodayMeals();
-            m[1] = MealRecord(slot: MealSlot.lunch, status: MealStatus.auto, kcal: engine.autoConfirmValue(mockMe.bmr, lunchAiTotal), aiKcal: lunchAiTotal, time: '12:20', title: '김치찌개 백반', items: lunchDraftItems());
+            m[1] = MealRecord(slot: MealSlot.lunch, status: MealStatus.auto, kcal: engine.autoConfirmValue(curMe.bmr, lunchAiTotal), aiKcal: lunchAiTotal, time: '12:20', title: '김치찌개 백반', items: lunchDraftItems());
             meals.reset(m);
           }),
           scenario('0끼', () => meals.reset([for (final s in MealSlot.values) MealRecord(slot: s)])),

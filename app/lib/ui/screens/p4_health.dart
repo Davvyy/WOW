@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../router.dart';
 import '../../services/health/health_models.dart';
 import '../../services/health/health_package_source.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 enum _P4State { idle, ok, zero, denied, unsupported }
 
@@ -69,7 +69,7 @@ class _HealthConnectScreenState extends ConsumerState<HealthConnectScreen> {
     final c = context.c;
     final src = ref.watch(healthSourceProvider);
     final platform = src.platformLabel == 'Apple 건강' ? 'Apple 건강' : 'Health Connect';
-    final ch = mockChallenge;
+    final ch = curChallenge;
     const items = [
       (Icons.directions_walk_rounded, '걸음'),
       (Icons.straighten_rounded, '거리'),

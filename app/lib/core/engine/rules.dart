@@ -55,6 +55,7 @@ class EngineRules {
     return EngineRules(
       t: d('t', z.t),
       c: d('c', z.c),
+      sMax: d('s_max', z.sMax),
       fMin: d('f_min', z.fMin),
       fRatio: d('f_ratio', z.fRatio),
       mMin: d('m_min', z.mMin),

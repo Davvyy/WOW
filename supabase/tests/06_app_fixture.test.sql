@@ -26,6 +26,8 @@ begin
       'snapshot_cumulative', (select rows from leaderboard_snapshots where challenge_id = ch and scope = 'cumulative' order by as_of desc limit 1),
       'snapshot_cumulative_under_review', before_cum,
       'expect', jsonb_build_object('cumulative', participant_cumulative(ji)));
+    perform tests.login(tests.uid('지수')); -- my_challenge_summary 는 auth.uid() 기준
+    out := out || jsonb_build_object('summary', my_challenge_summary());
     raise exception using errcode = 'P0D02', message = 'rollback';
   exception when sqlstate 'P0D02' then null;
   end;

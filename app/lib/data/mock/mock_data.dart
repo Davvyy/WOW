@@ -2,7 +2,8 @@
 import '../../core/engine/engine.dart';
 import '../models.dart';
 
-const engine = ChalloryEngine();
+/// 프로토타입 예시 데이터 계산용(기본 규칙). 화면은 현재 세션의 `engine`(state/session.dart)을 쓴다.
+const mockEngine = ChalloryEngine();
 
 final mockChallenge = ChallengeInfo(
   name: '가을 걷기 챌린지',
@@ -36,8 +37,6 @@ MeInfo _buildMe() {
 final mockMe = _buildMe();
 
 /// 같은 BMR 에서 파생되는 값(엔진 호출)
-double get meM => engine.m(mockMe.bmr);
-double get meF => engine.f(mockMe.bmr);
 
 // ---------- 오늘(10.13, D+8) 끼니 ----------
 MealItem _item(String id, List<String> cands, List<int> kcal, String portion, ItemKind kind,
@@ -160,7 +159,7 @@ const mockWatchMeals = [
   MealInput(slot: MealSlot.lunch, status: MealStatus.confirmed, kcal: 520),
   MealInput(slot: MealSlot.dinner, status: MealStatus.confirmed, kcal: 450),
 ];
-SimulateResult watchToday() => engine.simulate(const SimulateInput(
+SimulateResult watchToday() => mockEngine.simulate(const SimulateInput(
       profile: mockWatchProfile,
       stepsTotal: 12000,
       sessions: [mockWatchSession],
@@ -205,7 +204,7 @@ List<LedgerRow> buildLedger() {
   return [
     for (final s in seeds)
       () {
-        final r = engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: s.steps, meals: s.meals));
+        final r = mockEngine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: s.steps, meals: s.meals));
         if (s.revisionMeals == null) {
           return LedgerRow(
             d: s.d,
@@ -219,7 +218,7 @@ List<LedgerRow> buildLedger() {
             f: r.score.fP,
             floorApplied: r.score.floorApplied,
             substituted: r.intake.substituteSlots,
-            check: s.d <= engine.rules.checkDays,
+            check: s.d <= mockEngine.rules.checkDays,
             provisional: s.provisional,
             note: s.note,
             history: s.history,
@@ -227,7 +226,7 @@ List<LedgerRow> buildLedger() {
             meals: s.meals,
           );
         }
-        final r2 = engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: s.steps, meals: s.revisionMeals!));
+        final r2 = mockEngine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: s.steps, meals: s.revisionMeals!));
         return LedgerRow(
           d: s.d,
           date: s.date,
@@ -240,7 +239,7 @@ List<LedgerRow> buildLedger() {
           f: r2.score.fP,
           floorApplied: r2.score.floorApplied,
           substituted: r2.intake.substituteSlots,
-          check: s.d <= engine.rules.checkDays,
+          check: s.d <= mockEngine.rules.checkDays,
           provisional: false,
           note: s.note,
           history: s.history,

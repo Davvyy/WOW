@@ -9,6 +9,7 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../../state/session.dart';
 
 /// 식약처 식품영양성분 DB 검색 결과(모의). 실제는 서버 pg_trgm 검색(05 §6).
 const _foodDb = <(String, int)>[
@@ -191,7 +192,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final isSnackLevel = total > 0 && total < engine.rules.snackKcal;
     final auto = _origin.status == MealStatus.auto;
     final m = fmtM(meM);
-    final autoVal = engine.autoConfirmValue(mockMe.bmr, _aiTotal);
+    final autoVal = engine.autoConfirmValue(curMe.bmr, _aiTotal);
     final sure = _items.where((i) => i.confidence == Confidence.sure).length;
     final check = _items.where((i) => i.confidence == Confidence.check).length;
     final unchecked = _items.where((i) => !i.checked).length;
