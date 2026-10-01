@@ -234,7 +234,7 @@
       { rank: 3, name: '밤산책', score: 388.7, fill: 4, badge: 'watch' },
       { rank: 4, name: ME.nickname, score: CUMULATIVE, fill: 4, me: true, delta: 2 },
       { rank: 5, name: '오이냉국', score: 301.9, fill: 3, tie: true },
-      { rank: 5, name: '초록이', score: 301.9, fill: 4, tie: true },
+      { rank: 5, name: '새벽러닝', score: 301.9, fill: 4, tie: true },
       { rank: 7, name: '집계 중', score: null, fill: 0, aggregating: true },
       { rank: 8, name: '라떼한잔', score: 268.4, fill: 2 },
       { rank: 9, name: '마포구민', score: 251.0, fill: 3 },
