@@ -41,3 +41,17 @@ String weekdayKo(int month, int day, {int year = 2026}) =>
 
 /// 대체값 M_p 표기: 742.5 → 743 (프로토타입 Math.ceil)
 String fmtM(double m) => fmtInt(m.ceil());
+
+/// 조사 '로/으로' 선택. 받침 없음·ㄹ 받침 → 로, 그 외 → 으로. 숫자는 끝자리 발음 기준.
+String roParticle(String s) {
+  final t = s.trim();
+  if (t.isEmpty) return '로';
+  final ch = t[t.length - 1];
+  if (RegExp(r'\d').hasMatch(ch)) {
+    return const ['0', '1', '3', '6', '7', '8'].contains(ch) ? '으로' : '로';
+  }
+  final code = ch.codeUnitAt(0);
+  if (code < 0xAC00 || code > 0xD7A3) return '로';
+  final jong = (code - 0xAC00) % 28;
+  return (jong == 0 || jong == 8) ? '로' : '으로';
+}
