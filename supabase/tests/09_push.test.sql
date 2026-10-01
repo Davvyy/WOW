@@ -47,4 +47,21 @@ begin
   select array_agg(t) into toks from claim_due_notifications(now(), 200) c, unnest(c.push_tokens) t;
   perform tests.ok(toks is null or not ('tok-A' = any(toks)), '지워진 토큰으로는 안 보냄');
 end $$;
+-- N-02 리마인드 payload: 종류(confirm·sync)·끼니·건수
+do $$
+declare me uuid := tests.pid('지수'); uid uuid := tests.uid('지수'); k int; nt record;
+begin
+  update meals set status = 'draft' where participant_id = me and local_date = '2026-10-13' and slot in ('lunch', 'dinner');
+  get diagnostics k = row_count;
+  perform tests.ok(k >= 1, '확정 대기 끼니 준비');
+  delete from notifications where type = 'N-02';
+  perform enqueue_reminders('2026-10-13 21:00+09');
+  select * into nt from notifications where user_id = uid and type = 'N-02';
+  perform tests.eq(nt.payload ->> 'kind', 'confirm', 'N-02 확정 대기 종류');
+  perform tests.eq((nt.payload ->> 'pending')::int, k, 'N-02 대기 건수');
+  perform tests.eq(nt.payload ->> 'local_date', '2026-10-13', 'N-02 날짜');
+  perform tests.ok(nt.body like (case nt.payload ->> 'slot' when 'lunch' then '점심' else '저녁' end) || '%사진이 확정을 기다려요', 'N-02 문장에 끼니(' || nt.body || ')');
+  perform tests.ok(not exists (select 1 from notifications where type = 'N-02' and payload ->> 'kind' not in ('confirm', 'sync')), 'N-02 종류는 둘 중 하나');
+  perform tests.ok(not exists (select 1 from notifications where type = 'N-02' and payload ->> 'kind' = 'sync' and body <> '앱을 열면 걸음이 동기화돼요'), 'N-02 동기화 문장');
+end $$;
 rollback;

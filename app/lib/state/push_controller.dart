@@ -73,6 +73,16 @@ class DailyResult extends PushEvent {
   final String message;
 }
 
+/// N-02 저녁 리마인드. confirm: 오늘 끼니를 다시 읽음(P7 그 끼니) · sync: 받자마자 건강 데이터를 읽어 올림([synced])
+class Reminder extends PushEvent {
+  const Reminder(this.kind, this.message, {this.slot, this.synced = false, required super.opened});
+  final String kind;
+  final String message;
+  final MealSlot? slot;
+  final bool synced;
+  bool get isSync => kind == 'sync';
+}
+
 /// N-04 분석 완료 → 그 끼니가 초안이 됨(P7)
 class DraftReady extends PushEvent {
   const DraftReady(this.slot, {required super.opened});
@@ -95,7 +105,8 @@ class VerdictReady extends PushEvent {
 }
 
 /// 기기 등록(토큰·권한 → register_device)과 N-04 처리.
-/// N-04 를 받으면 그 끼니를 서버에서 다시 읽어 초안으로 바꾸고, N-01·N-05·N-06 을 받으면 장부·순위(·검토)를 다시 읽게 한 뒤
+/// N-04 를 받으면 그 끼니를 서버에서 다시 읽어 초안으로 바꾸고, N-01·N-05·N-06 을 받으면 장부·순위(·검토)를 다시 읽게 하고,
+/// N-02 를 받으면 오늘 끼니를 다시 읽거나(확정 대기) 걸음을 동기화한 뒤
 /// [events] 로 알린다(화면 이동·안내는 앱 셸이 한다).
 class PushController {
   PushController(this._ref);
@@ -170,11 +181,21 @@ class PushController {
   /// 마지막으로 서버에 올린 토큰(테스트·점검용)
   String? get registeredToken => _lastToken;
 
-  /// 받은 푸시 처리. N-01·N-04·N-05·N-06 만 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
+  /// 받은 푸시 처리. N-01·N-02·N-04·N-05·N-06 을 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
   Future<void> handle(PushMessage m, {required bool opened}) async {
     if (m.isAnalysisDone) {
       final slot = await _ref.read(mealsProvider.notifier).applyAnalysisPush(m.mealId!, hint: m.slot);
       if (slot != null) _emit(DraftReady(slot, opened: opened));
+    } else if (m.isReminder) {
+      final kind = m.reminderKind;
+      if (kind == 'sync') {
+        // "앱을 열면 걸음이 동기화돼요" — 연 김에(또는 떠 있는 김에) 바로 동기화
+        final synced = await _ref.read(activityProvider.notifier).refresh();
+        _emit(Reminder(kind, m.body ?? '앱을 열면 걸음이 동기화돼요', synced: synced, opened: opened));
+      } else {
+        await _ref.read(mealsProvider.notifier).loadToday();
+        _emit(Reminder(kind, m.body ?? '사진이 확정을 기다려요', slot: m.slot, opened: opened));
+      }
     } else if (m.isDailyResult) {
       // 09:00 확정 배치가 어제 점수·누적·순위 스냅샷을 확정했으므로 잠정 값을 버린다
       _ref.invalidate(ledgerProvider);

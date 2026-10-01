@@ -4,17 +4,43 @@ import 'package:challory/core/engine/engine.dart';
 import 'package:challory/data/mock/mock_data.dart' show mockAiTotal;
 import 'package:challory/data/models.dart';
 import 'package:challory/services/api/mock_api.dart';
+import 'package:challory/services/health/health_models.dart';
+import 'package:challory/services/health/health_source.dart';
 import 'package:challory/services/push/push_service.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/state/push_controller.dart';
 import 'package:challory/state/session.dart' show curChallenge;
 import 'package:challory/ui/screens/p10_ledger.dart' show LedgerScreen;
 import 'package:challory/ui/screens/p5_home.dart' show HomeScreen;
+import 'package:challory/ui/screens/p7_meal_edit.dart' show MealEditScreen;
+import 'package:challory/services/api/challory_api.dart' show ApiException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 PushMessage n06(String verdict, {String body = '10.12 저녁 기록은 같은 사진으로 확인돼 무효로 처리했어요. 이날 점수는 41.2 → 12.7점이에요.'}) =>
     PushMessage(data: {'type': 'N-06', 'id': 'n2', 'review_id': 'r-0415', 'verdict': verdict}, title: '판정 결과', body: body);
+
+/// 건강 원천 흉내: 오늘 1일치(서버 동기화 경로를 타게)
+class _OneDayHealth implements HealthSource {
+  int fetches = 0;
+  @override
+  String get platformLabel => 'Health Connect';
+  @override
+  Future<HealthAvailability> availability() async => HealthAvailability.ready;
+  @override
+  Future<PermissionResult> requestPermissions() async => PermissionResult.granted;
+  @override
+  Future<PermissionResult> permissionStatus() async => PermissionResult.granted;
+  @override
+  Future<List<HealthDay>> fetchDays({DateTime? now}) async {
+    fetches++;
+    return [HealthDay(localDate: '2026-10-13', stepsTotal: 8120)];
+  }
+}
+
+PushMessage n02sync() => const PushMessage(data: {'type': 'N-02', 'id': 'n5', 'local_date': '2026-10-13', 'kind': 'sync'}, body: '앱을 열면 걸음이 동기화돼요');
+PushMessage n02confirm() => const PushMessage(
+    data: {'type': 'N-02', 'id': 'n6', 'local_date': '2026-10-13', 'kind': 'confirm', 'slot': 'lunch', 'pending': '2'}, body: '점심 외 1끼 사진이 확정을 기다려요');
 
 PushMessage n04(String mealId, [MealSlot slot = MealSlot.lunch]) =>
     PushMessage(data: {'type': 'N-04', 'id': 'n1', 'meal_id': mealId, 'slot': slot.name}, title: '분석 완료', body: '점심 분석이 끝났어요');
@@ -237,6 +263,73 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.text('어제 41.2점'), findsNothing, reason: '눌러서 들어온 경우는 안내 없이 이동만');
+  });
+
+  test('N-02 동기화 리마인드 → 받자마자 건강 데이터를 읽어 서버에 올림', () async {
+    final health = _OneDayHealth();
+    final c2 = ProviderContainer(overrides: [
+      apiProvider.overrideWithValue(api),
+      pushServiceProvider.overrideWithValue(push),
+      deviceIdStoreProvider.overrideWithValue(MemoryDeviceIdStore()),
+      healthSourceProvider.overrideWithValue(health),
+    ]);
+    addTearDown(c2.dispose);
+    final ctl = c2.read(pushControllerProvider);
+    final ev = ctl.events.first;
+    await ctl.handle(n02sync(), opened: true);
+    final e = await ev as Reminder;
+    expect(e.isSync, isTrue);
+    expect(e.synced, isTrue);
+    expect(e.opened, isTrue);
+    expect(health.fetches, 1);
+    expect(api.calls, contains('sync-activity'));
+    expect(c2.read(activityProvider).stepsTotal, 8120);
+  });
+
+  test('N-02 동기화: 서버에 못 올리면 synced=false(안내 문장 유지)', () async {
+    final c2 = ProviderContainer(overrides: [
+      apiProvider.overrideWithValue(api..failNext = const ApiException(0, 'offline')),
+      pushServiceProvider.overrideWithValue(push),
+      healthSourceProvider.overrideWithValue(_OneDayHealth()),
+    ]);
+    addTearDown(c2.dispose);
+    final ctl = c2.read(pushControllerProvider);
+    final ev = ctl.events.first;
+    await ctl.handle(n02sync(), opened: false);
+    expect(((await ev) as Reminder).synced, isFalse);
+  });
+
+  test('N-02 확정 대기 → 오늘 끼니를 다시 읽고 끼니 전달 · kind 없는 이전 서버 문장도 구분', () async {
+    final ctl = c.read(pushControllerProvider);
+    var ev = ctl.events.first;
+    await ctl.handle(n02confirm(), opened: true);
+    final e = await ev as Reminder;
+    expect(e.isSync, isFalse);
+    expect(e.slot, MealSlot.lunch);
+    expect(e.message, '점심 외 1끼 사진이 확정을 기다려요');
+    expect(const PushMessage(data: {'type': 'N-02'}, body: '앱을 열면 걸음이 동기화돼요').reminderKind, 'sync');
+    expect(const PushMessage(data: {'type': 'N-02'}, body: '사진이 확정을 기다려요').reminderKind, 'confirm');
+    ev = ctl.events.first;
+    await ctl.handle(const PushMessage(data: {'type': 'N-02'}, body: '사진이 확정을 기다려요'), opened: false);
+    expect(((await ev) as Reminder).slot, isNull);
+  });
+
+  testWidgets('앱 셸: N-02 확정 대기 알림을 눌러 들어오면 P7(그 끼니)', (tester) async {
+    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const ChalloryApp()));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => c.read(pushControllerProvider).handle(n02confirm(), opened: true));
+    await tester.pumpAndSettle();
+    expect(find.byType(MealEditScreen), findsOneWidget);
+    expect(tester.widget<MealEditScreen>(find.byType(MealEditScreen)).slot, MealSlot.lunch);
+  });
+
+  testWidgets('앱 셸: 화면에 떠 있을 때 N-02 동기화(모의 원천이라 못 올림) → 문장 + "활동 보기"', (tester) async {
+    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const ChalloryApp()));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => c.read(pushControllerProvider).handle(n02sync(), opened: false));
+    await tester.pump();
+    expect(find.text('앱을 열면 걸음이 동기화돼요'), findsOneWidget);
+    expect(find.text('활동 보기'), findsOneWidget);
   });
 
   test('review_id 없는 N-06 은 무시', () async {

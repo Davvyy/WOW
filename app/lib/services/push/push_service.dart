@@ -12,7 +12,7 @@ enum PushPermission {
   final String wire;
 }
 
-/// 받은 푸시 한 건. 서버 notify·analyze-meal·verdict 가 data 에 type·id(알림)와 payload(N-01: local_date, N-04: meal_id·slot, N-05: review_id, N-06: review_id·verdict)를 싣는다.
+/// 받은 푸시 한 건. 서버 notify·analyze-meal·verdict 가 data 에 type·id(알림)와 payload(N-01: local_date, N-02: local_date·kind·slot·pending, N-04: meal_id·slot, N-05: review_id, N-06: review_id·verdict)를 싣는다.
 class PushMessage {
   const PushMessage({required this.data, this.title, this.body});
   final Map<String, String> data;
@@ -38,6 +38,12 @@ class PushMessage {
 
   /// N-01 어제 확정 결과(09:30, 본문 "어제 32.4점, 누적 11위")
   bool get isDailyResult => type == 'N-01';
+
+  /// N-02 21:00 조건부 리마인드(확정 대기 끼니 또는 오늘 동기화 0건)
+  bool get isReminder => type == 'N-02';
+
+  /// N-02 종류: confirm(확정 대기) · sync(동기화). payload 에 kind 가 없던 이전 서버는 문장으로 가른다.
+  String get reminderKind => data['kind'] ?? ((body ?? '').contains('동기화') ? 'sync' : 'confirm');
 
   /// N-04 분석 완료
   bool get isAnalysisDone => type == 'N-04' && mealId != null;

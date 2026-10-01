@@ -268,17 +268,20 @@ class ActivityNotifier extends Notifier<TodayActivity> {
 
   void set(TodayActivity a) => state = a;
 
-  /// 3일 재조회(앱 실행·포그라운드 복귀·당겨서 새로고침). 모의 원천은 덮어쓰지 않는다.
-  Future<void> refresh() async {
+  /// 3일 재조회(앱 실행·포그라운드 복귀·당겨서 새로고침·N-02 동기화 리마인드). 모의 원천은 덮어쓰지 않는다.
+  /// 서버에 올렸으면 true.
+  Future<bool> refresh() async {
     final src = ref.read(healthSourceProvider);
-    if (src is MockHealthSource) return;
+    if (src is MockHealthSource) return false;
     final days = await src.fetchDays();
-    if (!ref.mounted || days.isEmpty) return;
+    if (!ref.mounted || days.isEmpty) return false;
     // 서버 업로드(05 API #6): 보내지 못해도 화면 값은 갱신하고 다음 새로고침 때 다시 보낸다
+    var synced = false;
     try {
       await ref.read(apiProvider).syncActivity(buildSyncBatch(days));
+      synced = true;
     } on ApiException catch (_) {}
-    if (!ref.mounted) return;
+    if (!ref.mounted) return synced;
     final d = days.first;
     final wall = toKstWall(DateTime.now());
     String two(int n) => n.toString().padLeft(2, '0');
@@ -306,6 +309,7 @@ class ActivityNotifier extends Notifier<TodayActivity> {
       source: src.platformLabel == 'Apple 건강' ? 'Apple 건강' : '삼성헬스',
       syncTime: '${two(wall.hour)}:${two(wall.minute)}',
     );
+    return synced;
   }
 }
 
