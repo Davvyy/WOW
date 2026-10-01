@@ -15,7 +15,7 @@ supabase/
 │   └── 20261001000600_operator_rpc.sql  운영자 콘솔 RPC(전환·공지·CSV·사진 파기·감사 로그) + Storage 버킷
 ├── functions/                           Edge Functions(Deno)
 │   ├── _shared/                         AI 어댑터(Gemini·Claude·모의) · 분석 파이프라인 · 멱등성 · 배치 검증 · 푸시 · CSV
-│   ├── analyze-meal/  sync-activity/  verdict/  notify/  announce/  export/  purge-photos/
+│   ├── analyze-meal/  sync-activity/  meal-confirm/  meal-skip/  verdict/  notify/  announce/  export/  purge-photos/
 │   └── deno.json                        deno task check / deno task test
 ├── seed/generate_seed.mjs               seed.sql 생성기(프로토타입 예시 → 원천 값만)
 ├── seed.sql                             생성 파일(직접 수정 금지)
@@ -68,7 +68,7 @@ deno task test    # 단위 테스트(모의 어댑터, 네트워크·키 불필�
 supabase link --project-ref <ref>
 supabase db push                      # migrations/ 적용
 psql "$DATABASE_URL" -f supabase/seed.sql   # (선택) 프로토타입 예시 데이터
-supabase functions deploy analyze-meal sync-activity verdict notify announce export purge-photos
+supabase functions deploy analyze-meal sync-activity meal-confirm meal-skip verdict notify announce export purge-photos
 supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
   AI_ENGINE=gemini VERTEX_PROJECT=... VERTEX_LOCATION=asia-northeast3 VERTEX_ACCESS_TOKEN=...   # 또는 GEMINI_API_KEY
   # 스왑: AI_ENGINE=claude ANTHROPIC_API_KEY=...
