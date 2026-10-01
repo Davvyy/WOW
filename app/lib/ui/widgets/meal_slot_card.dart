@@ -59,7 +59,13 @@ class MealSlotCard extends StatelessWidget {
         right = isSnack ? null : kcalRight(subM, '대체값', muted: true);
       case MealStatus.captured:
       case MealStatus.failed:
-        if (m.noAnalysis || m.status == MealStatus.failed) {
+        if (m.pendingUpload) {
+          // 연결이 없어 아직 서버에 못 올린 사진(앱 전용 폴더에 보관, 연결되면 이어서 보냄)
+          thumb = thumbFood(Icons.cloud_upload_rounded);
+          desc = '연결되면 사진을 보낼게요 · 확정 전까지는 $subM kcal로 잠정 계산돼요';
+          badge = const ChChip('업로드 대기', tone: Tone.warn, icon: Icons.cloud_upload_rounded);
+          right = isSnack ? null : kcalRight(subM, '대체값', muted: true);
+        } else if (m.noAnalysis || m.status == MealStatus.failed) {
           thumb = thumbFood(Icons.image_rounded);
           desc = m.noAnalysis ? 'AI 분석 없이 저장됐어요 · 검색으로 확정해 주세요' : '사진은 저장됐어요 · 음식을 찾지 못해 검색으로 확정이 필요해요';
           badge = const ChChip('확정 대기', tone: Tone.warn, icon: Icons.edit_rounded);

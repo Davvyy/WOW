@@ -33,8 +33,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Future.microtask(() async {
       if (!mounted) return;
       ref.read(activityProvider.notifier).refresh();
-      final err = await ref.read(mealsProvider.notifier).loadToday(); // 서버 연결 시 오늘 끼니
+      final meals = ref.read(mealsProvider.notifier);
+      final err = await meals.loadToday(); // 서버 연결 시 오늘 끼니
       if (err != null && mounted) showToast(context, err);
+      // 지난번에 못 보낸 사진(앱 전용 폴더에 저장됨)을 표시하고 이어서 보낸다
+      if (await meals.restorePendingUploads() > 0) await meals.retryPendingUploads();
     });
   }
 
@@ -440,7 +443,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 final meals = ref.read(mealsProvider.notifier);
-                await Future.wait([ref.read(activityProvider.notifier).refresh(), meals.retryPendingUploads()]);
+                await Future.wait([ref.read(activityProvider.notifier).refresh(), meals.retryPendingUploads(force: true)]);
                 await meals.loadToday();
                 ref.invalidate(ledgerProvider);
                 ref.invalidate(leaderboardProvider);

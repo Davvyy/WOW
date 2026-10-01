@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config.dart';
@@ -176,7 +178,14 @@ WeeklyFeedback? weeklyFrom(List<LedgerRow> ledger) {
   return WeeklyFeedback(rows.length, avg, rows.where((x) => !x.substituted.contains(MealSlot.dinner)).length / rows.length);
 }
 
-final mealUploaderProvider = Provider<MealUploader>((ref) => MealUploader(ref.watch(apiProvider), prepare: preparePhoto));
+/// 업로드 대기열. 서버 모드는 앱 전용 폴더에 저장(앱을 꺼도 유지), 모의 모드는 메모리.
+final mealUploaderProvider = Provider<MealUploader>((ref) => MealUploader(
+      ref.watch(apiProvider),
+      prepare: preparePhoto,
+      store: AppConfig.hasSupabase
+          ? FilePendingStore(() async => Directory('${(await getApplicationSupportDirectory()).path}/upload_queue'))
+          : MemoryPendingStore(),
+    ));
 
 String todayKst() => kstDateString(toKstWall(DateTime.now()));
 
@@ -496,14 +505,34 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     return m.status != MealStatus.captured;
   }
 
-  /// 오프라인 큐 재시도(앱 복귀·당겨서 새로고침)
-  Future<void> retryPendingUploads() async {
-    final done = await ref.read(mealUploaderProvider).retryPending();
-    if (!ref.mounted) return;
+  /// 저장된 업로드 대기열을 불러와 해당 끼니 칸에 "업로드 대기"로 표시(앱 재시작 뒤)
+  Future<int> restorePendingUploads() async {
+    final jobs = await ref.read(mealUploaderProvider).restore();
+    if (!ref.mounted) return 0;
+    for (final job in jobs) {
+      final slot = MealSlot.values.where((s) => s.name == job.localTag).firstOrNull;
+      if (slot == null) continue;
+      final cur = of(slot);
+      if (cur.serverId == null && (cur.status == MealStatus.empty || cur.status == MealStatus.captured)) {
+        final k = job.photo.capturedAt.toUtc().add(const Duration(hours: 9));
+        String two(int v) => v.toString().padLeft(2, '0');
+        _put(cur.copyWith(status: MealStatus.captured, pendingUpload: true, time: '${two(k.hour)}:${two(k.minute)}'));
+      }
+    }
+    return jobs.length;
+  }
+
+  /// 업로드 대기열 재시도(앱 시작·복귀·당겨서 새로고침). [force] 는 재시도 상한을 넘은 것도 다시 보낸다.
+  Future<int> retryPendingUploads({bool force = false}) async {
+    final uploader = ref.read(mealUploaderProvider);
+    final done = await uploader.retryPending(force: force);
+    if (!ref.mounted) return 0;
     for (final (tag, meal) in done) {
       final slot = tag == null ? meal.slot : MealSlot.values.byName(tag);
       _applyCreated(slot, meal, true);
     }
+    if (done.isNotEmpty && ref.read(apiProvider).isRemote) ref.invalidate(ledgerProvider);
+    return uploader.pending.length;
   }
 
   /// 촬영 직후 "지금 확정" 경로: 분석을 기다리지 않고 바로 초안 상태로
