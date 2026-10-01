@@ -486,7 +486,7 @@ const chip = (text, kind = 'neutral', icon = '') => `<span class="chip ${kind}">
 const go = (target, label, cls = 'link') => `<button class="${cls}" data-go="${target}">${label}</button>`;
 const kcal = (n) => `${fmt.kcal(n)} kcal`;
 // 조사 '로/으로' 선택(템플릿 치환용): 받침 없음·ㄹ 받침 → 로, 그 외 → 으로. 숫자는 끝자리 발음 기준
-const ro = (str) => { const c = String(str).trim().slice(-1); if (/\d/.test(c)) return ['0', '1', '3', '6', '7', '8'].includes(c) ? '으로' : '로'; const code = c.charCodeAt(0); if (code < 0xAC00 || code > 0xD7A3) return '로'; const jong = (code - 0xAC00) % 28; return (jong === 0 || jong === 8) ? '로' : '으로'; };
+const ro = (str) => { const c = String(str).trim().slice(-1); if (/\d/.test(c)) return ['0', '3', '6'].includes(c) ? '으로' : '로'; // 영·삼·육만 받침(ㅇ·ㅁ·ㄱ) → 으로, 일·칠·팔은 ㄹ 받침 → 로 const code = c.charCodeAt(0); if (code < 0xAC00 || code > 0xD7A3) return '로'; const jong = (code - 0xAC00) % 28; return (jong === 0 || jong === 8) ? '로' : '으로'; };
 
 const weekday = (md) => { const [m, d] = md.split('.').map(Number); return ['일', '월', '화', '수', '목', '금', '토'][new Date(2026, m - 1, d).getDay()]; }; // 실제 2026년 달력
 const SLOT_LABEL = { breakfast: '아침', lunch: '점심', dinner: '저녁', snack: '간식' };
