@@ -23,7 +23,8 @@
   --critical: #B3261E; --critical-soft: #FBE4E2;
   --review: #5B4FCF; --review-soft: #ECEAFB;
   --ring-track: var(--border-strong);
-  --intake: #DC6420; --burn: #0B9EA9;         /* 섭취/소비 데이터 색 (dataviz 검증 통과) */
+  --intake: #DC6420; --burn: #0A95A0;         /* 섭취/소비 데이터 색 (dataviz 검증: bg·surface 3:1, CVD 통과) */
+  --on-critical: #FFFFFF; --h-on-accent: #FFFFFF;
   --kakao: #FEE500; --on-kakao: #191919; --apple: #000000; --on-apple: #FFFFFF;
   /* 검수 패널(프레임 밖) */
   --h-bg: #E6EBEC; --h-fg: #1A1C1E; --h-fg-2: #4F5A5E; --h-surface: #FFFFFF; --h-border: #CBD3D6; --h-accent: #0B6E70;
@@ -42,7 +43,7 @@
     --warn: #F2B84B; --warn-soft: #3D2E0F;
     --critical: #FF8A80; --critical-soft: #4A1A17;
     --review: #B4ACFF; --review-soft: #272352;
-    --intake: #DD7434; --burn: #1F9EA8;
+    --intake: #DD7434; --burn: #1F9EA8; --on-critical: #2B0B09; --h-on-accent: #0B1F20;
     --h-bg: #0B0F10; --h-fg: #E6E8EB; --h-fg-2: #A3A9B1; --h-surface: #15191C; --h-border: #2A3237; --h-accent: #5FD3D5;
     --bezel: #2A2F36;
     color-scheme: dark;
@@ -56,7 +57,7 @@
   --warn: #F2B84B; --warn-soft: #3D2E0F;
   --critical: #FF8A80; --critical-soft: #4A1A17;
   --review: #B4ACFF; --review-soft: #272352;
-  --intake: #DD7434; --burn: #1F9EA8;
+  --intake: #DD7434; --burn: #1F9EA8; --on-critical: #2B0B09; --h-on-accent: #0B1F20;
   --h-bg: #0B0F10; --h-fg: #E6E8EB; --h-fg-2: #A3A9B1; --h-surface: #15191C; --h-border: #2A3237; --h-accent: #5FD3D5;
   --bezel: #2A2F36;
   color-scheme: dark;
@@ -67,12 +68,13 @@ html, body { height: 100%; }
 body { margin: 0; background: var(--h-bg); color: var(--h-fg); font-family: var(--font-body); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
-.ms { font-family: 'Material Symbols Rounded'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga'; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; flex: none; }
+.ms { font-family: 'Material Symbols Rounded'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; width: 1em; height: 1em; overflow: hidden; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga'; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; flex: none; }
 .ms.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 .ms.sm { font-size: 18px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
 .ms.sm.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
 .ms.xs { font-size: 14px; font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20; }
 .ms.xs.fill { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 20; }
+html:not(.icons-ready) .ms { color: transparent !important; } /* 아이콘 폰트 로딩 전 리거처 텍스트 숨김 */
 .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .tnum { font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
@@ -83,15 +85,15 @@ button { cursor: pointer; }
 .harness { display: grid; grid-template-columns: 252px minmax(0, 1fr) 300px; min-height: 100%; }
 .panel { background: var(--h-surface); border-right: 1px solid var(--h-border); padding: 16px 14px 24px; display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; height: 100vh; overflow: auto; }
 .panel h1 { font-size: 15px; margin: 0; display: flex; align-items: center; gap: 8px; }
-.panel h1 .mark { width: 26px; height: 26px; border-radius: 8px; background: var(--h-accent); color: #fff; display: inline-grid; place-items: center; font-family: var(--font-num); font-weight: 700; font-size: 15px; }
+.panel h1 .mark { width: 26px; height: 26px; border-radius: 8px; background: var(--h-accent); color: var(--h-on-accent); display: inline-grid; place-items: center; font-family: var(--font-num); font-weight: 700; font-size: 15px; }
 .panel .sub { color: var(--h-fg-2); font-size: 12px; margin: -6px 0 0 34px; }
 .panel .sec { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--h-fg-2); font-weight: 600; margin: 4px 0 -6px; }
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav button { display: grid; grid-template-columns: 34px 1fr; align-items: center; text-align: left; gap: 6px; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--h-fg); font-size: 13px; }
 .nav button .id { font-family: var(--font-num); font-weight: 600; color: var(--h-fg-2); font-size: 12px; }
 .nav button:hover { background: var(--h-bg); }
-.nav button[aria-current="true"] { background: var(--h-accent); color: #fff; }
-.nav button[aria-current="true"] .id { color: rgba(255,255,255,.8); }
+.nav button[aria-current="true"] { background: var(--h-accent); color: var(--h-on-accent); }
+.nav button[aria-current="true"] .id { color: var(--h-on-accent); opacity: .8; }
 .variants { display: flex; flex-wrap: wrap; gap: 6px; }
 .variants button { border: 1px solid var(--h-border); background: var(--h-surface); color: var(--h-fg); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
 .variants button[aria-pressed="true"] { background: var(--h-fg); color: var(--h-surface); border-color: var(--h-fg); }
@@ -123,7 +125,7 @@ button { cursor: pointer; }
 }
 
 /* ---------- 폰 프레임 ---------- */
-.phone { width: 390px; height: 844px; background: var(--bg); color: var(--fg); border-radius: 44px; box-shadow: 0 0 0 10px var(--bezel), 0 24px 60px rgba(0,0,0,.25); position: relative; overflow: hidden; font-size: calc(15px * var(--zoom)); line-height: 1.47; display: flex; flex-direction: column; max-width: 100%; }
+.phone { width: 390px; height: 844px; background: var(--bg); color: var(--fg); border-radius: 44px; box-shadow: 0 0 0 10px var(--bezel), 0 24px 60px rgba(0,0,0,.25); position: relative; overflow: hidden; font-size: calc(15px * var(--zoom)); line-height: 1.47; display: flex; flex-direction: column; max-width: 100%; word-break: keep-all; overflow-wrap: anywhere; }
 .statusbar { height: 44px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 26px 0 30px; font-family: var(--font-num); font-weight: 600; font-size: 15px; color: var(--fg); position: relative; z-index: 3; }
 .statusbar .icons { display: flex; gap: 5px; align-items: center; }
 .statusbar .icons .ms { font-size: 16px; }
@@ -197,7 +199,7 @@ button { cursor: pointer; }
 .btn.secondary { background: var(--brand-soft); color: var(--brand); }
 .btn.ghost { background: transparent; color: var(--brand); border: 1px solid var(--border-strong); }
 .btn.quiet { background: var(--surface); color: var(--fg); }
-.btn.critical { background: var(--critical); color: #fff; }
+.btn.critical { background: var(--critical); color: var(--on-critical); }
 .btn.kakao { background: var(--kakao); color: var(--on-kakao); }
 .btn.apple { background: var(--apple); color: var(--on-apple); }
 .btn.sm { min-height: 36px; padding: 0 14px; font-size: .867em; width: auto; white-space: nowrap; flex: none; }
@@ -213,6 +215,7 @@ button { cursor: pointer; }
 .input input { border: 0; background: transparent; flex: 1; min-width: 0; width: 100%; outline: none; font-size: 1.067em; font-weight: 600; font-family: var(--font-num); }
 .input .unit { color: var(--fg-2); }
 .input.disabled { opacity: .5; }
+.input:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
 .seg { display: flex; background: var(--surface); border-radius: 999px; padding: 4px; gap: 4px; }
 .seg button { flex: 1; border: 0; border-radius: 999px; min-height: 40px; background: transparent; color: var(--fg-2); font-weight: 600; }
 .seg button[aria-checked="true"], .seg button[aria-selected="true"] { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -248,7 +251,7 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 .ring .big small { font-size: .45em; font-weight: 600; color: var(--fg-2); margin-left: 2px; letter-spacing: 0; }
 .ring .sub { font-size: .867em; color: var(--fg-2); }
 .ring .end-label { position: absolute; bottom: 12px; font-size: .733em; color: var(--fg-2); font-family: var(--font-num); font-weight: 600; }
-.ring .end-label.l { left: 26px; } .ring .end-label.r { right: 14px; }
+.ring .end-label.l { left: 36px; bottom: 10px; } .ring .end-label.r { right: 22px; bottom: 10px; }
 .three { display: grid; grid-template-columns: 1fr 1fr 1fr; width: 100%; gap: 8px; }
 .three > div { display: flex; flex-direction: column; align-items: center; gap: 0; }
 .three .lab { font-size: .733em; color: var(--fg-2); display: flex; align-items: center; gap: 4px; }
@@ -262,6 +265,17 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 .fill4 i.off { background: transparent; border: 1.5px solid var(--border-strong); background-image: repeating-linear-gradient(135deg, var(--border-strong) 0 1px, transparent 1px 4px); }
 .fill-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .867em; color: var(--fg-2); }
 .fill-row b { color: var(--fg); }
+
+/* 터치 타깃 44pt: 시각 크기는 유지하고 히트 영역만 확장 */
+.cands button, .seg.sm button, .check, .stepper button, .switch, .link, .banner .x, .btn.sm, .chip[role="radio"], .dates button { position: relative; }
+.cands button::before, .seg.sm button::before, .stepper button::before, .btn.sm::before, .chip[role="radio"]::before { content: ''; position: absolute; inset: -6px 0; }
+.switch::before { content: ''; position: absolute; inset: -9px -4px; }
+.check::before { content: ''; position: absolute; inset: -12px; }
+.link::before { content: ''; position: absolute; inset: -11px -4px; }
+.row .sc .heart { width: 44px !important; height: 44px !important; }
+.banner .x { width: 44px; height: 44px; margin: -6px -8px -6px 0; }
+.aux { min-height: 44px; }
+.cta .btn-row .btn.quiet { flex: 0 0 auto; width: auto; white-space: nowrap; }
 
 /* 식사 슬롯 */
 .slots { display: flex; flex-direction: column; gap: 8px; }
@@ -282,14 +296,14 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 
 /* 게이지·바 */
 .gauge { height: 8px; border-radius: 4px; background: var(--border-strong); overflow: hidden; position: relative; }
-.gauge i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand); border-radius: 4px; }
+.gauge i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand); border-radius: 4px; box-shadow: 0 0 0 2px var(--surface); }
 .gauge i.warn { background: var(--warn); }
 .bars { display: grid; grid-auto-flow: column; align-items: end; gap: 6px; height: 96px; padding-top: 14px; }
 .bars .bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; position: relative; }
 .bars .bar i { width: 100%; max-width: 26px; background: var(--brand); border-radius: 4px 4px 0 0; display: block; opacity: .55; }
 .bars .bar.today i { opacity: 1; }
 .bars .bar .v { position: absolute; top: -14px; font-family: var(--font-num); font-size: .733em; font-weight: 600; color: var(--fg-2); }
-.bars .bar .d { font-size: .667em; color: var(--fg-2); font-family: var(--font-num); }
+.bars .bar .d { font-size: .733em; color: var(--fg-2); font-family: var(--font-num); }
 .bars .bar.today .d { color: var(--brand); font-weight: 700; }
 
 /* 리더보드 */
@@ -319,9 +333,10 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 
 /* 표 */
 .table { width: 100%; border-collapse: collapse; font-size: .867em; }
-.table th, .table td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table th, .table td { text-align: right; padding: 8px 4px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table th { color: var(--fg-2); font-weight: 500; font-size: .92em; }
 .table th:first-child, .table td:first-child { text-align: left; }
+.table td { height: 44px; }
 .table td.num { font-family: var(--font-num); font-weight: 600; font-size: 1.07em; }
 .table tr.dim td { color: var(--fg-2); }
 .table tr.today td { background: var(--brand-soft); }
@@ -330,9 +345,8 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 /* 규칙 카드 캐러셀 */
 .carousel { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 4px 16px 8px; scrollbar-width: none; }
 .carousel::-webkit-scrollbar { display: none; }
-.rule { flex: none; width: 300px; min-height: 180px; scroll-snap-align: start; border-radius: 16px; padding: 16px 18px; background: var(--brand); color: var(--on-brand); display: flex; flex-direction: column; gap: 8px; }
+.rule { flex: none; width: 300px; min-height: 180px; scroll-snap-align: start; border-radius: 16px; padding: 16px 18px; background: #0B6E70; color: #fff; display: flex; flex-direction: column; gap: 8px; } /* 고정 배경 4색 + 흰 글자(양 모드 6:1 이상) */
 .rule:nth-child(2) { background: #1F5E8F; } .rule:nth-child(3) { background: #4A3F8A; } .rule:nth-child(4) { background: #3E6B3A; }
-:root[data-theme="dark"] .rule, :root:not([data-theme="light"]) .rule { color: #fff; }
 .rule .no { font-family: var(--font-num); font-weight: 700; font-size: 1.6em; opacity: .85; }
 .rule .t { font-weight: 700; font-size: 1.133em; }
 .rule .b { font-size: .933em; line-height: 1.5; opacity: .95; flex: 1; }
@@ -347,6 +361,7 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 .sheet { background: var(--bg); color: var(--fg); border-radius: 16px 16px 0 0; padding: 12px 16px 32px; width: 100%; display: flex; flex-direction: column; gap: 12px; }
 .sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--border-strong); margin: 0 auto 4px; }
 .modal { background: var(--bg); color: var(--fg); border-radius: 16px; padding: 20px 18px 16px; width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.cam .toast { bottom: 212px; }
 .toast { position: absolute; left: 16px; right: 16px; bottom: 110px; background: var(--fg); color: var(--bg); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 8px; z-index: 7; font-weight: 500; }
 .banner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: .867em; }
 .banner.brand { background: var(--brand-soft); color: var(--brand); }
@@ -362,9 +377,10 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 .dates { display: flex; justify-content: space-between; gap: 4px; }
 .dates button { flex: 1; border: 0; background: transparent; color: var(--fg-2); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; border-radius: 10px; font-size: .733em; }
 .dates button .d { font-family: var(--font-num); font-weight: 700; font-size: 1.35em; color: var(--fg); }
-.dates button[aria-current="date"] { background: var(--brand); color: var(--on-brand); }
-.dates button[aria-current="date"] .d { color: var(--on-brand); }
-.dates button.future { opacity: .4; }
+.dates button[aria-selected="true"] { background: var(--brand); color: var(--on-brand); }
+.dates button[aria-selected="true"] .d { color: var(--on-brand); }
+.dates button.future, .dates button.future .d { color: var(--border-strong); cursor: default; }
+.dates button .ms { font-size: 12px; color: var(--good); }
 .dates button .m { width: 5px; height: 5px; border-radius: 999px; background: var(--good); }
 
 /* 카메라 */
@@ -391,11 +407,14 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 .item .kc small { font-size: .55em; font-family: var(--font-body); color: var(--fg-2); font-weight: 500; }
 .cands { display: flex; gap: 6px; flex-wrap: wrap; }
 .cands button { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 999px; padding: 5px 10px; font-size: .8em; min-height: 32px; }
-.cands button[aria-checked="true"] { background: var(--brand-soft); color: var(--brand); border-color: transparent; font-weight: 600; }
+.cands button[aria-checked="true"] { background: var(--brand-soft); color: var(--brand); border-color: transparent; font-weight: 600; box-shadow: inset 0 0 0 2px var(--brand); }
+.chip[role="radio"][aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--brand); font-weight: 600; }
 .stepper { display: inline-flex; align-items: center; border: 1px solid var(--border-strong); border-radius: 999px; overflow: hidden; }
 .stepper button { width: 40px; height: 36px; border: 0; background: transparent; color: var(--fg); display: grid; place-items: center; }
 .stepper > span { min-width: 40px; text-align: center; font-family: var(--font-num); font-weight: 700; }
-.item.unchecked .top .grow, .item.unchecked .cands, .item.unchecked .seg, .item.unchecked .stepper, .item.unchecked .toggle-row { opacity: .4; }
+.item.unchecked .nm > span:first-child { text-decoration: line-through; color: var(--fg-2); }
+.item.unchecked .assume, .item.unchecked .kc { color: var(--fg-2); }
+.item.unchecked .cands, .item.unchecked .seg, .item.unchecked .stepper, .item.unchecked .toggle-row { opacity: .5; pointer-events: none; }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .867em; }
 .totalbar { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .totalbar .cur { font-family: var(--font-num); font-weight: 700; font-size: 1.8em; font-variant-numeric: tabular-nums; }
@@ -449,7 +468,8 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
     <div class="crumbs" id="crumbs"></div>
     <div class="phone" id="phone">
       <div class="statusbar" aria-hidden="true"><span id="clock">21:10</span><span class="icons"><span class="ms">signal_cellular_alt</span><span class="ms">wifi</span><span class="ms">battery_5_bar</span></span></div>
-      <div class="screen" id="screen" aria-live="polite"></div>
+      <div class="screen" id="screen"></div>
+      <div class="sr" id="announce" aria-live="polite"></div>
     </div>
   </main>
 
@@ -459,12 +479,14 @@ textarea.ta { width: 100%; min-height: 110px; border-radius: 12px; border: 1px s
 <script src="data.js"></script>
 <script>
 /* ======================= 공용 ======================= */
-const { ENGINE, CONST, fmt, CHALLENGE, ME, TODAY, FINAL, TODAY_MEALS, LUNCH_DRAFT, TODAY_ACTIVITY, TODAY_ACTIVITY_IOS, WATCH_USER, WATCH_ACTIVITY, WATCH_MEALS, WATCH_TODAY, LEDGER, CUMULATIVE, TODAY_ROW, LEADERBOARD, REASON, VERDICT } = window.CHALLORY;
+const { ENGINE, CONST, fmt, CHALLENGE, ME, TODAY, FINAL, REVIEW_CASE, REVIEW_TODAY, TODAY_MEALS, LUNCH_DRAFT, TODAY_ACTIVITY, TODAY_ACTIVITY_IOS, WATCH_USER, WATCH_ACTIVITY, WATCH_MEALS, WATCH_TODAY, LEDGER, CUMULATIVE, TODAY_ROW, LEADERBOARD, REASON, VERDICT } = window.CHALLORY;
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ms = (name, cls = '') => `<span class="ms ${cls}" aria-hidden="true">${name}</span>`;
 const chip = (text, kind = 'neutral', icon = '') => `<span class="chip ${kind}">${icon ? ms(icon) : ''}${text}</span>`;
 const go = (target, label, cls = 'link') => `<button class="${cls}" data-go="${target}">${label}</button>`;
 const kcal = (n) => `${fmt.kcal(n)} kcal`;
+// 조사 '로/으로' 선택(템플릿 치환용): 받침 없음·ㄹ 받침 → 로, 그 외 → 으로. 숫자는 끝자리 발음 기준
+const ro = (str) => { const c = String(str).trim().slice(-1); if (/\d/.test(c)) return ['0', '1', '3', '6', '7', '8'].includes(c) ? '으로' : '로'; const code = c.charCodeAt(0); if (code < 0xAC00 || code > 0xD7A3) return '로'; const jong = (code - 0xAC00) % 28; return (jong === 0 || jong === 8) ? '로' : '으로'; };
 
 const weekday = (md) => { const [m, d] = md.split('.').map(Number); return ['일', '월', '화', '수', '목', '금', '토'][new Date(2026, m - 1, d).getDay()]; }; // 실제 2026년 달력
 const SLOT_LABEL = { breakfast: '아침', lunch: '점심', dinner: '저녁', snack: '간식' };
@@ -492,7 +514,7 @@ function tabbar(active) {
     <span class="fab-label" aria-hidden="true">촬영</span>
   </nav><div class="home-ind" aria-hidden="true"></div>`;
 }
-function progressBar(step) { return `<div class="progress" aria-label="진행 ${step}/3">${[1, 2, 3].map(i => `<i class="${i <= step ? 'on' : ''}"></i>`).join('')}</div>`; }
+function progressBar(step) { return `<div class="progress" role="progressbar" aria-valuenow="${step}" aria-valuemin="1" aria-valuemax="3" aria-label="진행 ${step}/3">${[1, 2, 3].map(i => `<i class="${i <= step ? 'on' : ''}"></i>`).join('')}</div>`; }
 function fill4(cells, pct) { // cells: [아침, 점심, 저녁, 걸음] boolean
   const labels = ['아침', '점심', '저녁', '걸음'];
   const sr = labels.map((l, i) => `${l} ${cells[i] ? (i === 3 ? '동기화됨' : '확정') : (i === 3 ? '미동기화' : '미확정')}`).join(', ');
@@ -501,18 +523,18 @@ function fill4(cells, pct) { // cells: [아침, 점심, 저녁, 걸음] boolean
 
 /* 링 (270° 게이지). ratio 0~1.5, provisional → 점선 끝 */
 function ring({ D, ratio, provisional = true, label, sub, empty = false }) {
-  const r = 92, cx = 110, cy = 112, arc = 270, start = 135;
+  const r = 92, cx = 110, cy = 112, arc = 270, start = 225; // 7:30 → 상단 → 4:30, 틈은 아래(0 좌하단 · 목표 우하단)
   const polar = (deg) => { const a = (deg - 90) * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
   const arcPath = (fromDeg, toDeg) => { const [x1, y1] = polar(fromDeg), [x2, y2] = polar(toDeg); const large = toDeg - fromDeg > 180 ? 1 : 0; return `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`; };
   const p = Math.min(ratio, 1);
   const over = ratio > 1;
   const endDeg = start + arc * p;
-  const [dx, dy] = (() => { const a = (start + arc + 6 - 90) * Math.PI / 180; const rr = r + 1; return [cx + rr * Math.cos(a), cy + rr * Math.sin(a)]; })();
+  const [dx, dy] = (() => { const a = (start + arc - 12 - 90) * Math.PI / 180; const rr = r + 20; return [cx + rr * Math.cos(a), cy + rr * Math.sin(a)]; })(); // 초과(150점 구간) 마커: 끝단 바깥
   return `<div class="ring" role="img" aria-label="${esc(label.replace(/<[^>]+>/g, ''))}, ${esc(sub)}">
     <svg viewBox="0 0 220 224" aria-hidden="true">
       <path d="${arcPath(start, start + arc)}" fill="none" stroke="var(--ring-track)" stroke-width="18" stroke-linecap="round"/>
-      ${!empty && p > 0.001 ? `<path d="${arcPath(start, endDeg)}" fill="none" stroke="var(--brand)" stroke-width="18" stroke-linecap="round" ${provisional ? 'stroke-dasharray="6 5"' : ''}/>` : ''}
-      ${over ? `<g transform="translate(${(dx + 14).toFixed(1)} ${(dy + 10).toFixed(1)})"><circle r="9" fill="var(--brand)"/><text y="3.5" text-anchor="middle" font-size="9" font-weight="700" fill="var(--on-brand)" font-family="var(--font-num)">+</text></g>` : ''}
+      ${!empty && p > 0.001 ? `<path d="${arcPath(start, endDeg)}" fill="none" stroke="var(--surface)" stroke-width="22" stroke-linecap="round"/><path d="${arcPath(start, endDeg)}" fill="none" stroke="var(--brand)" stroke-width="18" stroke-linecap="round" ${provisional ? 'stroke-dasharray="6 5"' : ''}/>` : ''}
+      ${over ? `<g transform="translate(${dx.toFixed(1)} ${dy.toFixed(1)})"><circle r="9" fill="var(--brand)"/><text y="3.5" text-anchor="middle" font-size="9" font-weight="700" fill="var(--on-brand)" font-family="var(--font-num)">+</text></g>` : ''}
     </svg>
     <div class="center"><div class="big">${label}</div><div class="sub">${esc(sub)}</div></div>
     <span class="end-label l" aria-hidden="true">0</span><span class="end-label r" aria-hidden="true">−${CONST.T}</span>
@@ -548,7 +570,7 @@ def('p1', '시작·초대코드·로그인', {
       <div class="card-head"><div><p class="cap" style="color:var(--brand)">초대받은 챌린지</p><p class="title">${esc(ch.name)}</p></div>${ms('check_circle', 'fill')}</div>
       <div class="chips">${chip('10.6 ~ 11.2 · 28일', 'neutral', 'calendar_month')}${chip(`${ch.joined}/${ch.capacity}명 참가`, 'neutral', 'group')}</div>
       ${go('p11', `규칙 미리 보기 ${ms('chevron_right')}`)}
-    </div>` : v === 'default' ? `<div class="card outline" style="opacity:.6"><p class="cap">코드를 입력하면 챌린지 정보가 여기에 보여요</p></div>` : ''}
+    </div>` : v === 'default' ? `<div class="card outline" style="border-style:dashed"><p class="cap">코드를 입력하면 챌린지 정보가 여기에 보여요</p></div>` : ''}
     <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px">
       <button class="btn kakao" data-go="p2" ${v === 'valid' ? '' : 'aria-disabled="true"'}>${ms('chat_bubble', 'fill')}카카오로 계속하기</button>
       <button class="btn apple" data-go="p2" ${v === 'valid' ? '' : 'aria-disabled="true"'}><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Apple로 계속하기</button>
@@ -586,7 +608,7 @@ def('p2', '프로필·안전 체크', { default: '계산됨', consent: '동의 �
     </div>
     <div class="card brand" aria-live="polite">
       ${consented ? `<p class="body">기초대사량 <b class="num" style="font-size:1.2em">약 ${fmt.int(bmr)}</b> kcal · 하루 목표 적자 <b class="num">${CONST.T}</b> kcal = <b class="num">100</b>점</p>
-      <p class="cap">Mifflin-St Jeor 공식, 10 kcal 단위 반올림(${fmt.k1(raw).replace('.0', '')} → ${fmt.int(bmr)}) · 챌린지 안 모두 같은 공식이에요</p>` : `<p class="body muted">기초대사량 — · 하루 목표 적자 — kcal</p><p class="cap">위 항목에 동의하고 입력하면 바로 계산돼요</p>`}
+      <p class="cap">Mifflin-St Jeor 공식, 10 kcal 단위 반올림(${fmt.k2(raw)} → ${fmt.int(bmr)}) · 챌린지 안 모두 같은 공식이에요</p>` : `<p class="body muted">기초대사량 — · 하루 목표 적자 — kcal</p><p class="cap">위 항목에 동의하고 입력하면 바로 계산돼요</p>`}
     </div>
     <div class="card" style="gap:4px">
       <p class="title" style="margin-bottom:4px">안전 체크 2문항</p>
@@ -608,7 +630,7 @@ def('p3', '동의', { default: '선택 미동의', 'all-agreed': '전체 동의'
   const ai = v === 'all-agreed';
   const consentCard = (title, sub, state, extra = '') => `<div class="card outline" style="gap:6px">
     <div style="display:flex; gap:10px; align-items:flex-start">
-      ${state === 'done' ? `<span class="check" aria-checked="true" style="background:var(--good);border-color:var(--good)">${ms('check')}</span>` : `<button class="check" role="checkbox" aria-checked="${state === 'on'}" aria-label="${esc(title)}">${state === 'on' ? ms('check') : ''}</button>`}
+      ${state === 'done' ? `<span class="check" role="img" aria-label="동의 완료" style="background:var(--good);border-color:var(--good)">${ms('check')}</span>` : `<button class="check" role="checkbox" aria-checked="${state === 'on'}" aria-label="${esc(title)}">${state === 'on' ? ms('check') : ''}</button>`}
       <div style="flex:1"><p class="body" style="font-weight:600">${title}</p><p class="cap">${sub}</p>${extra}</div>${ms('expand_more')}
     </div></div>`;
   return `${appbar({ title: '동의', back: 'p2' })}${progressBar(2)}
@@ -674,10 +696,11 @@ function slotCard(m, opts = {}) {
   const M = ME.M;
   const st = m.status;
   let thumb, desc, right, badge = '';
-  const target = (st === 'empty' || st === 'skipped') ? 'p6' : 'p7';
+  const target = (st === 'empty' || st === 'skipped') ? 'p6' : st === 'void' ? 'p10-revision' : 'p7';
   if (st === 'empty') { thumb = `<span class="thumb empty">${ms('photo_camera')}</span>`; desc = `아직 기록 없음 · 미기록 시 ${fmt.int(Math.ceil(M))} kcal로 계산돼요`; right = `<span class="kcal muted" style="font-size:1em">${fmt.int(Math.ceil(M))}<small>대체값</small></span>`; }
   else if (st === 'analyzing') { thumb = `<span class="thumb food ${token}">${ms('hourglass_top')}</span>`; desc = '분석 중… 끝나면 알려드려요'; right = `<span class="kcal"><span class="skel" style="width:44px"></span></span>`; badge = chip('분석 중', 'neutral', 'hourglass_top'); }
-  else if (st === 'draft') { thumb = `<span class="thumb food ${token}">${ms('image')}</span>`; desc = `AI 초안 약 ${fmt.int(m.aiKcal)} kcal · 확인 필요`; right = `<span class="kcal">${fmt.int(m.aiKcal)}<small>초안</small></span>`; badge = chip('확인 필요', 'warn', 'priority_high'); }
+  else if (st === 'draft') { const prov = Math.max(M, CONST.AUTO_CONFIRM * m.aiKcal); thumb = `<span class="thumb food ${token}">${ms('image')}</span>`; desc = `AI 초안 약 ${fmt.int(m.aiKcal)} kcal · ${fmt.int(prov)} kcal로 잠정 계산 중`; right = `<span class="kcal">${fmt.int(prov)}<small>잠정</small></span>`; badge = chip('확인 필요', 'warn', 'priority_high'); }
+  else if (st === 'void') { thumb = `<span class="thumb empty">${ms('history')}</span>`; desc = `무효 → 대체값 ${fmt.int(Math.ceil(M))} kcal 적용 · ${REASON.dup_photo}`; right = `<span class="kcal muted" style="font-size:1em">${fmt.int(Math.ceil(M))}<small>대체값</small></span>`; badge = chip('정정', 'warn', 'history'); }
   else if (st === 'captured') { thumb = `<span class="thumb food ${token}">${ms('image')}</span>`; desc = opts.noConsent ? 'AI 분석 없이 저장됐어요 · 검색으로 확정해 주세요' : '사진은 저장됐어요 · 음식을 찾지 못해 검색으로 확정이 필요해요'; right = `<span class="kcal muted" style="font-size:1em">${fmt.int(Math.ceil(M))}<small>대체값</small></span>`; badge = chip('확정 대기', 'warn', 'edit'); }
   else if (st === 'auto') { thumb = `<span class="thumb food ${token}">${ms('image')}</span>`; desc = `${esc(m.title || '')} · 09:00 자동 확정`; right = `<span class="kcal">${fmt.int(m.kcal)}<small>kcal</small></span>`; badge = chip('자동 확정', 'warn', 'schedule'); }
   else if (st === 'skipped') { thumb = `<span class="thumb empty">${ms('block')}</span>`; desc = '이 끼니는 먹지 않았어요 (건너뜀)'; right = `<span class="kcal muted" style="font-size:1em">0<small>kcal</small></span>`; }
@@ -692,24 +715,26 @@ def('p5', '홈(오늘)', {
   // 변형별 입력 → 엔진 계산
   let meals = TODAY_MEALS.map(m => ({ ...m })), steps = TODAY_ACTIVITY.stepsTotal, date = '10.13', dday = `D+${ch.dayIndex}/${ch.days}`;
   let statusChip = chip(`잠정 · ${ch.syncTime} 동기화 · ${ch.source}`, 'neutral', 'schedule');
-  let provisional = true, ringCaption = '', banners = '', extraCards = '', rankText = `잠정 <b class="num">4</b>위 <span style="color:var(--good)">▲2</span>`, lifecycle = null;
+  const cumMe = LEADERBOARD.cumulative.find(r => r.me);
+  let provisional = true, ringCaption = '', banners = '', extraCards = '', rankText = `잠정 <b class="num">${cumMe.rank}</b>위 <span style="color:var(--good)">▲${cumMe.delta}</span>`, lifecycle = null;
   if (v === 'substitute') meals[2] = { slot: 'dinner', label: '저녁', status: 'empty' };
   if (v === 'zero-meal') meals = [{ slot: 'breakfast', status: 'empty' }, { slot: 'lunch', status: 'empty' }, { slot: 'dinner', status: 'empty' }];
   if (v === 'pending-confirm') meals[1] = { slot: 'lunch', label: '점심', time: '12:20', status: 'captured' };
   if (v === 'push-denied') meals[1] = { slot: 'lunch', label: '점심', time: '12:20', status: 'draft', aiKcal: 780 };
   if (v === 'health') meals = [{ slot: 'breakfast', time: '07:40', status: 'confirmed', kcal: 300, title: '요거트 · 사과' }, { slot: 'lunch', time: '12:20', status: 'confirmed', kcal: 480, title: '샐러드 · 삶은 달걀' }, { slot: 'dinner', time: '19:05', status: 'confirmed', kcal: 370, title: '두부 · 나물' }];
-  if (v === 'review') steps = 26000;
-  if (v === 'final') { date = '10.12'; dday = `D+7/${ch.days}`; provisional = false; }
+  if (v === 'review') steps = REVIEW_CASE.steps;
+  if (v === 'final') { date = '10.12'; dday = `D+7/${ch.days}`; provisional = false; steps = LEDGER[6].steps; }
   const sim = ENGINE.simulate({ profile: ME, stepsTotal: steps, meals: meals.map(m => ({ slot: m.slot, status: m.status, kcal: m.kcal, aiKcal: m.aiKcal })) });
   let { bmr, act, inn, sc, E } = sim;
-  if (v === 'final') { const r = LEDGER[6]; sc = { D: r.D, S: r.S, ratio: Math.max(0, r.D / CONST.T), floorApplied: false }; inn = { I: r.I, confirmedMeals: 2, substitutedSlots: ['dinner'], draftSlots: [] }; act = { A: r.A }; E = bmr + r.A; statusChip = chip('확정 · 10.13 09:00', 'good', 'check') + ' ' + chip('정정됨 · 저녁 무효', 'warn', 'history'); meals = [{ slot: 'breakfast', time: '07:50', status: 'confirmed', kcal: 420, title: '계란토스트 · 바나나' }, { slot: 'lunch', time: '12:30', status: 'confirmed', kcal: 780, title: '김치찌개 백반' }, { slot: 'dinner', time: '19:10', status: 'void', kcal: 600, title: '저녁 (무효 → 대체값)' }]; ringCaption = `저녁 무효 → 대체값 ${fmt.int(Math.ceil(ME.M))} 적용 · 41.2 → ${fmt.k1(r.S)}점`; }
+  if (v === 'final') { const r = LEDGER[6]; sc = { D: r.D, S: r.S, ratio: Math.max(0, r.D / CONST.T), floorApplied: false }; inn = { I: r.I, confirmedMeals: 2, substitutedSlots: ['dinner'], draftSlots: [] }; act = { A: r.A }; E = bmr + r.A; statusChip = chip('확정 · 10.13 09:00', 'good', 'check') + ' ' + chip('정정됨 · 저녁 무효', 'warn', 'history'); meals = [{ slot: 'breakfast', time: '07:50', status: 'confirmed', kcal: 420, title: '계란토스트 · 바나나' }, { slot: 'lunch', time: '12:30', status: 'confirmed', kcal: 780, title: '김치찌개 백반' }, { slot: 'dinner', time: '19:10', status: 'void', kcal: 600, title: '닭가슴살 샐러드 · 고구마' }]; ringCaption = `저녁 무효 → 대체값 ${fmt.int(Math.ceil(ME.M))} 적용 · ${fmt.k1(r.S_before)} → ${fmt.k1(r.S)}점`; rankText = `확정 <b class="num">${cumMe.rank}</b>위 <span style="color:var(--good)">▲${cumMe.delta}</span>`; }
   if (inn.substitutedSlots.length && v !== 'final' && v !== 'zero-meal') ringCaption = `${inn.substitutedSlots.map(s => SLOT_LABEL[s]).join('·')} 미기록 → ${fmt.int(Math.ceil(ME.M))} kcal 적용 중`;
+  if (inn.pendingSlots && inn.pendingSlots.length) ringCaption = `${inn.pendingSlots.map(s => SLOT_LABEL[s]).join('·')} 확정 대기 → ${fmt.int(Math.ceil(ME.M))} kcal로 잠정 계산 중 · 검색으로 확정하면 반영`;
   if (inn.draftSlots && inn.draftSlots.length) ringCaption = `${SLOT_LABEL[inn.draftSlots[0].slot]} 미확정 → ${fmt.int(inn.draftSlots[0].value)} kcal로 잠정 계산 중 · 확정하면 반영`;
   if (sc.floorApplied) ringCaption = `섭취 하한 ${fmt.int(sc.F)} 적용`;
-  if (v === 'review') { statusChip = chip('검토 중 · 잠정 유지', 'review', 'policy'); banners += `<div class="banner review" role="status">${ms('policy')}<div class="grow"><b>걸음 26,000이 평소의 2.5배를 넘어 검토 중이에요.</b> 순위는 잠정으로 유지되고, 72시간 안에 설명을 남길 수 있어요.</div>${go('p10-review', '소명하기', 'btn sm quiet')}</div>`; rankText = `잠정 <b class="num">2</b>위 <span class="muted">· 검토 중</span>`; }
-  if (v === 'push-denied') banners += `<div class="banner brand" role="status">${ms('notifications_off')}<div class="grow"><b>점심 분석 완료 · 확인하기</b><br>알림이 꺼져 있어 홈에서 알려드려요</div>${go('p7', '확인', 'btn sm quiet')}</div>`;
+  if (v === 'review') { statusChip = chip('검토 중 · 잠정 유지', 'review', 'policy'); banners += `<div class="banner review" role="status">${ms('policy')}<div class="grow"><b>걸음 26,000이 평소의 2.5배를 넘어 검토 중이에요.</b> 순위는 잠정으로 유지되고, 72시간 안에 설명을 남길 수 있어요.</div>${go('p10-review', '소명하기', 'btn sm quiet')}</div>`; rankText = `잠정 <b class="num">${cumMe.rank}</b>위 <span class="muted">· 검토 중</span>`; }
+  if (v === 'push-denied') banners += `<div class="banner brand" role="status">${ms('notifications_off')}<div class="grow"><b>점심 분석 완료 · 확인하기</b><br>알림이 꺼져 있어 홈에서 알려드려요</div>${go('p7', '점심 확인하기', 'btn sm quiet')}</div>`;
   if (v === 'offline') statusChip = chip(`오프라인 · ${ch.syncTime} 기준`, 'neutral', 'cloud_off');
-  if (v === 'notice') banners += `<div class="banner neutral" role="status">${ms('campaign')}<div class="grow"><b>[공지]</b> ${esc(ch.notice.title)}</div><span class="badge-dot" style="background:var(--critical)" aria-label="읽지 않음"></span><button class="x" aria-label="닫기">${ms('close', 'sm')}</button></div>`;
+  if (v === 'notice') banners += `<div class="banner neutral" role="status">${ms('campaign')}<div class="grow"><b>[공지]</b> ${esc(ch.notice.title)}</div><span class="badge-dot" role="img" style="background:var(--critical)" aria-label="읽지 않음"></span><button class="x" aria-label="닫기">${ms('close', 'sm')}</button></div>`;
   if (v === 'health') extraCards += `<div class="card outline" style="border-color:var(--border-strong);gap:6px" role="status"><div style="display:flex;gap:8px;align-items:flex-start">${ms('spa')}<div><p class="body" style="font-weight:600">오늘 섭취 기록이 적어요</p><p class="cap">점수와 무관하게 충분히 드세요 · 추정치예요 · 이 안내는 순위·점수에 영향이 없어요</p></div></div></div>`;
   if (v === 'before') lifecycle = { title: `${ch.name}`, chip: chip('시작 전 · D−3', 'neutral', 'event'), ringLabel: '—', ringSub: '10월 6일에 시작해요', card: `<div class="card brand"><p class="title">10월 6일 ${weekday('10.6')}요일에 시작해요</p><p class="cap">첫 3일은 점검 기간이라 누적에 들어가지 않아요. 지금 연결 상태를 확인해 두면 첫날부터 걸음이 반영돼요.</p>${go('p4-ok', `연결 상태 확인 ${ms('chevron_right')}`)}</div>` };
   if (v === 'closing') lifecycle = { title: ch.name, chip: chip('최종 집계 중', 'review', 'hourglass_top'), ringLabel: `<span style="font-size:.6em">잠금</span>`, ringSub: '운영자 확인 후 발표돼요', card: `<div class="card" style="background:var(--review-soft)"><p class="title" style="color:var(--review)">최종 집계 중 · 운영자 확인 후 발표돼요</p><p class="cap">마지막 날 기록은 11.3 09:00에 확정됐어요. 미결 검토가 끝나면 결과가 발표되고 7일 이의 기간이 시작돼요.</p></div>` };
@@ -728,7 +753,7 @@ def('p5', '홈(오늘)', {
   return `${appbar({ title: lifecycle ? lifecycle.title : ch.name, meta: lifecycle ? '' : dday, actions: `<button class="iconbtn" data-go="p12" aria-label="설정">${ms('settings')}</button>` })}
   <div class="scroll has-tab" style="gap:12px">
     ${banners}
-    ${lifecycle ? `<div>${lifecycle.chip}</div>` : `<div class="dates" role="tablist" aria-label="날짜">${dates.map(d => `<button role="tab" ${d === date ? 'aria-current="date"' : ''} class="${['10.14', '10.15'].includes(d) ? 'future' : ''}"><span class="d">${d.split('.')[1]}</span><span>${weekday(d)}</span>${!['10.14', '10.15'].includes(d) && d !== date ? '<span class="m" aria-label="확정"></span>' : '<span style="height:5px"></span>'}</button>`).join('')}</div>`}
+    ${lifecycle ? `<div>${lifecycle.chip}</div>` : `<div class="dates" role="tablist" aria-label="날짜">${dates.map(d => { const fut = ['10.14', '10.15'].includes(d); return `<button role="tab" aria-selected="${d === date}" class="${fut ? 'future' : ''}" ${fut ? 'disabled aria-disabled="true"' : ''} aria-label="10월 ${d.split('.')[1]}일 ${weekday(d)}요일${!fut && d !== date ? ' 확정됨' : d === date ? ' 선택됨' : ''}"><span class="d">${d.split('.')[1]}</span><span>${weekday(d)}</span>${!fut && d !== date ? ms('check', 'xs') : '<span style="height:12px"></span>'}</button>`; }).join('')}</div>`}
     <div class="card ringcard tappable" data-go="p10">
       ${ringHtml}
       ${lifecycle ? lifecycle.card : `<div class="three">
@@ -740,7 +765,7 @@ def('p5', '홈(오늘)', {
       ${ringCaption ? `<p class="cap" style="color:var(--warn)">${ms('info', 'xs')} ${ringCaption}</p>` : ''}`}
     </div>
     ${lifecycle && v !== 'published' ? '' : `<div class="card tappable" data-go="p10" style="gap:6px">
-      <div class="card-head"><p class="title">${lifecycle ? `최종 누적 <span class="num" style="font-size:1.25em">${fmt.k1(FINAL.me.score)}</span>점` : `오늘 <span class="num" style="font-size:1.25em">${fmt.k1(sc.S)}</span>점 · 누적 <span class="num" style="font-size:1.25em">${fmt.k1(CUMULATIVE)}</span>점`}</p></div>
+      <div class="card-head"><p class="title">${lifecycle ? `최종 누적 <span class="num" style="font-size:1.25em">${fmt.k1(FINAL.me.score)}</span>점` : `${date === '10.13' ? '오늘' : date} <span class="num" style="font-size:1.25em">${fmt.k1(sc.S)}</span>점 · 누적 <span class="num" style="font-size:1.25em">${fmt.k1(CUMULATIVE)}</span>점`}</p></div>
       <div class="kv"><span>${lifecycle ? `최종 <b class="num">${FINAL.me.rank}</b>위 · ${LEADERBOARD.total - 2}명` : rankText}</span>${go('p10', `점수 계산 보기 ${ms('chevron_right')}`)}</div>
     </div>`}
     ${lifecycle ? '' : `<div class="card" style="gap:8px">
@@ -767,7 +792,7 @@ def('p5', '홈(오늘)', {
 });
 
 /* ---------- P6 식사 촬영 ---------- */
-def('p6', '식사 촬영', { default: '촬영 가능', toast: '저장 토스트', 'push-ask': '알림 프리퍼미션', 'no-consent': 'AI 미동의', failed: '카메라 실패' }, (v) => {
+def('p6', '식사 촬영', { default: '촬영 가능', toast: '저장 토스트', 'push-ask': '알림 프리퍼미션', 'no-consent': 'AI 미동의', failed: '카메라 열기 불가' }, (v) => {
   return `<div class="cam">
     <div class="top"><button class="iconbtn" style="color:#fff" data-go="p5" aria-label="닫기">${ms('close')}</button>
       <div class="chips">${chip('점심', 'on-dark', 'schedule')}${chip('태그 바꾸기', 'on-dark', 'expand_more')}</div>
@@ -781,7 +806,7 @@ def('p6', '식사 촬영', { default: '촬영 가능', toast: '저장 토스트'
       <button class="aux" data-go="p7-search-only">사진 없이 기록</button>
     </div>
     ${v === 'toast' ? `<div class="toast" role="status">${ms('check_circle', 'fill')}저장했어요. 분석이 끝나면 알려드려요</div>` : ''}
-    ${v === 'push-ask' ? `<div class="scrim center"><div class="modal" role="dialog" aria-labelledby="pa"><div style="display:flex;gap:10px;align-items:center">${ms('notifications_active', 'fill')}<p class="title" id="pa">분석이 끝나면 알려드릴게요</p></div><p class="cap">사진 분석은 최대 6초 걸려요. 알림을 켜면 홈으로 돌아가 있어도 결과를 바로 확인할 수 있어요. 끄면 홈 화면에서 알려드려요.</p><div class="btn-row"><button class="btn quiet" data-go="p5-push-denied">나중에</button><button class="btn" data-go="p5">알림 켜기</button></div></div></div>` : ''}
+    ${v === 'push-ask' ? `<div class="scrim center"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="pa"><div style="display:flex;gap:10px;align-items:center">${ms('notifications_active', 'fill')}<p class="title" id="pa">분석이 끝나면 알려드릴게요</p></div><p class="cap">사진 분석은 최대 6초 걸려요. 알림을 켜면 홈으로 돌아가 있어도 결과를 바로 확인할 수 있어요. 끄면 홈 화면에서 알려드려요.</p><div class="btn-row"><button class="btn quiet" data-go="p5-push-denied">나중에</button><button class="btn" data-go="p5">알림 켜기</button></div></div></div>` : ''}
   </div>`;
 }, {
   purpose: '3초 촬영 후 홈 복귀. 인앱 카메라 전용(갤러리 없음), 끼니 자동 태그.',
@@ -792,7 +817,8 @@ def('p6', '식사 촬영', { default: '촬영 가능', toast: '저장 토스트'
 /* ---------- P7 식사 확인·편집 (상태 보유) ---------- */
 let P7 = null;
 function p7Reset(variant) {
-  P7 = { items: LUNCH_DRAFT.items.map(it => ({ ...it, checked: true, cand: 0, brothOff: false, count: it.count || 1 })), variant };
+  P7 = { items: LUNCH_DRAFT.items.map(it => ({ ...it, checked: !it.defaultUnchecked, cand: 0, brothOff: false, count: it.count || 1 })), variant };
+  if (variant === 'downward') { P7.items.forEach(it => { if (it.id === 'stew' || it.id === 'egg') it.checked = false; }); } // 310+20+10 = 340 → AI 850의 40%
   if (variant === 'snack') P7.items = [{ id: 'coffee', name: '아메리카노', candidates: ['아메리카노', '카페라떼', '바닐라라떼'], candKcal: [10, 180, 260], portion: '1잔', grams: 355, mult: 1, kcalPer: 10, kind: 'count', count: 1, confidence: 'sure', checked: true, cand: 0 }, { id: 'cookie', name: '쿠키', candidates: ['쿠키', '스콘', '마들렌'], candKcal: [90, 230, 110], portion: '1개', grams: 20, mult: 1, kcalPer: 90, kind: 'count', count: 1, confidence: 'check', checked: true, cand: 0 }];
   if (variant === 'search-only') P7.items = [];
 }
@@ -805,11 +831,14 @@ function p7ItemKcal(it) {
 }
 function p7Total() { return P7.items.reduce((a, it) => a + p7ItemKcal(it), 0); }
 def('p7', '식사 확인·편집', { default: 'AI 초안(점심 780)', auto: '자동 확정 1,105', downward: '하향 50% 확인 모달', snack: '간식(커피·쿠키)', 'search-only': '검색 전용(초안 없음)', 'skip-limit': '건너뜀 한도 도달', offline: '오프라인' }, (v) => {
-  if (!P7 || P7.variant !== v) p7Reset(v);
+  if (!P7 || P7.variant !== v) { // 기본 변형에서 실제로 −50% 넘게 낮춘 상태로 들어온 경우만 상태 유지, 그 외는 변형별 초기화
+    const keep = v === 'downward' && P7 && P7.variant === 'default' && p7Total() < 0.5 * LUNCH_DRAFT.aiTotal;
+    if (keep) P7.variant = v; else p7Reset(v);
+  }
   const total = p7Total();
   const isSnack = total > 0 && total < CONST.SNACK_KCAL;
   const aiTotal = v === 'snack' ? 100 : LUNCH_DRAFT.aiTotal;
-  const autoVal = Math.max(ME.M, CONST.AUTO_CONFIRM * 850);
+  const autoVal = Math.max(ME.M, CONST.AUTO_CONFIRM * aiTotal); // 04 §6 예3: max(742.5, 1.3×850) = 1,105
   const confBadge = (c) => c === 'sure' ? chip('확실', 'good', 'check') : c === 'check' ? chip('확인 필요', 'warn', 'priority_high') : chip('직접 입력', 'neutral', 'edit');
   const itemHtml = (it, i) => {
     const k = it.checked ? p7ItemKcal(it) : it.candKcal[it.cand] * (it.kind === 'count' ? it.count : it.mult);
@@ -821,32 +850,33 @@ def('p7', '식사 확인·편집', { default: 'AI 초안(점심 780)', auto: '�
       <div class="top">
         <button class="check" role="checkbox" aria-checked="${it.checked}" data-act="toggle" aria-label="${esc(it.name)} 먹었어요">${it.checked ? ms('check') : ''}</button>
         <div class="grow"><div class="nm"><span>${esc(it.candidates[it.cand])}</span>${confBadge(it.confidence)}</div><div class="assume">가정 분량 · ${assume}</div></div>
-        <div class="kc" aria-live="polite">${fmt.int(k)}<small> kcal</small></div>
+        <div class="kc">${fmt.int(k)}<small> kcal</small></div>
       </div>
-      <div class="cands" role="radiogroup" aria-label="음식 후보">${it.candidates.map((c, ci) => `<button role="radio" aria-checked="${ci === it.cand}" data-act="cand" data-ci="${ci}">${esc(c)} <span class="num muted">${it.candKcal[ci] * (it.kind === 'count' ? it.count : 1)}</span></button>`).join('')}<button data-act="search" aria-label="다른 음식 검색">${ms('search', 'xs')} 검색</button></div>
+      <div class="cands" role="radiogroup" aria-label="음식 후보">${it.candidates.map((c, ci) => `<button role="radio" aria-checked="${ci === it.cand}" data-act="cand" data-ci="${ci}">${esc(c)} <span class="num muted">${it.candKcal[ci] * (it.kind === 'count' ? it.count : 1)}</span></button>`).join('')}</div><div class="cands"><button data-act="search" aria-label="다른 음식 검색">${ms('search', 'xs')} 검색</button></div>
       ${it.kind === 'rice' ? `<div class="seg sm" role="radiogroup" aria-label="분량">${[[0.5, '반 공기'], [1, '1공기'], [1.5, '곱빼기']].map(([m, l]) => `<button role="radio" aria-checked="${it.mult === m}" data-act="mult" data-m="${m}">${l}</button>`).join('')}</div>` : ''}
       ${it.kind === 'soup' ? `<div class="toggle-row"><span>국물 안 먹음 (−40%)</span><button class="switch" role="switch" aria-checked="${it.brothOff}" data-act="broth" aria-label="국물 안 먹음"></button></div>` : ''}
       ${it.kind === 'count' ? `<div class="toggle-row"><span>개수</span><span class="stepper"><button data-act="dec" aria-label="하나 빼기">${ms('remove', 'sm')}</button><span aria-live="polite">${it.count}</span><button data-act="inc" aria-label="하나 더하기">${ms('add', 'sm')}</button></span></div>` : ''}
       ${it.kind === 'side' ? `<div class="toggle-row"><span>반찬 1젓가락 ≈ 10~15 g</span><span class="stepper"><button data-act="dec" aria-label="덜 먹음">${ms('remove', 'sm')}</button><span>${it.mult === 1 ? '1' : it.mult}</span><button data-act="inc" aria-label="더 먹음">${ms('add', 'sm')}</button></span></div>` : ''}
     </div>`;
   };
-  const header = `<div class="photo" role="img" aria-label="${esc(LUNCH_DRAFT.photoLabel)}"><span class="tag">${v === 'snack' ? '간식 · 15:40' : `점심 · ${LUNCH_DRAFT.time}`}</span><span class="tag" style="margin-left:auto">${ms('photo_camera', 'xs')} 인앱 촬영 · 서버 시각</span></div>`;
+  const header = `<div class="photo" role="img" aria-label="${v === 'snack' ? '아메리카노와 쿠키 사진' : esc(LUNCH_DRAFT.photoLabel)}"><span class="tag">${v === 'snack' ? '간식 · 15:40' : `점심 · ${LUNCH_DRAFT.time}`}</span><span class="tag" style="margin-left:auto">${ms('photo_camera', 'xs')} 인앱 촬영 · 서버 시각</span></div>`;
   let body;
   if (v === 'search-only') {
-    body = `${header}<div class="banner warn" role="status">${ms('search')}<div class="grow"><b>음식을 찾지 못했어요.</b> 이름으로 검색해 주세요. AI 분석 없이 저장된 사진이에요.</div></div>
+    body = `${header}<div class="banner warn" role="status">${ms('search')}<div class="grow"><b>음식을 찾지 못했어요.</b> 이름으로 검색해 주세요. 사진은 저장됐고, 확정하기 전까지는 ${fmt.int(Math.ceil(ME.M))} kcal로 잠정 계산돼요.</div></div>
       <div class="input">${ms('search', 'sm')}<input placeholder="음식 이름 검색 (식약처 DB)" aria-label="음식 이름 검색" style="font-family:var(--font-body);font-weight:400"></div>
       <p class="cap" style="font-weight:600">최근 음식</p><div class="chips">${['김치찌개 백반 780', '닭가슴살 샐러드 380', '계란토스트 320', '군고구마 220'].map(c => chip(c, 'neutral', 'history')).join('')}</div>
       <button class="btn secondary">${ms('edit')}직접 입력 (이름·kcal)</button>`;
   } else {
     body = `${header}
-    <div class="card" style="gap:4px"><div class="totalbar"><span class="cap">현재</span><span class="cur">약 ${fmt.int(total)}<small> kcal</small></span></div><p class="cap" style="text-align:right">AI 초안 ${fmt.int(aiTotal)} · ${P7.items.filter(x => x.confidence === 'sure').length}개 확실 · ${P7.items.filter(x => x.confidence === 'check').length}개 확인 필요</p></div>
-    ${v === 'auto' ? `<div class="banner warn" role="status">${ms('schedule')}<div class="grow"><b>자동 확정 ${fmt.int(autoVal)} kcal</b> · 09:00까지 확정하지 않아 max(${fmt.int(Math.ceil(ME.M))}, 1.3×AI 850)으로 계산됐어요. 48시간 안에는 고칠 수 있어요.</div><button class="btn sm quiet">수정하기</button></div>` : ''}
+    <div class="card" style="gap:4px"><div class="totalbar"><span class="cap">현재</span><span class="cur" aria-live="polite" aria-atomic="true">약 ${fmt.int(total)}<small> kcal</small></span></div><p class="cap" style="text-align:right">AI 초안 약 ${fmt.int(aiTotal)} · ${P7.items.filter(x => x.confidence === 'sure').length}개 확실 · ${P7.items.filter(x => x.confidence === 'check').length}개 확인 필요${P7.items.some(x => !x.checked) ? ` · ${P7.items.filter(x => !x.checked).length}개 먹지 않음` : ''}</p></div>
+    ${v === 'auto' ? `<div class="banner warn" role="status">${ms('schedule')}<div class="grow"><b>자동 확정 ${fmt.int(autoVal)} kcal</b> · 09:00까지 확정하지 않아 max(${fmt.int(Math.ceil(ME.M))}, 1.3×AI ${fmt.int(aiTotal)})으로 계산됐어요. 아래 항목을 고쳐 저장하면 확정값으로 바뀌어요(48시간 안).</div></div>` : ''}
     ${isSnack ? `<div class="banner neutral" role="status">${ms('cookie')}<div class="grow"><b>150 kcal 미만은 간식이에요.</b> 섭취에는 더해지지만 끼니 슬롯은 채우지 않아요.</div></div>` : ''}
     ${v === 'offline' ? `<div class="banner neutral" role="status">${ms('cloud_off')}<div class="grow">오프라인 · 연결되면 확정할 수 있어요</div></div>` : ''}
     <div id="p7items" style="display:flex;flex-direction:column;gap:10px">${P7.items.map(itemHtml).join('')}</div>
     <button class="btn secondary">${ms('add')}항목 추가 — 검색 · 최근 음식 · 직접 입력</button>
     <div class="inline-note">${ms('check_box')}<span>먹은 것만 체크해 두세요. 체크를 풀면 그 항목은 계산에서 빠져요. 이름을 바꾸면 kcal도 함께 바뀌어요.</span></div>
-    <div class="inline-note">${ms('schedule')}<span>09:00까지 확정하지 않으면 max(${fmt.int(Math.ceil(ME.M))}, 1.3×AI) kcal로 자동 확정돼요. 그 뒤 48시간 안에는 고칠 수 있어요.</span></div>`;
+    <div class="inline-note">${ms('schedule')}<span>09:00까지 확정하지 않으면 max(${fmt.int(Math.ceil(ME.M))}, 1.3×AI) kcal로 자동 확정돼요. 그 뒤 48시간 안에는 고칠 수 있어요.</span></div>
+    <p class="disclaimer">모든 kcal은 추정이에요 · 확정값만 순위에 반영돼요</p>`;
   }
   const skipLimit = v === 'skip-limit';
   return `${appbar({ title: v === 'snack' ? '간식 확인' : '점심 확인', back: 'p5', actions: `<button class="iconbtn" aria-label="사진 삭제">${ms('delete')}</button>` })}
@@ -854,11 +884,11 @@ def('p7', '식사 확인·편집', { default: 'AI 초안(점심 780)', auto: '�
   <div class="cta">
     ${skipLimit ? `<p class="cap" style="color:var(--warn)">${ms('info', 'xs')} 이번 주 건너뜀 3회를 모두 썼어요. 안 먹은 끼니는 ${fmt.int(Math.ceil(ME.M))} kcal로 계산돼요.</p>` : ''}
     <div class="btn-row">
-      <button class="btn quiet" ${skipLimit ? 'aria-disabled="true"' : ''} style="flex:.7">건너뜀${skipLimit ? '' : ' <span class="muted">(남은 2회)</span>'}</button>
-      <button class="btn" data-go="${v === 'downward' ? 'p7-downward' : 'p5'}" id="p7confirm" ${v === 'offline' ? 'aria-disabled="true"' : ''}>${ms('check')}확정 ${v === 'search-only' ? '' : `· 약 ${fmt.int(total)} kcal`}</button>
+      <button class="btn quiet" ${skipLimit ? 'aria-disabled="true"' : ''}>건너뜀${skipLimit ? '' : ' <span class="muted">(남은 2회)</span>'}</button>
+      <button class="btn" data-go="${(v !== 'downward' && v !== 'auto' && v !== 'search-only' && total < 0.5 * aiTotal) ? 'p7-downward' : 'p5'}" id="p7confirm" ${(v === 'offline' || P7.items.length === 0) ? 'aria-disabled="true"' : ''}>${ms('check')}${v === 'auto' ? '수정 저장' : '확정'} ${v === 'search-only' ? '' : `· 약 ${fmt.int(total)} kcal`}</button>
     </div>
   </div>
-  ${v === 'downward' ? `<div class="scrim center"><div class="modal" role="alertdialog" aria-labelledby="dw"><p class="title" id="dw">AI 추정보다 50% 넘게 낮아요</p><p class="body">AI 초안 780 kcal → 현재 약 320 kcal. 그대로 확정할까요? 운영자가 확인할 수 있어요.</p><div class="btn-row"><button class="btn quiet" data-go="p7">다시 볼게요</button><button class="btn" data-go="p5">그대로 확정</button></div></div></div>` : ''}`;
+  ${v === 'downward' ? `<div class="scrim center"><div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="dw"><p class="title" id="dw">AI 추정보다 50% 넘게 낮아요</p><p class="body">AI 초안 약 ${fmt.int(aiTotal)} kcal → 현재 약 ${fmt.int(total)} kcal(${fmt.pct(total / aiTotal)}). 그대로 확정할까요? 운영자가 확인할 수 있어요.</p><div class="btn-row"><button class="btn quiet" data-go="p7">다시 볼게요</button><button class="btn" data-go="p5">그대로 확정</button></div></div></div>` : ''}`;
 }, {
   purpose: 'AI 초안을 사람이 편집·확정한다. 확정값만 순위·링에 반영.',
   rules: ['항목 리스트 + 가정 분량 노출 + 실시간 재계산(후보 칩 탭 시 이름과 kcal 함께 변경)', '한식 프리셋: 반 공기/1공기/곱빼기, 국물 토글 −40%, 개수 스테퍼, 반찬 1젓가락, 먹은 것만 체크', '150 kcal 미만은 간식 라벨(슬롯 미충족, 섭취엔 합산)', 'AI 대비 −50% 하향은 확인 모달 + 플래그', '미확정 시 09:00 max(M, 1.3×AI) 자동 확정 고지'],
@@ -872,7 +902,7 @@ def('p8', '활동 상세', { default: '예시 1 · Galaxy(삼성헬스)', watch:
   const isWatch = v === 'watch';
   const who = isWatch ? WATCH_USER : ME;
   const act = isWatch ? WATCH_ACTIVITY : (v === 'ios' ? TODAY_ACTIVITY_IOS : TODAY_ACTIVITY);
-  const steps = v === 'zero' ? 0 : v === 'review' ? 26000 : act.stepsTotal;
+  const steps = v === 'zero' ? 0 : v === 'review' ? REVIEW_CASE.steps : act.stepsTotal;
   const sim = isWatch ? WATCH_TODAY : ENGINE.simulate({ profile: ME, stepsTotal: steps, sessions: [], meals: TODAY_MEALS });
   const a = sim.act, bmr = sim.bmr;
   const src = isWatch ? 'Apple 건강' : v === 'ios' ? 'Apple 건강' : ch.source;
@@ -880,8 +910,9 @@ def('p8', '활동 상세', { default: '예시 1 · Galaxy(삼성헬스)', watch:
   const perStep = ENGINE.kcalPerStep(who.weightKg);
   // 7일 추이 (D2~D8), 예시 1 기준
   const week = LEDGER.slice(1).map(r => ({ d: r.date.split('.')[1], A: r.A, today: r.d === 8 }));
+  week[week.length - 1].A = a.A; // 오늘 막대는 현재 변형의 계산값
   const maxA = Math.max(...week.map(w => w.A), 1);
-  const bars = `<div class="card" style="gap:6px"><div class="card-head"><p class="title">최근 7일 활동 kcal</p><span class="cap">추정 · 상한 ${fmt.int(CONST.C)}</span></div>
+  const bars = isWatch ? '' : `<div class="card" style="gap:6px"><div class="card-head"><p class="title">최근 7일 활동 kcal</p><span class="cap">추정 · 상한 ${fmt.int(CONST.C)}</span></div>
     <div class="bars" role="img" aria-label="최근 7일 활동 칼로리: ${week.map(w => `10월 ${w.d}일 ${fmt.int(w.A)}`).join(', ')}">${week.map(w => `<div class="bar ${w.today ? 'today' : ''}"><span class="v">${fmt.int(w.A)}</span><i style="height:${Math.max(4, Math.round(w.A / maxA * 72))}px"></i><span class="d">${w.d}</span></div>`).join('')}</div></div>`;
   const stepsCard = v === 'zero'
     ? `<div class="card" style="gap:8px"><div class="card-head"><p class="title">걸음</p>${chip('0', 'critical')}</div><p class="body" style="font-weight:600">걸음이 0이에요</p><ol class="cap" style="margin:0;padding-left:18px;line-height:1.8"><li>삼성헬스 → 설정 → Health Connect 동기화 켜기</li><li>Health Connect 권한에서 챌로리 "걸음" 허용</li><li>챌로리를 다시 열거나 당겨서 새로고침</li></ol><div class="btn-row"><button class="btn sm quiet">삼성헬스 열기</button><button class="btn sm quiet" data-go="p4-zero">연결 진단</button></div></div>`
@@ -909,9 +940,9 @@ def('p8', '활동 상세', { default: '예시 1 · Galaxy(삼성헬스)', watch:
     ${stepsCard}
     <div class="card" style="gap:4px"><div class="card-head"><p class="title">운동 세션</p><span class="cap">자동 기록만</span></div><div class="list">${sessions}</div></div>
     ${bars}
-    <div class="card outline" style="gap:6px"><div class="card-head"><p class="title">플랫폼 활동 칼로리</p>${chip('참고값 · 순위 미반영', 'neutral', 'info')}</div><p class="body">${isWatch || v === 'ios' ? `Apple 건강 활동 ${fmt.int(isWatch ? act.platformActive : 310)} kcal` : '삼성헬스 활동 칼로리 — 제공 안 됨'}</p><p class="cap">폰이든 워치든 순위는 같은 공식(MET 엔진)으로 계산해요.</p></div>
+    <div class="card outline" style="gap:6px"><div class="card-head"><p class="title">플랫폼 활동 칼로리</p>${chip('참고값 · 순위 미반영', 'neutral', 'info')}</div><p class="body">${isWatch || v === 'ios' ? `Apple 건강 활동 ${fmt.int(act.platformActive)} kcal` : '삼성헬스 활동 칼로리 — 제공 안 됨'}</p><p class="cap">폰이든 워치든 순위는 같은 공식(MET 엔진)으로 계산해요.</p></div>
     <details class="card" style="gap:6px"><summary style="font-weight:600;cursor:pointer">계산 내역</summary>
-      <p class="cap formula" style="font-family:var(--font-body);font-weight:500">걸음 × (${CONST.MET_WALK}−1) × ${who.weightKg} ÷ 6,000 = <b style="font-size:1em">${perStep.toFixed(4)}</b> kcal/보<br>${isWatch ? `세션 (MET ${act.sessions[0].met}−1) × ${who.weightKg} kg × 0.5 h = ${fmt.k1(a.sessionNet)}<br>` : ''}상한: 걸음 30,000보 · 층수 50층 · 활동 ${fmt.int(CONST.C)} kcal · 2024 Compendium 17190/12050</p></details>
+      <p class="cap formula" style="font-family:var(--font-body);font-weight:500">걸음 × (${CONST.MET_WALK}−1) × ${who.weightKg} ÷ 6,000 = <b style="font-size:1em">${perStep.toFixed(4)}</b> kcal/보<br>${isWatch ? `세션 (MET ${act.sessions[0].met}−1) × ${who.weightKg} kg × 0.5 h = ${fmt.k1(a.sessionNet)}<br>` : ''}상한: 걸음 30,000보 · 층수 50층 · 활동 ${fmt.int(CONST.C)} kcal · 2024 Compendium 17190(걷기) · 17131(계단)</p></details>
     <p class="disclaimer">모든 수치는 추정이에요</p>
   </div>${tabbar('act')}`;
 }, {
@@ -921,22 +952,23 @@ def('p8', '활동 상세', { default: '예시 1 · Galaxy(삼성헬스)', watch:
 });
 
 /* ---------- P9 리더보드 ---------- */
-let HEARTED = new Set();
+let HEARTED_TODAY = null; // 보낸 사람 기준 하루 1회 (02 §3-9)
 def('p9', '리더보드', { default: '오늘(잠정)', cumulative: '누적(확정)', 'review-me': '검토 중(본인)', 'review-other': '검토 중(타인=집계 중)', report: '신고 시트', before: '시작 전', closing: '최종 집계 중', published: '최종 확정', 'opt-out': '순위 비공개' }, (v) => {
   const today = ['default', 'review-me', 'review-other', 'report', 'opt-out'].includes(v);
   const lb = today ? LEADERBOARD.today : LEADERBOARD.cumulative;
   const me = lb.find(r => r.me);
   const avatar = (name, cls = 'sm-avatar') => `<span class="${cls} avatar ${avatarCls(name)}" aria-hidden="true">${[...name][0]}</span>`;
   const rowHtml = (r, opts = {}) => {
-    if (r.aggregating) return `<div class="row aggregating"><span class="rk">${r.rank}</span><div class="who"><span class="nm" style="display:flex;gap:6px;align-items:center">${ms('hourglass_top', 'sm')}<span class="name">집계 중</span></span><span class="sub">운영자 확인 중 · 점수는 잠시 뒤 보여요</span></div><span class="sc muted">—</span></div>`;
+    if (r.aggregating) return `<div class="row aggregating" role="listitem"><span class="rk">${r.rank}</span><div class="who"><span class="nm" style="display:flex;gap:6px;align-items:center">${ms('hourglass_top', 'sm')}<span class="name">집계 중</span></span><span class="sub">점수는 잠시 뒤 보여요</span></div><span class="sc muted">—</span></div>`;
     const mine = r.me;
     const reviewMe = mine && v === 'review-me';
-    const hearted = HEARTED.has(r.name);
-    return `<div class="row ${mine ? 'me' : ''}" ${mine ? 'data-go="p10"' : ''} role="${mine ? 'button' : 'listitem'}">
-      <span class="rk">${r.rank}${r.tie ? '<span class="cap" style="display:block;font-size:.6em;font-family:var(--font-body)">공동</span>' : ''}</span>
+    const hearted = HEARTED_TODAY === r.name;
+    const heartLocked = !!HEARTED_TODAY && !hearted;
+    return `<div class="row ${mine ? 'me' : ''}" ${mine ? 'data-go="p10" tabindex="0"' : ''} role="${mine ? 'button' : 'listitem'}">
+      <span class="rk">${r.rank}${r.tie ? '<span class="cap" style="display:block;font-size:11px;font-family:var(--font-body)">공동</span>' : ''}</span>
       <div class="who"><span class="nm">${avatar(r.name)}<span class="name">${esc(r.name)}${mine ? '(나)' : ''}</span>${r.badge === 'watch' && opts.showBadge ? chip('워치', 'neutral', 'watch') : ''}${reviewMe ? chip('검토 중', 'review', 'policy') : ''}</span>
-        <span class="sub"><span class="fill4" role="img" aria-label="반영률 ${r.fill}/4">${[0, 1, 2, 3].map(i => `<i class="${i < r.fill ? '' : 'off'}" style="width:7px;height:10px"></i>`).join('')}</span>${r.fill * 25}%${mine && r.delta ? ` · <span style="color:var(--good)">▲${r.delta} 2계단 상승</span>` : ''}${reviewMe ? ` · ${go('p10-review', '소명하기')}` : ''}</span></div>
-      <span class="sc">${fmt.k1(r.score)}${mine ? '' : `<button class="heart" aria-pressed="${hearted}" data-heart="${esc(r.name)}" aria-label="${esc(r.name)} 응원하기${hearted ? ' (응원했어요)' : ''}">${ms('favorite', hearted ? 'sm fill' : 'sm')}</button>`}</span>
+        <span class="sub"><span class="fill4" role="img" aria-label="반영률 ${r.fill}/4">${[0, 1, 2, 3].map(i => `<i class="${i < r.fill ? '' : 'off'}" style="width:7px;height:10px"></i>`).join('')}</span>${r.fill * 25}%${mine && r.delta ? ` · <span style="color:var(--good)"><span aria-hidden="true">▲${r.delta}</span><span class="sr">${r.delta}계단 상승</span></span>` : ''}${reviewMe ? ` · ${go('p10-review', '소명하기')}` : ''}</span></div>
+      <span class="sc">${fmt.k1(r.score)}${mine ? '' : `<button class="heart" aria-pressed="${hearted}" ${heartLocked ? 'aria-disabled="true" style="opacity:.45"' : ''} data-heart="${esc(r.name)}" aria-label="${esc(r.name)} 응원하기${hearted ? ' (응원했어요)' : heartLocked ? ' (오늘 응원을 이미 보냈어요)' : ''}">${ms('favorite', hearted ? 'sm fill' : 'sm')}</button>`}</span>
     </div>`;
   };
   const podium = (list) => { const [a, b, c] = list; const p = (r, cls) => r ? `<div class="p ${cls}">${avatar(r.name, 'avatar')}<span class="rk">${ms(r.rank === 1 ? 'workspace_premium' : 'military_tech', 'sm fill')}${r.rank}위</span><span class="nm">${esc(r.name)}</span><span class="sc">${fmt.k1(r.score)}</span></div>` : ''; return `<div class="podium">${p(b, 'second')}${p(a, 'first')}${p(c, 'third')}</div>`; };
@@ -950,16 +982,17 @@ def('p9', '리더보드', { default: '오늘(잠정)', cumulative: '누적(확�
     const list = lb.filter(r => !r.me);
     const top3 = list.filter(r => !r.aggregating).slice(0, 3);
     const rest = lb.filter(r => r.rank > 3 || r.aggregating).filter(r => !r.me);
-    const gap = today ? `위 순위까지 ${fmt.k1(me.gapToPrev)}점` : `3위까지 ${fmt.k1(LEADERBOARD.cumulative[2].score - me.score)}점`;
+    const gap = today ? `위 순위까지 약 ${fmt.k1(me.gapToPrev)}점` : `3위까지 약 ${fmt.k1(LEADERBOARD.cumulative[2].score - me.score)}점`;
     const myRow = rowHtml(me).replace('</div>\n      <span class="sc">', `<span class="sub">${gap}</span></div>\n      <span class="sc">`);
-    content = `${podium(top3)}<div class="sticky-me">${myRow}</div>${rest.map(r => rowHtml(r)).join('')}
+    content = `${podium(top3)}<div class="sticky-me">${myRow}</div><div role="list" aria-label="순위 목록" style="display:flex;flex-direction:column">${rest.map(r => rowHtml(r)).join('')}</div>
       <p class="cap" style="text-align:center">전체 ${LEADERBOARD.total}명 · 20명씩 더 보기</p>
-      <div class="card outline" style="gap:4px"><p class="title">이번 주 피드백</p><p class="body">평균 ${fmt.k1(LEADERBOARD.weekly.avg)}점 · 저녁 확정률 ${fmt.pct(LEADERBOARD.weekly.dinnerConfirmRate)}</p><p class="cap">순위와 무관한 내 기록이에요. 저녁을 확정하는 날이 늘면 반영률이 올라가요.</p></div>`;
+      <div class="card outline" style="gap:4px"><p class="title">내 기록 피드백 <span class="cap">점검 기간 뒤 확정 ${LEADERBOARD.weekly.days}일</span></p><p class="body">하루 평균 약 ${fmt.k1(LEADERBOARD.weekly.avg)}점 · 저녁 확정률 ${fmt.pct(LEADERBOARD.weekly.dinnerConfirmRate)}</p><p class="cap">순위와 무관한 내 기록이에요. 저녁을 확정하는 날이 늘면 반영률이 올라가요.</p></div>
+      <p class="disclaimer">점수는 추정 kcal 기준이에요 · 의료 조언이 아니에요</p>`;
   }
   const seg = ['before', 'closing', 'published'].includes(v) ? '' : `<div class="seg" role="tablist" aria-label="기간"><button role="tab" aria-selected="${today}" data-go="p9">오늘 (잠정)</button><button role="tab" aria-selected="${!today}" data-go="p9-cumulative">누적</button></div>`;
-  const reportSheet = v === 'report' ? `<div class="scrim"><div class="sheet" role="dialog" aria-labelledby="rp"><div class="grab"></div><p class="title" id="rp">익명으로 신고</p><p class="cap">신고자는 표시되지 않아요. 운영자가 확인하고 당사자에게만 결과를 알려요.</p>
+  const reportSheet = v === 'report' ? `<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rp"><div class="grab"></div><p class="title" id="rp">익명으로 신고</p><p class="cap">신고자는 표시되지 않아요. 운영자가 확인하고 당사자에게만 결과를 알려요.</p>
     <div class="field"><label>대상</label><div class="input" style="font-weight:600">${avatar('달려라하니')} 달려라하니 · 10.12 저녁</div></div>
-    <div class="field"><label id="rs">사유</label><div class="chips" role="radiogroup" aria-labelledby="rs">${['사진 재사용', '음식 아님', '걸음 비정상', '기타'].map((r, i) => `<button class="chip ${i === 0 ? 'brand' : ''}" role="radio" aria-checked="${i === 0}" style="min-height:36px;font-size:.867em">${r}</button>`).join('')}</div></div>
+    <div class="field"><label id="rs">사유</label><div class="chips" role="radiogroup" aria-labelledby="rs">${['사진 재사용', '음식 아님', '걸음 비정상', '기타'].map((r, i) => `<button class="chip ${i === 0 ? 'brand' : ''}" role="radio" aria-checked="${i === 0}" style="min-height:36px;font-size:.867em">${i === 0 ? ms('check', 'xs') : ''}${r}</button>`).join('')}</div></div>
     <div class="btn-row"><button class="btn quiet" data-go="p9">취소</button><button class="btn" data-go="p9">신고하기</button></div></div></div>` : '';
   return `${appbar({ title: '순위', meta: ch.name, actions: v !== 'report' && today && v !== 'opt-out' ? `<button class="iconbtn" data-go="p9-report" aria-label="더보기">${ms('more_vert')}</button>` : '' })}
   <div class="scroll has-tab" style="gap:10px">
@@ -969,24 +1002,26 @@ def('p9', '리더보드', { default: '오늘(잠정)', cumulative: '누적(확�
   </div>${tabbar('rank')}${reportSheet}`;
 }, {
   purpose: '오늘(잠정)·누적(확정) 순위, 격차, 응원·신고. 공정성 참여.',
-  rules: ['포디움 3 + 내 행 스티키 + 위 순위까지 격차(꼴찌·하위% 금지)', '타인의 검토 중은 "집계 중"으로만(공개 지목 금지), 본인은 "검토 중 · 소명하기"', '응원 하트 1일 1회(재탭 시 "내일 다시"), 익명 신고 사유 템플릿 4종', '반영률 칩은 색+칸+텍스트'],
+  rules: ['포디움 3 + 내 행 스티키 + 위 순위까지 격차만 표시(06 §6 비교 원칙)', '타인의 검토 중은 "집계 중"으로만(공개 지목 금지), 본인은 "검토 중 · 소명하기"', '응원 하트 1일 1회(재탭 시 "내일 다시"), 익명 신고 사유 템플릿 4종', '반영률 칩은 색+칸+텍스트'],
   links: ['내 행 → P10', '더보기 → 신고 시트', '세그먼트 오늘/누적'],
   interactive: '하트는 실제로 토글돼요(1일 1회 규칙은 토스트로 안내).',
 });
 
 /* ---------- P10 점수 장부·소명 ---------- */
 def('p10', '점수 장부·소명', { default: '잠정(오늘)', revision: '정정 이력', review: '검토 중 + 소명 입력', 'verdict-approve': '판정: 승인', 'verdict-warn': '판정: 경고', 'verdict-void': '판정: 무효', 'verdict-exclude': '판정: 순위 제외', expired: '소명 기간 만료', objection: '결과 이의' }, (v) => {
-  const t = TODAY_ROW; const r7 = LEDGER[6];
+  const t = v === 'review' ? Object.assign({}, TODAY_ROW, { A: REVIEW_TODAY.act.A, D: REVIEW_TODAY.sc.D, S: REVIEW_TODAY.sc.S, steps: REVIEW_CASE.steps }) : TODAY_ROW; const r7 = LEDGER[6];
   const Ieff = Math.max(t.I, t.F);
-  const formula = `<div class="card brand" style="gap:6px"><p class="cap" style="color:var(--brand);font-weight:600">오늘 10.13 · 잠정</p>
+  const formula = `<div class="card brand" style="gap:6px"><p class="cap" style="color:var(--brand);font-weight:600">오늘 10.13 · 잠정${v === 'review' ? ' · 검토 중(걸음 ' + fmt.int(REVIEW_CASE.steps) + ' 잠정 반영)' : ''}</p>
     <p class="formula">(${fmt.int(t.bmr)} + ${fmt.int(t.A)}) − max(${fmt.int(t.I)}, ${fmt.int(t.F)}) = ${fmt.int(t.D)}<br>${fmt.int(t.D)} ÷ ${CONST.T} × 100 = <b>${fmt.k1(t.S)}점</b></p>
     <p class="cap">기초대사 + 활동(상한 ${fmt.int(CONST.C)}) − 섭취(하한 ${fmt.int(t.F)}) = 순적자 · ${CONST.T} kcal = 100점 · 최대 150점</p></div>`;
   const chips = `<div class="chips">${chip(`대체값 ${fmt.int(Math.ceil(ME.M))} = max(700, 0.45×BMR)`, 'neutral')}${chip(`섭취 하한 ${fmt.int(t.F)} = max(1,200, 0.8×BMR)`, 'neutral')}${chip(`활동 상한 ${fmt.int(CONST.C)}`, 'neutral')}${chip('체중 비례 목표(T∝W) 시 —점 [미결]', 'neutral')}</div>`;
   const rows = LEDGER.map(r => {
     const flags = [r.check ? '점검' : '', r.substituted.length ? `대체(${r.substituted.map(s => SLOT_LABEL[s]).join('')})` : '', r.floorApplied ? '하한' : '', r.revision ? '정정' : '', r.provisional ? '잠정' : '', r.health ? '건강 안내' : ''].filter(Boolean).join(' · ');
-    return `<tr class="${r.check ? 'dim' : ''} ${r.provisional ? 'today' : ''}" data-go="${r.provisional ? 'p5' : 'p5-final'}"><td>${r.date}<br><span class="cap" style="font-size:.85em">${flags}</span></td><td>${fmt.int(r.bmr)}</td><td>${fmt.int(r.A)}</td><td>${fmt.int(r.I)}</td><td>${r.D < 0 ? '−' + fmt.int(-r.D) : fmt.int(r.D)}</td><td class="num">${r.revision ? `<s class="muted" style="font-weight:400">${fmt.k1(r.S_before)}</s> ${fmt.k1(r.S)}` : fmt.k1(r.S)}</td></tr>`;
+    const rowGo = r.provisional ? 'p5' : r.date === '10.12' ? 'p5-final' : '';
+    const rowS = v === 'review' && r.provisional ? REVIEW_TODAY.sc.S : r.S;
+    return `<tr class="${r.check ? 'dim' : ''} ${r.provisional ? 'today' : ''}" ${rowGo ? `data-go="${rowGo}" tabindex="0" role="button"` : ''}><td>${r.date}<br><span class="cap" style="font-size:.85em">${flags}</span></td><td>${fmt.int(r.bmr)}</td><td>${fmt.int(v === 'review' && r.provisional ? REVIEW_TODAY.act.A : r.A)}</td><td>${fmt.int(r.I)}</td><td>${(() => { const D = v === 'review' && r.provisional ? REVIEW_TODAY.sc.D : r.D; return D < 0 ? '−' + fmt.int(-D) : fmt.int(D); })()}</td><td class="num">${r.revision ? `<s class="muted" style="font-weight:400">${fmt.k1(r.S_before)}</s> ${fmt.k1(r.S)}` : fmt.k1(rowS)}</td></tr>`;
   }).join('');
-  const table = `<div class="card" style="gap:6px"><div class="card-head"><p class="title">일별 장부</p><span class="cap">누적 ${fmt.k1(CUMULATIVE)}점 (확정분)</span></div><div class="table-wrap"><table class="table"><thead><tr><th scope="col">날짜</th><th scope="col">BMR</th><th scope="col">활동 A</th><th scope="col">섭취 I</th><th scope="col">순적자 D</th><th scope="col">점수 S</th></tr></thead><tbody>${rows}</tbody></table></div><p class="cap">첫 3일(10.6~10.8)은 점검 기간으로 누적에 들어가지 않아요. 행을 누르면 그날 홈으로 이동해요.</p></div>`;
+  const table = `<div class="card" style="gap:6px"><div class="card-head"><p class="title">일별 장부 <span class="cap">추정 kcal 기준</span></p><span class="cap">누적 ${fmt.k1(CUMULATIVE)}점 (확정분)</span></div><div class="table-wrap" tabindex="0" role="region" aria-label="일별 장부 표"><table class="table"><thead><tr><th scope="col">날짜</th><th scope="col">BMR</th><th scope="col">활동 A</th><th scope="col">섭취 I</th><th scope="col">순적자 D</th><th scope="col">점수 S</th></tr></thead><tbody>${rows}</tbody></table></div><p class="cap">첫 3일(10.6~10.8)은 점검 기간으로 누적에 들어가지 않아요. 오늘·정정된 날(10.12) 행을 누르면 그날 홈으로 이동해요.</p></div>`;
   const history = `<div class="card" style="gap:4px"><p class="title">변경 이력</p><div class="list">
     <div class="li">${ms('history')}<div class="grow"><div>10.12 저녁 무효 → 대체값 ${fmt.int(Math.ceil(ME.M))} · <span class="num" style="font-weight:700">${fmt.k1(r7.S_before)} → ${fmt.k1(r7.S)}</span></div><div class="cap">${REASON.dup_photo} · 운영자 판정(정정)</div></div></div>
     <div class="li">${ms('edit')}<div class="grow"><div>10.10 점심 850 → 780 확정(본인)</div><div class="cap">AI 초안 수정 · 확정값만 반영</div></div></div>
@@ -999,9 +1034,9 @@ def('p10', '점수 장부·소명', { default: '잠정(오늘)', revision: '정�
     <button class="btn" data-go="p10-verdict-approve">${ms('send')}설명 보내기</button><p class="cap" style="text-align:center">운영자가 72시간 안에 확인해요</p></div>`;
   if (v === 'verdict-approve') section = `<div class="banner" style="background:var(--good-soft);color:var(--good)" role="status">${ms('check_circle', 'fill')}<div class="grow"><b>${VERDICT.approve.text}</b> · ${VERDICT.approve.effect}<br><span class="cap" style="color:inherit">${REASON.steps_spike} · 10.13 확인</span></div></div>`;
   if (v === 'verdict-warn') section = `<div class="banner warn" role="status">${ms('warning')}<div class="grow"><b>${VERDICT.warn.text.replace('{n}', '1')}</b> · ${VERDICT.warn.effect}<br><span class="cap" style="color:inherit">${REASON.source_unknown}</span></div></div>${chip('경고 1/3', 'warn', 'warning')}`;
-  if (v === 'verdict-void') section = `<div class="banner warn" role="status">${ms('history')}<div class="grow"><b>${REASON.dup_photo}.</b> ${VERDICT.void.text.replace('{대체 처리}', `대체값 ${M}`)}<br><span class="cap" style="color:inherit">10.12 ${fmt.k1(r7.S_before)}→${fmt.k1(r7.S)}점 · 누적 −${fmt.k1(r7.S_before - r7.S)}</span></div></div>`;
+  if (v === 'verdict-void') section = `<div class="banner warn" role="status">${ms('history')}<div class="grow"><b>${REASON.dup_photo}.</b> ${VERDICT.void.text.replace('{대체 처리}로', `대체값 ${M}${ro(M)}`)}<br><span class="cap" style="color:inherit">10.12 ${fmt.k1(r7.S_before)}→${fmt.k1(r7.S)}점 · 누적 −${fmt.k1(r7.S_before - r7.S)}</span></div></div>`;
   if (v === 'verdict-exclude') section = `<div class="banner review" role="status">${ms('visibility_off')}<div class="grow"><b>${VERDICT.exclude.text}</b><br>${VERDICT.exclude.effect}</div></div>${chip('경고 3/3 · 순위 제외', 'review', 'policy')}`;
-  if (v === 'expired') section = `<div class="banner neutral" role="status">${ms('schedule')}<div class="grow"><b>설명 기간이 지났어요.</b> 기록으로만 확인했어요 · ${VERDICT.approve.effect}</div></div>`;
+  if (v === 'expired') section = `<div class="banner neutral" role="status">${ms('schedule')}<div class="grow"><b>${VERDICT.expired.text}</b></div></div>`;
   if (v === 'objection') section = `<div class="card brand" style="gap:8px"><p class="title">최종 결과에 이의 남기기</p><p class="cap">이의 기간 ~${ch.objectionUntil} · 1회만 남길 수 있어요. 운영자가 확인하고 정정 여부를 알려드려요.</p><textarea class="ta" aria-label="이의 내용" placeholder="어느 날짜의 어떤 점수가 다르다고 생각하는지 적어 주세요."></textarea><button class="btn">${ms('send')}이의 보내기</button></div>`;
   return `${appbar({ title: '점수 장부', back: 'p5' })}
   <div class="scroll" style="gap:12px">
@@ -1011,11 +1046,11 @@ def('p10', '점수 장부·소명', { default: '잠정(오늘)', revision: '정�
     ${chips}
     ${table}
     ${history}
-    <p class="disclaimer">점수는 매시간 잠정 · D+1 09:00 확정 · 이후 변경은 "정정"으로 기록돼요</p>
+    <p class="disclaimer">모든 수치는 추정이에요 · 점수는 매시간 잠정 · D+1 09:00 확정 · 이후 변경은 "정정"으로 기록돼요</p>
   </div>`;
 }, {
   purpose: '"왜 이 점수인가"를 숫자로. 산식 대입 카드 + 일별 표 + 적용 규칙 칩 + 변경 이력 + 검토·소명(당사자만).',
-  rules: ['모든 값은 data.js 장부에서 엔진으로 계산(10.12 정정은 저녁 600 무효 → 대체값 742.5 재계산)', '판정 문구는 06 §6 사유 템플릿 + 판정 문장 + 점수 영향 문장 조합만', '금지 어휘(부정·조작·실패·거짓·적발) 0건', '소명은 1회·72h, 만료 시 기록으로만 확인'],
+  rules: ['모든 값은 data.js 장부에서 엔진으로 계산(10.12 정정은 저녁 600 무효 → 대체값 742.5 재계산)', '판정 문구는 06 §6 사유 템플릿 + 판정 문장 + 점수 영향 문장 조합만', '금지 어휘 0건(06 §6 판정 템플릿 하단 목록 기준)', '소명은 1회·72h, 만료 시 기록으로만 확인'],
   links: ['표 행 → 해당 날짜 P5', '칩 → P11 규칙'],
 });
 
@@ -1024,7 +1059,11 @@ let SIM = { steps: 9000, run: 0, intake: 1800 };
 def('p11', '챌린지 규칙', { default: '규칙 카드 + 시뮬레이터', markdown: '운영자 추가 규칙 있음' }, (v) => {
   const M = fmt.int(Math.ceil(ME.M));
   const sessions = SIM.run > 0 ? [{ met: ENGINE.runMet(9), minutes: SIM.run, steps: Math.round(SIM.run * 150) }] : [];
-  const sim = ENGINE.simulate({ profile: ME, stepsTotal: SIM.steps, sessions, meals: [{ slot: 'breakfast', status: 'confirmed', kcal: Math.round(SIM.intake * 0.25) }, { slot: 'lunch', status: 'confirmed', kcal: Math.round(SIM.intake * 0.4) }, { slot: 'dinner', status: 'confirmed', kcal: SIM.intake - Math.round(SIM.intake * 0.25) - Math.round(SIM.intake * 0.4) }] });
+  // 3끼 확정 가정: 섭취는 끼니 분할 없이 I 로 직접 계산 (간식 규칙 미적용)
+  const simBmr = ENGINE.bmr(ME).bmr;
+  const simAct = ENGINE.activity({ weightKg: ME.weightKg, stepsTotal: SIM.steps, sessions });
+  const simSc = ENGINE.score({ bmr: simBmr, A: simAct.A, I: SIM.intake, confirmedMeals: 3 });
+  const sim = { bmr: simBmr, act: simAct, sc: simSc };
   const cards = [
     ['①', '먹은 걸 찍어요', `세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 ${M} kcal로, 간식은 찍은 만큼 더해져요.`, `대체값 ${M} · 간식 150 미만`],
     ['②', '움직여요', `걸음·달리기·계단 자동 기록만 인정. 하루 활동 최대 ${fmt.int(CONST.C)} kcal.`, `활동 상한 ${fmt.int(CONST.C)} · 걸음 30,000`],
@@ -1047,6 +1086,7 @@ def('p11', '챌린지 규칙', { default: '규칙 카드 + 시뮬레이터', mar
       </div>
       <div class="kv" id="simOut" aria-live="polite"><span>활동 ${fmt.k1(sim.act.A)} · 순적자 ${fmt.int(sim.sc.D)}${sim.sc.floorApplied ? ' · 하한 적용' : ''}</span><span>예상 <b class="num" style="font-size:1.6em">${fmt.k1(sim.sc.S)}</b>점</span></div>
       <div class="gauge" aria-hidden="true"><i style="width:${Math.min(100, sim.sc.ratio / 1.5 * 100).toFixed(1)}%"></i></div>
+      <p class="cap">가정: 3끼 확정 · 달리기는 9 km/h(MET ${ENGINE.runMet(9)}) 기준이고 달리기 중 걸음 150보/분은 걸음에서 빼요 · 결과는 P5·P10과 같은 산식 함수</p>
       ${go('p10', `오늘 실제값과 비교 ${ms('chevron_right')}`)}</div>
     ${v === 'markdown' ? `<div class="card outline" style="gap:6px"><p class="title">운영자 추가 규칙</p><p class="body">· 회식 날(10.17)은 저녁 자동 확정 대신 대체값 적용을 요청할 수 있어요(운영자에게 메시지).<br>· 상품은 상위 3명 + 반영률 100% 달성자 추첨 2명.</p><p class="cap">운영자 민호 · 10.5 게시</p></div>` : ''}
     <div class="inline-note">${ms('info')}<span>일부만 찍는 기록은 완전히 막을 수 없어요. 신고와 운영자 확인으로 보완해요.</span></div>
@@ -1062,15 +1102,15 @@ def('p11', '챌린지 규칙', { default: '규칙 카드 + 시뮬레이터', mar
 /* ---------- P12 설정 ---------- */
 def('p12', '설정', { default: '정상', disconnected: '연결 끊김', 'push-off': 'OS 알림 꺼짐', notices: '공지 목록', delete: '계정 삭제 모달', 'weight-read': '건강 앱 체중 읽기' }, (v) => {
   const li = (icon, title, sub = '', trail = ms('chevron_right'), attrs = '') => `<div class="li" ${attrs}>${ms(icon)}<div class="grow"><div style="font-weight:600">${title}</div>${sub ? `<div class="cap">${sub}</div>` : ''}</div><span class="trail">${trail}</span></div>`;
-  const sw = (on) => `<button class="switch" role="switch" aria-checked="${on}"></button>`;
+  const sw = (on, label) => `<button class="switch" role="switch" aria-checked="${on}" aria-label="${esc(label)}"></button>`;
   const diag = v === 'disconnected' ? li('sync_problem', '삼성헬스 · 연결 끊김', '마지막 동기화 10.12 22:40 · 오늘 걸음을 못 읽었어요', `${chip('연결 확인', 'critical')}${ms('chevron_right')}`, 'data-go="p4-zero"') : li('sync', `삼성헬스 · ${ch.syncTime} 동기화`, `오늘 ${fmt.int(TODAY_ACTIVITY.stepsTotal)}걸음 ✓ · Health Connect`, ms('chevron_right'), 'data-go="p4-ok"');
-  const pushOff = v === 'push-off' ? `<div class="banner warn">${ms('notifications_off')}<div class="grow"><b>알림이 꺼져 있어요</b> · 설정에서 켜기. 그동안 분석 결과는 홈 화면에서 알려드려요.</div><button class="btn sm quiet">설정</button></div>` : '';
-  const notices = v === 'notices' ? `<div class="scrim"><div class="sheet" role="dialog" aria-labelledby="nt"><div class="grab"></div><p class="title" id="nt">공지</p><div class="list">
+  const pushOff = v === 'push-off' ? `<div class="banner warn">${ms('notifications_off')}<div class="grow"><b>알림이 꺼져 있어요</b> · 그동안 분석 결과는 홈 화면에서 알려드려요.</div><button class="btn sm quiet">알림 켜기</button></div>` : '';
+  const notices = v === 'notices' ? `<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="nt"><div class="grab"></div><p class="title" id="nt">공지</p><div class="list">
     <div class="li">${ms('campaign')}<div class="grow"><div style="font-weight:600">${esc(ch.notice.title)}</div><div class="cap">${ch.notice.date} · 읽지 않음</div></div><span class="badge-dot" style="background:var(--critical)"></span></div>
     <div class="li">${ms('campaign')}<div class="grow"><div style="font-weight:600">점검 기간이 끝났어요 · 10.9부터 누적 반영</div><div class="cap">10.9 · 읽음</div></div></div>
     <div class="li">${ms('campaign')}<div class="grow"><div style="font-weight:600">가을 걷기 챌린지가 시작됐어요</div><div class="cap">10.6 · 읽음</div></div></div></div><button class="btn quiet" data-go="p12">닫기</button></div></div>` : '';
-  const del = v === 'delete' ? `<div class="scrim center"><div class="modal" role="alertdialog" aria-labelledby="dl"><p class="title" id="dl" style="color:var(--critical)">계정을 삭제할까요?</p><p class="body">사진·식사·걸음·체중 기록이 즉시 삭제돼요. 일별 점수는 닉네임 없이 익명으로만 남아요. 되돌릴 수 없어요.</p><div class="field"><label for="delc">확인을 위해 "삭제"를 입력해 주세요</label><div class="input"><input id="delc" style="font-family:var(--font-body)" placeholder="삭제"></div></div><div class="btn-row"><button class="btn quiet" data-go="p12">취소</button><button class="btn critical" aria-disabled="true">계정 삭제</button></div></div></div>` : '';
-  const weightRead = v === 'weight-read' ? `<div class="scrim center"><div class="modal" role="dialog" aria-labelledby="wr"><div style="display:flex;gap:10px;align-items:center">${ms('monitor_weight')}<p class="title" id="wr">체중을 건강 앱에서 읽을까요?</p></div><p class="cap">최초 1회 체중(WeightRecord) 읽기 권한을 요청해요. 읽은 체중은 참고용으로만 저장되고 점수·BMR에는 반영되지 않아요.</p><div class="btn-row"><button class="btn quiet" data-go="p12">직접 입력</button><button class="btn" data-go="p12">읽기 허용</button></div></div></div>` : '';
+  const del = v === 'delete' ? `<div class="scrim center"><div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="dl"><p class="title" id="dl" style="color:var(--critical)">계정을 삭제할까요?</p><p class="body">사진·식사·걸음·체중 기록이 즉시 삭제돼요. 일별 점수는 닉네임 없이 익명으로 챌린지 종료까지만 남아요. 되돌릴 수 없어요.</p><div class="field"><label for="delc">확인을 위해 "삭제"를 입력해 주세요</label><div class="input"><input id="delc" style="font-family:var(--font-body)" placeholder="삭제"></div></div><div class="btn-row"><button class="btn quiet" data-go="p12">취소</button><button class="btn critical" aria-disabled="true">계정 삭제</button></div></div></div>` : '';
+  const weightRead = v === 'weight-read' ? `<div class="scrim center"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="wr"><div style="display:flex;gap:10px;align-items:center">${ms('monitor_weight')}<p class="title" id="wr">체중을 건강 앱에서 읽을까요?</p></div><p class="cap">최초 1회 체중(WeightRecord) 읽기 권한을 요청해요. 읽은 체중은 참고용으로만 저장되고 점수·BMR에는 반영되지 않아요.</p><div class="btn-row"><button class="btn quiet" data-go="p12">직접 입력</button><button class="btn" data-go="p12">읽기 허용</button></div></div></div>` : '';
   return `${appbar({ title: '설정', back: 'p5' })}
   <div class="scroll settings" style="gap:10px">
     ${pushOff}
@@ -1085,15 +1125,15 @@ def('p12', '설정', { default: '정상', disconnected: '연결 끊김', 'push-o
     </div>
     <div class="card" style="gap:2px"><p class="sec-title">연결</p>${diag}</div>
     <div class="card" style="gap:2px"><p class="sec-title">알림</p>
-      <div class="toggle"><div><div style="font-weight:600">어제 결과</div><div class="cap">09:30</div></div>${sw(true)}</div>
-      <div class="toggle"><div><div style="font-weight:600">저녁 리마인드</div><div class="cap">21:00 · 미확정·미동기화일 때만</div></div>${sw(true)}</div>
-      <div class="toggle"><div><div style="font-weight:600">분석 완료</div><div class="cap">사진 분석이 끝났을 때</div></div>${sw(true)}</div>
-      <p class="cap">공지·검토·판정 알림은 끌 수 없어요.</p>
+      <div class="toggle"><div><div style="font-weight:600">어제 결과</div><div class="cap">09:30</div></div>${sw(true, '어제 결과 알림')}</div>
+      <div class="toggle"><div><div style="font-weight:600">저녁 리마인드</div><div class="cap">21:00 · 미확정·미동기화일 때만</div></div>${sw(true, '저녁 리마인드 알림')}</div>
+      <div class="toggle"><div><div style="font-weight:600">분석 완료</div><div class="cap">사진 분석이 끝났을 때</div></div>${sw(true, '분석 완료 알림')}</div>
+      <p class="cap">공지·검토·판정·건강 안내 알림은 끌 수 없어요.</p>
       ${li('campaign', '공지', `${esc(ch.notice.title)} · 읽지 않음 1`, `<span class="badge-dot" style="background:var(--critical)"></span>${ms('chevron_right')}`, 'data-go="p12-notices"')}
     </div>
     <div class="card" style="gap:2px"><p class="sec-title">공개</p>
-      <div class="toggle"><div><div style="font-weight:600">순위에 내 행 보이기</div><div class="cap">끄면 내 행만 보여요</div></div>${sw(true)}</div>
-      <div class="toggle"><div><div style="font-weight:600">측정 등급 배지 보이기</div><div class="cap">기본 꺼짐 · 폰/워치 표시</div></div>${sw(false)}</div>
+      <div class="toggle"><div><div style="font-weight:600">순위에 내 행 보이기</div><div class="cap">끄면 내 행만 보여요</div></div>${sw(true, '순위에 내 행 보이기')}</div>
+      <div class="toggle"><div><div style="font-weight:600">측정 등급 배지 보이기</div><div class="cap">기본 꺼짐 · 폰/워치 표시</div></div>${sw(false, '측정 등급 배지 보이기')}</div>
     </div>
     <div class="card" style="gap:2px"><p class="sec-title">동의·데이터</p>
       ${li('smart_toy', 'AI 사진 분석 동의 철회', '철회하면 촬영 후 검색으로 확정해요')}
@@ -1139,10 +1179,20 @@ function render() {
   screenEl.innerHTML = s.render(CURRENT.variant);
   phoneEl.classList.toggle('dark-chrome', CURRENT.id === 'p6');
   screenEl.querySelectorAll('.scroll').forEach(el => { el.scrollTop = 0; });
+  afterRender(s, CURRENT.variant);
   renderNav(); renderNotes();
   document.getElementById('crumbs').innerHTML = `<span>${s.id.toUpperCase()}</span><b>${esc(s.name)}</b><span>·</span><span>${esc(s.variants[CURRENT.variant])}</span><span>·</span><code style="font-size:11px">${esc(location.hash || '#p5')}</code>`;
   // P6 토스트 → 1.5초 후 홈
   if (CURRENT.id === 'p6' && CURRENT.variant === 'toast') setTimeout(() => { if (CURRENT.id === 'p6' && CURRENT.variant === 'toast') navigate('p5'); }, 1500);
+}
+function afterRender(s, variant) {
+  // 키보드 접근: data-go 가 있는 비버튼 요소에 role/tabindex
+  screenEl.querySelectorAll('[data-go]:not(button):not(a):not([tabindex])').forEach(el => { el.setAttribute('tabindex', '0'); if (!el.getAttribute('role')) el.setAttribute('role', 'button'); });
+  // 모달·시트: 뒤 화면 inert + 첫 컨트롤 포커스
+  const dlg = screenEl.querySelector('[role="dialog"], [role="alertdialog"]');
+  screenEl.querySelectorAll('.scroll, .appbar, .tabbar, .cta, .cam > .top, .cam > .bottom').forEach(el => { if (dlg && !dlg.contains(el)) el.setAttribute('inert', ''); else el.removeAttribute('inert'); });
+  if (dlg) { const f = dlg.querySelector('button, input, textarea, [tabindex="0"]'); if (f) f.focus({ preventScroll: true }); }
+  const an = document.getElementById('announce'); if (an) an.textContent = `${s.name} · ${s.variants[variant]}`;
 }
 function renderNav() {
   const nav = document.getElementById('nav');
@@ -1167,7 +1217,7 @@ function renderNotes() {
 document.addEventListener('click', (e) => {
   const navBtn = e.target.closest('[data-nav]'); if (navBtn) { navigate(navBtn.dataset.nav); return; }
   const heart = e.target.closest('[data-heart]');
-  if (heart) { const name = heart.dataset.heart; if (HEARTED.has(name)) { toast('내일 다시 응원할 수 있어요'); } else { HEARTED.add(name); toast(`${name}님을 응원했어요 (오늘 1회)`); render(); } return; }
+  if (heart) { const name = heart.dataset.heart; if (HEARTED_TODAY) { toast(HEARTED_TODAY === name ? '내일 다시 응원할 수 있어요' : `오늘은 ${HEARTED_TODAY}님을 이미 응원했어요 · 내일 다시`); } else { HEARTED_TODAY = name; toast(`${name}님을 응원했어요 (오늘 1회)`); render(); } return; }
   const act = e.target.closest('[data-act]');
   if (act && CURRENT.id === 'p7') { p7Action(act); return; }
   const goEl = e.target.closest('[data-go]');
@@ -1179,11 +1229,16 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('#mTheme')) { const cur = document.documentElement.getAttribute('data-theme'); setTheme(cur === 'dark' ? 'light' : cur === 'light' ? 'system' : 'dark'); return; }
   if (e.target.closest('#zoomBtn')) { const b = document.getElementById('zoomBtn'); const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); document.documentElement.style.setProperty('--zoom', on ? '1.2' : '1'); return; }
 });
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-go]:not(button):not(a)')) { e.preventDefault(); e.target.click(); }
+  if (e.key === 'Escape') { const dlg = screenEl.querySelector('[role="dialog"], [role="alertdialog"]'); if (dlg) { const back = dlg.querySelector('[data-go]'); if (back) navigate(back.dataset.go); } }
+});
 document.getElementById('mScreen').addEventListener('change', (e) => navigate(e.target.value));
 document.getElementById('mVariant').addEventListener('change', (e) => navigate(e.target.value));
 
 function p7Action(el) {
   const card = el.closest('[data-item]'); const it = P7.items[+card.dataset.item]; const a = el.dataset.act;
+  if (a !== 'toggle' && !it.checked) return; // 먹지 않은 항목의 컨트롤은 비활성
   if (a === 'toggle') it.checked = !it.checked;
   if (a === 'cand') { it.cand = +el.dataset.ci; it.name = it.candidates[it.cand]; }
   if (a === 'mult') it.mult = +el.dataset.m;
@@ -1221,6 +1276,10 @@ function setTheme(mode) {
 }
 try { const saved = localStorage.getItem('challory-theme'); if (saved && saved !== 'system') setTheme(saved); } catch (_) {}
 window.showScreen = (id) => navigate(id); // 스크린샷 도구용
+// 아이콘 폰트 준비 전 리거처 텍스트 숨김(최대 3초 뒤 강제 표시)
+const iconsReady = () => document.documentElement.classList.add('icons-ready');
+if (document.fonts && document.fonts.load) { document.fonts.load('24px "Material Symbols Rounded"').then(iconsReady, iconsReady); } else { iconsReady(); }
+setTimeout(iconsReady, 3000);
 window.addEventListener('hashchange', render);
 render();
 </script>
