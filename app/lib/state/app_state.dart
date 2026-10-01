@@ -549,11 +549,43 @@ class DayNotifier extends Notifier<int> {
 final selectedDayProvider = NotifierProvider<DayNotifier, int>(DayNotifier.new);
 
 // ---------- 응원(하루 1회) ----------
+/// 오늘 응원한 대상(participant_id, 모의 행은 닉네임). 보내는 사람 기준 하루 1회(cheers UNIQUE(from, local_date)).
 class HeartNotifier extends Notifier<String?> {
   @override
   String? build() => null;
-  void send(String name) => state = name;
+
+  /// 서버에서 오늘 보낸 응원을 읽어 온다(앱 재실행·다른 기기)
+  Future<void> load() async {
+    try {
+      final to = await ref.read(apiProvider).cheeredToday();
+      if (ref.mounted && to != null) state = to;
+    } on ApiException {
+      // 표시용 — 못 읽으면 보낼 때 서버가 409 로 막는다
+    }
+  }
+
+  /// 응원 보내기. 성공 null, 아니면 안내 문구. 모의 행(participant_id 없음)은 화면 안에서만.
+  Future<String?> send(LeaderRow row) async {
+    if (state != null) return '내일 다시 응원할 수 있어요';
+    final key = row.participantId ?? row.name;
+    state = key; // 화면 먼저
+    if (row.participantId == null) return null;
+    try {
+      await ref.read(apiProvider).sendCheer(row.participantId!);
+      return null;
+    } on ApiException catch (e) {
+      if (e.status == 409) return '내일 다시 응원할 수 있어요'; // 다른 기기에서 이미 보냄 → 표시는 유지
+      if (ref.mounted) state = null;
+      return apiErrorText(e);
+    }
+  }
 }
+
+/// 내 검토(사유·SLA·판정 문장·소명). 서버 모드 P10 검토 카드·판정 배너.
+final myReviewsProvider = FutureProvider<List<MyReview>>((ref) async {
+  ref.watch(sessionProvider);
+  return ref.watch(apiProvider).fetchMyReviews();
+});
 
 final heartedTodayProvider = NotifierProvider<HeartNotifier, String?>(HeartNotifier.new);
 

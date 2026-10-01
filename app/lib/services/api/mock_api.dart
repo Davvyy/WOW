@@ -92,6 +92,41 @@ class MockChalloryApi implements ChalloryApi {
     }
   }
 
+  String? cheeredTo;
+  final reviews = <MyReview>[];
+  final appeals = <String, String>{};
+  String? objection;
+
+  @override
+  Future<void> sendCheer(String toParticipantId) async {
+    _maybeFail('cheers');
+    if (cheeredTo != null) throw const ApiException(409, '오늘은 이미 응원했어요');
+    cheeredTo = toParticipantId;
+  }
+
+  @override
+  Future<String?> cheeredToday() async => cheeredTo;
+
+  @override
+  Future<List<MyReview>> fetchMyReviews() async {
+    calls.add('reviews');
+    return List.of(reviews);
+  }
+
+  @override
+  Future<void> submitAppeal(String reviewId, String text) async {
+    _maybeFail('appeals');
+    if (appeals.containsKey(reviewId)) throw const ApiException(422, '설명은 1회만 남길 수 있어요');
+    appeals[reviewId] = text;
+  }
+
+  @override
+  Future<void> submitObjection(String text) async {
+    _maybeFail('objection');
+    if (objection != null) throw const ApiException(409, '이의는 1회만 남길 수 있어요');
+    objection = text;
+  }
+
   @override
   Future<Leaderboard> fetchLeaderboard() async {
     calls.add('leaderboard');

@@ -7,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/engine/engine.dart';
 import '../../data/mock/mock_data.dart' show Leaderboard;
 import '../../data/models.dart';
-import '../../state/session.dart' show ChallengeSession;
+import '../../state/session.dart' show ChallengeSession, currentSession;
 import 'challory_api.dart';
 import 'server_mapping.dart';
 
@@ -116,6 +116,80 @@ class SupabaseChalloryApi implements ChalloryApi {
     } catch (e) {
       throw ApiException(0, e.toString());
     }
+  }
+
+  /// 테이블 직접 쓰기(RLS) 오류 → ApiException
+  ApiException _pg(Object e, {String? conflict, String? denied}) {
+    if (e is PostgrestException) {
+      if (e.code == '23505') return ApiException(409, conflict ?? '이미 반영됐어요');
+      if (e.code == '42501') return ApiException(403, denied ?? '보낼 수 없어요');
+      return ApiException(500, e.message);
+    }
+    return ApiException(0, e.toString());
+  }
+
+  String _kstToday() {
+    final k = DateTime.now().toUtc().add(const Duration(hours: 9));
+    return '${k.year}-${k.month.toString().padLeft(2, '0')}-${k.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Future<void> sendCheer(String toParticipantId) async {
+    final s = currentSession;
+    if (s.participantId == null || s.challengeId == null) throw const ApiException(422, '챌린지 정보를 아직 불러오지 못했어요');
+    try {
+      // RLS: 본인 participant 로만, 같은 챌린지 대상, 오늘(KST) 날짜. UNIQUE(from, local_date) = 하루 1회
+      await _client.from('cheers').insert({
+        'challenge_id': s.challengeId,
+        'from_participant_id': s.participantId,
+        'to_participant_id': toParticipantId,
+        'local_date': _kstToday(),
+      });
+    } catch (e) {
+      throw _pg(e, conflict: '오늘은 이미 응원했어요', denied: '응원을 보낼 수 없어요');
+    }
+  }
+
+  @override
+  Future<String?> cheeredToday() async {
+    final me = currentSession.participantId;
+    if (me == null) return null;
+    try {
+      final row = await _client.from('cheers').select('to_participant_id').eq('from_participant_id', me).eq('local_date', _kstToday()).maybeSingle();
+      return row?['to_participant_id'] as String?;
+    } catch (e) {
+      throw _pg(e);
+    }
+  }
+
+  @override
+  Future<List<MyReview>> fetchMyReviews() async {
+    final me = currentSession.participantId;
+    if (me == null) return const [];
+    try {
+      final rows = await _client.from('reviews')
+          .select('id, type, status, local_date, sla_due_at, reason_template, verdict, message, decided_at, appeals(text)')
+          .eq('participant_id', me).order('created_at', ascending: false);
+      return [for (final r in rows) myReviewFromServer(r)];
+    } catch (e) {
+      throw _pg(e);
+    }
+  }
+
+  @override
+  Future<void> submitAppeal(String reviewId, String text) async {
+    final me = currentSession.participantId;
+    try {
+      // RLS: 본인 검토 · open · 72h 이내. UNIQUE(review_id) = 1회
+      await _client.from('appeals').insert({'review_id': reviewId, 'participant_id': me, 'text': text.trim()});
+    } catch (e) {
+      throw _pg(e, conflict: '설명은 1회만 남길 수 있어요', denied: '설명 기간이 지났거나 이미 확인이 끝났어요');
+    }
+  }
+
+  @override
+  Future<void> submitObjection(String text) async {
+    await _rpc('submit_objection', {'p_text': text});
   }
 
   @override

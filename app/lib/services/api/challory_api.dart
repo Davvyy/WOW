@@ -29,6 +29,21 @@ abstract class ChalloryApi {
   /// 공지 읽음 표시(notifications.read_at, 본인 행)
   Future<void> markNoticesRead(List<String> ids);
 
+  /// API #18 응원(보내는 사람 기준 하루 1회). 이미 보냈으면 409.
+  Future<void> sendCheer(String toParticipantId);
+
+  /// 오늘(KST) 내가 응원한 참가자 id(없으면 null)
+  Future<String?> cheeredToday();
+
+  /// API #20 내 검토(사유·SLA·판정 문장·보낸 소명)
+  Future<List<MyReview>> fetchMyReviews();
+
+  /// API #21 소명 1회(72h)
+  Future<void> submitAppeal(String reviewId, String text);
+
+  /// API #34 결과 이의(발표 후 7일·1회)
+  Future<void> submitObjection(String text);
+
   /// API #17 리더보드: 최신 스냅샷(오늘·누적) + 내 행(본인 점수는 내 장부에서)
   Future<Leaderboard> fetchLeaderboard();
 

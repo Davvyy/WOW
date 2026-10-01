@@ -40,14 +40,16 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   bool _today = true;
 
-  void _heart(String name) {
-    final cur = ref.read(heartedTodayProvider);
-    if (cur == null) {
-      ref.read(heartedTodayProvider.notifier).send(name);
-      showToast(context, '응원했어요(오늘 1회)');
-    } else {
-      showToast(context, '내일 다시 응원할 수 있어요');
-    }
+  @override
+  void initState() {
+    super.initState();
+    if (ref.read(apiProvider).isRemote) Future.microtask(() => ref.read(heartedTodayProvider.notifier).load());
+  }
+
+  Future<void> _heart(LeaderRow row) async {
+    final err = await ref.read(heartedTodayProvider.notifier).send(row);
+    if (!mounted) return;
+    showToast(context, err ?? '응원했어요(오늘 1회)');
   }
 
   void _report(LeaderRow target) {
@@ -123,7 +125,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         );
       }
       final mine = r.me;
-      final isHearted = hearted == r.name;
+      final isHearted = hearted == (r.participantId ?? r.name);
       final locked = hearted != null && !isHearted;
       final fillPct = r.fill * 25;
       final cells = [for (var i = 0; i < 4; i++) i < r.fill];
@@ -179,7 +181,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               NumText(fmtK1(r.score ?? 0), size: 19, weight: FontWeight.w700),
               if (!mine)
                 IconButton(
-                  onPressed: () => _heart(r.name),
+                  onPressed: () => _heart(r),
                   tooltip: '${r.name} 응원하기${isHearted ? ' (응원했어요)' : locked ? ' (오늘 응원을 이미 보냈어요)' : ''}',
                   icon: Icon(isHearted ? Icons.favorite_rounded : Icons.favorite_border_rounded, size: 20, color: isHearted ? c.critical : c.fg2.withValues(alpha: locked ? 0.45 : 1)),
                   constraints: const BoxConstraints(minWidth: 44, minHeight: 44),

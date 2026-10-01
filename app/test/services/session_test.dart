@@ -63,4 +63,14 @@ void main() {
       ChallengePhase.published,
     ]);
   });
+
+  test('reviews 행(+appeals) → 내 검토', () {
+    final r = myReviewFromServer({
+      'id': 'r1', 'type': 'steps_spike', 'status': 'appealed', 'local_date': '2026-10-12', 'sla_due_at': '2026-10-16T00:00:00+00:00',
+      'reason_template': 'steps_spike', 'verdict': null, 'message': null, 'decided_at': null,
+      'appeals': [{'text': '하프마라톤에 나갔어요'}],
+    });
+    expect([r.type, r.status, r.appealText, r.open, r.decided], ['steps_spike', 'appealed', '하프마라톤에 나갔어요', false, false]);
+    expect(myReviewFromServer({'id': 'r2', 'type': 'report', 'status': 'open', 'appeals': []}).appealText, isNull);
+  });
 }

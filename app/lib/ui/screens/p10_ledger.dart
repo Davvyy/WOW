@@ -27,8 +27,42 @@ class LedgerScreen extends ConsumerStatefulWidget {
 
 class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   final _appeal = TextEditingController();
+  final _objection = TextEditingController();
   String? _variant;
   bool _sent = false;
+  bool _busy = false;
+  bool _objectionSent = false;
+
+  /// 소명 보내기(서버: appeals insert, RLS 로 본인·open·72h·1회). [reviewId] 가 없으면 모의 시나리오.
+  Future<void> _sendAppeal(String reviewId) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(apiProvider).submitAppeal(reviewId, _appeal.text);
+      if (!mounted) return;
+      setState(() => _sent = true);
+      ref.invalidate(myReviewsProvider);
+    } catch (e) {
+      if (mounted) showToast(context, apiErrorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 결과 이의(서버 RPC submit_objection: 발표 후 7일·1회)
+  Future<void> _sendObjection() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(apiProvider).submitObjection(_objection.text);
+      if (!mounted) return;
+      setState(() => _objectionSent = true);
+      ref.invalidate(myReviewsProvider);
+      showToast(context, '이의를 남겼어요. 운영자가 확인해요');
+    } catch (e) {
+      if (mounted) showToast(context, apiErrorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   void initState() {
@@ -39,6 +73,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   @override
   void dispose() {
     _appeal.dispose();
+    _objection.dispose();
     super.dispose();
   }
 
@@ -83,22 +118,108 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       case 'expired':
         return InfoBanner(tone: Tone.neutral, icon: Icons.schedule_rounded, child: boldThen(context, verdictText['expired']!.text, '', color: c.fg2));
       case 'objection':
-        return ChCard(
-          color: c.brandSoft,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
-            const Txt.title('최종 결과에 이의 남기기'),
-            Txt.cap('이의 기간 ~${curChallenge.objectionUntil} · 1회만 남길 수 있어요. 운영자가 확인하고 정정 여부를 알려드려요.'),
-            TextField(
-              minLines: 4,
-              maxLines: 6,
-              decoration: InputDecoration(hintText: '어느 날짜의 어떤 점수가 다르다고 생각하는지 적어 주세요.', filled: true, fillColor: c.bg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-            ),
-            ChButton('이의 보내기', icon: Icons.send_rounded, onPressed: () => showToast(context, '이의를 남겼어요. 운영자가 확인해요')),
-          ], gap: 8)),
-        );
+        return _objectionCard(context);
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _objectionCard(BuildContext context, {bool already = false}) {
+    final c = context.c;
+    if (already || _objectionSent) {
+      return InfoBanner(tone: Tone.brand, icon: Icons.send_rounded, child: boldThen(context, '이의를 남겼어요.', ' 운영자가 확인하고 정정 여부를 알려드려요', color: c.brand));
+    }
+    return ChCard(
+      color: c.brandSoft,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
+        const Txt.title('최종 결과에 이의 남기기'),
+        Txt.cap('이의 기간 ~${curChallenge.objectionUntil} · 1회만 남길 수 있어요. 운영자가 확인하고 정정 여부를 알려드려요.'),
+        TextField(
+          controller: _objection,
+          minLines: 4,
+          maxLines: 6,
+          maxLength: 1000,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(hintText: '어느 날짜의 어떤 점수가 다르다고 생각하는지 적어 주세요.', filled: true, fillColor: c.bg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+        ),
+        ChButton('이의 보내기', icon: Icons.send_rounded, onPressed: _objection.text.trim().length < 5 || _busy ? null : _sendObjection),
+      ], gap: 8)),
+    );
+  }
+
+  /// 서버 모드: 내 검토 카드(진행 중) · 최근 판정 통지 · 결과 이의
+  List<Widget> _serverReviewCards(BuildContext context, List<MyReview> reviews) {
+    final c = context.c;
+    final active = reviews.where((r) => r.type != 'objection' && !r.decided).firstOrNull;
+    final decided = reviews.where((r) => r.decided && r.message != null && r.type != 'objection').firstOrNull;
+    final hasObjection = reviews.any((r) => r.type == 'objection');
+    String two(int v) => v.toString().padLeft(2, '0');
+    String when(DateTime t) {
+      final k = t.toUtc().add(const Duration(hours: 9));
+      return '${fmtMd(k)} ${two(k.hour)}:${two(k.minute)}';
+    }
+
+    final out = <Widget>[];
+    if (active != null) {
+      final reason = reasonText[active.reasonTemplate ?? active.type] ?? (active.type == 'report' ? '신고가 접수돼 기록을 확인 중이에요' : '기록을 확인 중이에요');
+      final day = active.localDate == null ? '' : '${fmtMd(active.localDate!)} · ';
+      if (active.status == 'appealed' || _sent) {
+        out.add(InfoBanner(
+          tone: Tone.review,
+          icon: Icons.send_rounded,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            boldThen(context, '설명을 보냈어요.', ' 운영자가 확인하고 결과를 알려드려요', color: c.review),
+            if ((active.appealText ?? _appeal.text).isNotEmpty) Txt.cap('“${active.appealText ?? _appeal.text}”'),
+          ]),
+        ));
+      } else {
+        out.add(ChCard(
+          color: c.reviewSoft,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.policy_rounded, color: c.review),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Txt('$day$reason · 검토 중', weight: FontWeight.w600, color: c.review),
+                  Txt.cap(
+                      '${active.slaDueAt == null ? '' : '${when(active.slaDueAt!)}까지 '}설명을 남길 수 있어요(1회). 순위는 잠정으로 유지되고, 다른 참가자에게는 "집계 중"으로만 보여요.',
+                      color: c.review),
+                ]),
+              ),
+            ]),
+            const Txt.cap('무슨 일이 있었나요?', weight: FontWeight.w600),
+            TextField(
+              controller: _appeal,
+              maxLength: 500,
+              minLines: 4,
+              maxLines: 6,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: '예: 북한산 등산을 다녀왔어요. 삼성헬스 운동 기록 캡처를 함께 보냅니다.',
+                filled: true,
+                fillColor: c.bg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            ChButton('설명 보내기', icon: Icons.send_rounded, onPressed: _appeal.text.trim().isEmpty || _busy ? null : () => _sendAppeal(active.id)),
+          ], gap: 8)),
+        ));
+      }
+    }
+    if (decided != null) {
+      final tone = switch (decided.verdict) { 'approve' => Tone.good, 'warn' => Tone.warn, 'void' => Tone.warn, _ => Tone.review };
+      out.add(InfoBanner(
+        tone: tone,
+        icon: Icons.gavel_rounded,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Txt('판정 결과${decided.decidedAt == null ? '' : ' · ${when(decided.decidedAt!)}'}', weight: FontWeight.w600),
+          Txt(decided.message!), // 사유 + 판정 + 점수 영향 문장(서버 템플릿 조합)
+        ]),
+      ));
+    }
+    if (ref.watch(phaseProvider) == ChallengePhase.published) out.add(_objectionCard(context, already: hasObjection));
+    return out;
   }
 
   Widget _reviewSection(BuildContext context) {
@@ -134,7 +255,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
-        ChButton('설명 보내기', icon: Icons.send_rounded, onPressed: _appeal.text.trim().isEmpty ? null : () => setState(() => _sent = true)),
+        ChButton('설명 보내기', icon: Icons.send_rounded, onPressed: _appeal.text.trim().isEmpty || _busy ? null : () => _sendAppeal('mock-review')),
         const Center(child: Txt.cap('운영자가 72시간 안에 확인해요')),
       ], gap: 8)),
     );
@@ -294,8 +415,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       title: '점수 장부',
       backFallback: R.home,
       children: [
-        if (v != null && v != 'revision' && v != 'review') _verdictSection(context, v),
-        if (review) _reviewSection(context),
+        if (remote) ..._serverReviewCards(context, ref.watch(myReviewsProvider).value ?? const []),
+        if (!remote && v != null && v != 'revision' && v != 'review') _verdictSection(context, v),
+        if (!remote && review) _reviewSection(context),
         ChCard(
           color: c.brandSoft,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([

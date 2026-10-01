@@ -18,15 +18,19 @@ import 'package:flutter_test/flutter_test.dart';
 final _f = jsonDecode(File('test/fixtures/server_ledger.json').readAsStringSync()) as Map<String, dynamic>;
 
 class _RemoteFake extends MockChalloryApi {
-  _RemoteFake({this.noSession = false});
+  _RemoteFake({this.noSession = false, this.status});
   final bool noSession;
+  final String? status;
   final reported = <String?>[];
   @override
   bool get isRemote => true;
   @override
   Future<ChallengeSession?> fetchSession() async => noSession
       ? null
-      : sessionFromSummary(Map<String, dynamic>.from(_f['summary'] as Map), today: DateTime(2026, 10, 13));
+      : sessionFromSummary(
+          Map<String, dynamic>.from(_f['summary'] as Map)
+            ..['challenge'] = {...(_f['summary'] as Map)['challenge'] as Map, if (status != null) 'status': status},
+          today: DateTime(2026, 10, 13));
 
   @override
   Future<Leaderboard> fetchLeaderboard() async => leaderboardFromServer(
@@ -116,5 +120,58 @@ void main() {
     await _pump(tester, R.home, _RemoteFake(noSession: true));
     expect(find.text('참가 중인 챌린지가 없어요'), findsOneWidget);
     expect(find.text('초대코드 입력'), findsOneWidget);
+  });
+
+  testWidgets('P9 응원: 서버 participant_id 로 보내고 하루 1회', (tester) async {
+    final api = _RemoteFake();
+    await _pump(tester, R.rank, api);
+    final hearts = find.byIcon(Icons.favorite_border_rounded);
+    expect(hearts, findsWidgets);
+    await tester.tap(hearts.first);
+    await tester.pump();
+    final ids = [for (final r in (_f['snapshot_today'] as List)) (r as Map)['participant_id']];
+    expect(ids, contains(api.cheeredTo));
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+    await tester.tap(find.byIcon(Icons.favorite_border_rounded).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('내일 다시 응원할 수 있어요'), findsOneWidget);
+    expect(api.cheeredTo, isNotNull, reason: '두 번째 응원은 서버로 보내지 않음');
+  });
+
+  testWidgets('P10 검토 카드: 서버 사유·기한 → 소명 보내기', (tester) async {
+    final api = _RemoteFake()
+      ..reviews.add(MyReview(id: 'rv1', type: 'dup_photo', status: 'open', reasonTemplate: 'dup_photo', localDate: DateTime(2026, 10, 12),
+          slaDueAt: DateTime.utc(2026, 10, 16, 0)));
+    await _pump(tester, R.ledger, api);
+    expect(find.textContaining('같은 사진이 두 번 이상 사용됐어요 · 검토 중'), findsOneWidget);
+    expect(find.textContaining('10.16 09:00까지'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, '10.10 저녁과 같은 접시를 다시 찍었어요.');
+    await tester.pump();
+    await tester.tap(find.text('설명 보내기'));
+    await tester.pumpAndSettle();
+    expect(api.appeals['rv1'], '10.10 저녁과 같은 접시를 다시 찍었어요.');
+    expect(find.textContaining('설명을 보냈어요.'), findsOneWidget);
+  });
+
+  testWidgets('P10 판정 통지: 서버 문장(사유+판정+점수 영향) 그대로', (tester) async {
+    final api = _RemoteFake()
+      ..reviews.add(const MyReview(id: 'rv2', type: 'dup_photo', status: 'decided', verdict: 'void',
+          message: '같은 사진이 두 번 이상 사용됐어요. 대체값 743으로 다시 계산했어요. 10.12 41.2→12.7점 · 누적 −28.5'));
+    await _pump(tester, R.ledger, api);
+    expect(find.text('같은 사진이 두 번 이상 사용됐어요. 대체값 743으로 다시 계산했어요. 10.12 41.2→12.7점 · 누적 −28.5'), findsOneWidget);
+  });
+
+  testWidgets('P10 결과 이의: 발표 후 1회', (tester) async {
+    final api = _RemoteFake(status: 'published');
+    await _pump(tester, R.ledger, api);
+    expect(find.text('최종 결과에 이의 남기기'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, '10.12 저녁은 다른 날 사진이에요.');
+    await tester.pump();
+    await tester.tap(find.text('이의 보내기'));
+    await tester.pumpAndSettle();
+    expect(api.objection, '10.12 저녁은 다른 날 사진이에요.');
+    expect(find.textContaining('이의를 남겼어요'), findsWidgets);
+    expect(find.text('이의 보내기'), findsNothing, reason: '1회만 — 입력 카드가 사라짐');
   });
 }

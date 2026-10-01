@@ -301,7 +301,7 @@ begin
       case when p_scope = 'today' then coalesce(ds.main_meal_count, 0) else (select coalesce(sum(x.main_meal_count), 0) from daily_scores x
         where x.participant_id = p.id and x.is_counted and x.is_final and x.local_date <= p_date) end as meals,
       exists (select 1 from reviews rv where rv.participant_id = p.id and rv.status in ('open', 'appealed')
-        and rv.type not in ('session_anomaly', 'manual_input_burst', 'late_upload', 'photo_mismatch')) as under_review,
+        and rv.type not in ('session_anomaly', 'manual_input_burst', 'late_upload', 'photo_mismatch', 'objection')) as under_review,
       -- 반영률 4칸: 아침·점심·저녁 확정 + 활동 동기화(표시 전용, 05 §5.3)
       (select count(*) from (select distinct m.slot from meals m where m.participant_id = p.id and m.local_date = p_date
          and m.slot <> 'snack' and m.counted and m.status in ('confirmed', 'auto', 'corrected') and m.confirmed_kcal >= 150) z)

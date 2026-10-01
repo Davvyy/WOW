@@ -203,6 +203,7 @@ ChallengeSession sessionFromSummary(Map<String, dynamic> j, {String platformLabe
     rules: rulesJson.isEmpty ? EngineRules.defaults : EngineRules.fromJson(rulesJson),
     status: ch['status'] as String,
     participantId: p['id'] as String?,
+    challengeId: ch['id'] as String?,
     rulesMd: (ch['rules_md'] as String?) ?? '',
     slotStarts: (
       _hhmm(rulesJson['breakfast_start'] ?? '04:00'),
@@ -236,3 +237,22 @@ Notice noticeFromServer(Map<String, dynamic> r) => Notice(
       at: DateTime.parse((r['scheduled_at'] ?? r['created_at']) as String).toUtc().add(const Duration(hours: 9)),
       read: r['read_at'] != null,
     );
+
+/// reviews 행(+appeals) → 내 검토
+MyReview myReviewFromServer(Map<String, dynamic> r) {
+  DateTime? t(Object? v) => v == null ? null : DateTime.parse(v as String);
+  final ap = r['appeals'];
+  final appeal = ap is List ? (ap.isEmpty ? null : ap.first as Map) : ap as Map?;
+  return MyReview(
+    id: r['id'] as String,
+    type: r['type'] as String,
+    status: r['status'] as String,
+    localDate: t(r['local_date']),
+    slaDueAt: t(r['sla_due_at']),
+    reasonTemplate: r['reason_template'] as String?,
+    verdict: r['verdict'] as String?,
+    message: r['message'] as String?,
+    appealText: appeal?['text'] as String?,
+    decidedAt: t(r['decided_at']),
+  );
+}

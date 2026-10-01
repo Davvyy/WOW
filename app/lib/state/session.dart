@@ -13,6 +13,7 @@ class ChallengeSession {
     required this.rules,
     required this.status,
     this.participantId,
+    this.challengeId,
     this.rulesMd = '',
     this.slotStarts = const ('04:00', '10:30', '15:00', '22:00'),
     this.finalizeTime = '09:00',
@@ -28,6 +29,7 @@ class ChallengeSession {
   /// challenges.status (draft/recruiting/checking/running/closing/published/archived/cancelled)
   final String status;
   final String? participantId;
+  final String? challengeId;
 
   /// 운영자 추가 규칙(Markdown, P11)
   final String rulesMd;

@@ -310,3 +310,28 @@ class Notice {
 
   Notice markRead() => Notice(id: id, title: title, body: body, at: at, read: true);
 }
+
+/// 내 검토 1건(reviews, 본인 행) + 내가 보낸 소명/이의 본문(appeals)
+class MyReview {
+  const MyReview({required this.id, required this.type, required this.status, this.localDate, this.slaDueAt, this.reasonTemplate,
+      this.verdict, this.message, this.appealText, this.decidedAt});
+  final String id;
+
+  /// reviews.type (steps_spike·dup_photo·report·objection …)
+  final String type;
+
+  /// open · appealed · decided
+  final String status;
+  final DateTime? localDate;
+  final DateTime? slaDueAt;
+  final String? reasonTemplate;
+  final String? verdict;
+
+  /// 판정 통지 문장(사유+판정+점수 영향, 서버 verdict_message)
+  final String? message;
+  final String? appealText;
+  final DateTime? decidedAt;
+
+  bool get open => status == 'open';
+  bool get decided => status == 'decided';
+}
