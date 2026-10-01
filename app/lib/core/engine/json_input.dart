@@ -1,5 +1,5 @@
 // 서버 RPC score_simulate_from_inputs 와 같은 JSON 형식의 입·출력 변환.
-// 골든 테스트와 P11 시뮬레이터(서버 호출 실패 시 로컬 계산)에서 함께 쓴다.
+// 골든 테스트와 P11 시뮬레이터(서버 호출이 안 될 때 로컬 계산)에서 함께 쓴다.
 import 'engine.dart';
 
 MealSlot _slot(String s) => MealSlot.values.byName(s);
