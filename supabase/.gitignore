@@ -1,0 +1,3 @@
+# Supabase CLI 로컬 상태(link 정보 등)
+.temp/
+.branches/

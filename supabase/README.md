@@ -73,13 +73,16 @@ deno task test    # 단위 테스트(모의 어댑터, 네트워크·키 불필�
 supabase link --project-ref <ref>
 supabase db push                      # migrations/ 적용
 psql "$DATABASE_URL" -f supabase/seed.sql   # (선택) 프로토타입 예시 데이터
-supabase functions deploy photo-upload-url meals meal-manual meal-confirm meal-skip analyze-meal sync-activity reports account \
-  verdict notify announce export purge-photos
+supabase functions deploy --use-api photo-upload-url meals meal-manual meal-confirm meal-skip analyze-meal sync-activity reports account \
+  verdict notify announce export purge-photos   # --use-api: Docker 없이 서버에서 번들
 supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
   AI_ENGINE=gemini VERTEX_PROJECT=... VERTEX_LOCATION=asia-northeast3 VERTEX_ACCESS_TOKEN=...   # 또는 GEMINI_API_KEY
   # 스왑: AI_ENGINE=claude ANTHROPIC_API_KEY=...
   # 푸시: FCM_PROJECT_ID=... FCM_ACCESS_TOKEN=...
 ```
+
+- `config.toml`: 함수별 `verify_jwt`·import map(`functions/deno.json`)·진입점, 로컬 Storage 버킷(`meal-photos`, JPEG 5 MiB), Auth 복귀 딥링크를 담는다. `notify` 만 `verify_jwt = false`(pg_cron·외부 스케줄러가 JWT 없이 `x-cron-secret` 으로 부름, 함수가 CRON_SECRET 으로 막음)이고 나머지는 Bearer JWT 필수. `project_id` 는 로컬 구분용 이름이라 원격 프로젝트는 `supabase link --project-ref` 로 고른다. Auth 제공자(카카오·Apple) 설정은 이 파일이 아니라 Dashboard 에서 한다(아래 "로그인(Auth) 설정").
+- Windows: 위 명령은 PowerShell 이 아니라 **Git Bash** 에서 돌린다(`\` 줄 잇기·`$VAR`·`ls -d` 가 bash 문법). Supabase CLI 는 `scoop install supabase` 또는 `npx supabase@2` 로 쓰고, `--use-api` 를 붙이면 Docker Desktop 없이 배포된다. 저장소는 줄바꿈 변환 없이 받는 것이 안전하다(`git config --global core.autocrlf input`, SQL·셸 스크립트가 CRLF 로 바뀌지 않게).
 
 - pg_cron: Dashboard › Database › Extensions 에서 켠 뒤 `20261001000500_cron.sql` 을 다시 실행하면 스케줄이 등록된다(KST = UTC+9: 매시 잠정, 00:00 UTC = 09:00 KST 확정, 09:10 건강 신호, 09:30 N-01, 21:00 N-02, 00:00 KST 생명주기).
 - 알림 발송 워커 `notify` 는 pg_net 또는 외부 스케줄러가 1~5분마다 `x-cron-secret` 헤더로 호출한다. transactional 알림은 워커를 기다리지 않는다: 분석 완료(N-04)는 `analyze-meal` 이, 판정 결과(N-06)는 `verdict`(확정 호출, 재전송 제외)가 큐에 넣은 직후 `claim_notification` 으로 그 건을 집어 바로 보낸다(`_shared/supabase.ts` `sendPendingNow`, 같은 no_push·하루 4건 규칙, 실패하면 워커가 이어서 보냄). 검토 안내(N-05, scheduled)도 `reports`·`sync-activity` 가 같은 방식으로 바로 보내되, 22~08시 생성분은 예약 시각(08:00)이 아니므로 집히지 않고 워커가 08:00 에 보낸다.
