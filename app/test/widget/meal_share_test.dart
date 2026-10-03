@@ -115,6 +115,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
       }
       expect(find.textContaining('점심을 확정했어요'), findsOneWidget);
+      expect(tester.widget<SnackBar>(find.byType(SnackBar)).persist, isFalse, reason: '공유 버튼이 있어도 시간이 지나면 닫혀야 한다');
       expect(find.widgetWithText(SnackBarAction, '공유'), findsOneWidget);
       await tester.tap(find.widgetWithText(SnackBarAction, '공유'));
       await tester.pumpAndSettle();

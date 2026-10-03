@@ -183,6 +183,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     messenger.showSnackBar(SnackBar(
       content: Text('${slotLabel[slot]}을 확정했어요'),
       duration: const Duration(seconds: 6),
+      persist: false,
       action: SnackBarAction(label: '공유', onPressed: () {
         final ctx = rootNavigatorKey.currentContext;
         if (ctx != null) showMealShareSheet(ctx, slot);

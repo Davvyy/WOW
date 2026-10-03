@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' show max;
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -672,7 +673,16 @@ class DayNotifier extends Notifier<int> {
     return curChallenge.dayIndex;
   }
 
-  void set(int d) => state = d.clamp(1, curChallenge.dayIndex);
+  void set(int d) => state = d.clamp(firstSelectableDay, curChallenge.dayIndex);
+}
+
+/// 고를 수 있는 첫 날(1~). 참가자의 점검 시작일 이전은 기록이 없으므로 고르지 않는다.
+int get firstSelectableDay {
+  final cs = currentSession.checkStart;
+  if (cs == null) return 1;
+  final s = curChallenge.start;
+  final days = DateTime(cs.year, cs.month, cs.day).difference(DateTime(s.year, s.month, s.day)).inDays;
+  return max(1, days + 1);
 }
 
 final selectedDayProvider = NotifierProvider<DayNotifier, int>(DayNotifier.new);

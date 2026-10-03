@@ -211,7 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Builder(builder: (_) {
             final dd = dayStart + i;
             final dt = _dateOf(dd);
-            final future = dd > ch.dayIndex;
+            final future = dd > ch.dayIndex || dd < firstSelectableDay; // 오늘 이후·참가 이전은 고를 수 없다
             final sel = dd == day;
             final wk = weekdayKo(dt.month, dt.day);
             return Semantics(

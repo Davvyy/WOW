@@ -72,6 +72,7 @@ class _ChalloryAppState extends ConsumerState<ChalloryApp> {
     m.showSnackBar(SnackBar(
       content: Text(text),
       duration: Duration(seconds: secs),
+      persist: false,
       action: SnackBarAction(label: label, onPressed: () => router.push(route)),
     ));
   }
