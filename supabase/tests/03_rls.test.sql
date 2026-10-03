@@ -99,9 +99,9 @@ begin
   perform tests.ok(exists (select 1 from audit_logs where action = 'participant_status'), '운영자: 상태 변경 감사 로그');
   perform tests.throws(format('update participants set nickname = ''x'' where id = %L', tests.pid('지수')), 'PT403', '운영자: 참가자 닉네임 변경 불가');
   perform tests.throws('insert into audit_logs (actor_role, action) values (''operator'', ''x'')', '42501', '운영자: 감사 로그 직접 쓰기 불가');
-end $;
+end $$;
 -- 새 챌린지(OP0): 초안 + 기본 규칙 행, 초대코드는 모집 시작 때
-do $
+do $$
 declare r jsonb; d date := kst_date(now()) + 1; bad text := 'select create_challenge(%L)';
 begin
   r := create_challenge(jsonb_build_object('name', '  봄 걷기 챌린지  ', 'start_date', d, 'end_date', d + 13, 'capacity', 40));
@@ -114,7 +114,7 @@ begin
   perform tests.throws(format(bad, jsonb_build_object('name', 'x', 'start_date', d, 'end_date', d + 13, 'capacity', 29)), 'PT422', '정원 30명 미만 불가');
   perform tests.throws(format(bad, jsonb_build_object('name', ' ', 'start_date', d, 'end_date', d + 13, 'capacity', 40)), 'PT422', '이름 없으면 불가');
   perform tests.throws(format(bad, jsonb_build_object('name', 'x', 'start_date', d - 2, 'end_date', d + 11, 'capacity', 40)), 'PT422', '지난 날짜 시작 불가');
-end $;
+end $$;
 reset role;
 
 -- ---------------- 다른 운영자·외부인
