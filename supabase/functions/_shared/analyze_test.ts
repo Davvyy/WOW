@@ -119,3 +119,11 @@ Deno.test('Gemini 어댑터: responseSchema 요청·텍스트 JSON 파싱', asyn
   await assertRejects(() => new GeminiAdapter({ apiKey: 'k', fetchImpl: () => Promise.resolve(new Response('', { status: 503 })) })
     .analyze({ bytes: new Uint8Array([1]), mimeType: 'image/jpeg' }, { signal: new AbortController().signal }));
 });
+
+Deno.test('Gemini 어댑터: 기본 모델은 새 키로도 쓸 수 있는 gemini-3.5-flash-lite, GEMINI_MODEL 로 바꿀 수 있다', () => {
+  assertEquals(
+    new GeminiAdapter({ apiKey: 'k' }).url(),
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
+  );
+  assertEquals(new GeminiAdapter({ apiKey: 'k', model: 'gemini-3.8-flash' }).url().includes('/models/gemini-3.8-flash:'), true);
+});

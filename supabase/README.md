@@ -88,6 +88,7 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 - 알림 발송 워커 `notify` 는 pg_net 또는 외부 스케줄러가 1~5분마다 `x-cron-secret` 헤더로 호출한다. transactional 알림은 워커를 기다리지 않는다: 분석 완료(N-04)는 `analyze-meal` 이, 판정 결과(N-06)는 `verdict`(확정 호출, 재전송 제외)가 큐에 넣은 직후 `claim_notification` 으로 그 건을 집어 바로 보낸다(`_shared/supabase.ts` `sendPendingNow`, 같은 no_push·하루 4건 규칙, 실패하면 워커가 이어서 보냄). 검토 안내(N-05, scheduled)도 `reports`·`sync-activity` 가 같은 방식으로 바로 보내되, 22~08시 생성분은 예약 시각(08:00)이 아니므로 집히지 않고 워커가 08:00 에 보낸다.
 - 푸시 data 는 `type`·`id`(알림) + payload(N-01: `local_date`, N-02: `local_date`·`kind`(confirm·sync)·`slot`·`pending`, N-04: `meal_id`·`slot`, N-05: `review_id`, N-06: `review_id`·`verdict`)를 문자열로 싣는다. 앱은 N-04 를 받으면 그 끼니를 다시 읽고(눌렀으면 P7), N-05·N-06 을 받으면 장부·검토·순위를 다시 읽고(눌렀으면 P10), N-01 을 받으면 확정된 장부·순위를 다시 읽는다(눌렀으면 P5).
 - 키가 없으면 `analyze-meal` 은 모의 어댑터(프로토타입 점심 초안 6항목)를, `notify` 는 로그 발송을 쓴다.
+- Gemini 기본 모델은 `gemini-3.5-flash-lite` 이고 `GEMINI_MODEL` 시크릿으로 바꾼다. 2.5 모델은 예전에 쓰던 사용자에게만 열려 새 키로는 404 가 난다. `analyze-meal` 은 호출 1회 8초·최대 2회라 응답이 빠른 모델이어야 한다. 무료 등급은 보낸 사진이 Google 제품 개선에 쓰이므로 실제 참가자를 받기 전 유료 등급으로 바꾼다.
 - 음식 DB: 시드의 `food_db_cache` 30건은 **예시 값**이다. 실제 식약처 음식 표준데이터(15100070)는 CSV를 내려받아 `food_db_cache(food_code, name_kr, category, serving_g, kcal, ...)` 로 적재하고 동의어 100개를 `food_synonyms` 에 넣는다.
 
 ## 식사 사진 흐름 (05 §6)

@@ -1,4 +1,6 @@
-// Gemini 2.5 Flash 어댑터. Vertex AI(서울 리전 가용 시 우선) 또는 Generative Language API.
+// Gemini 어댑터. Vertex AI(서울 리전 가용 시 우선) 또는 Generative Language API.
+// 기본 모델 gemini-3.5-flash-lite: 2.5 모델은 예전에 2.5 를 쓰던 사용자에게만 열려 새 키로는 404 가 난다.
+// GEMINI_MODEL 로 바꿀 수 있다(analyze-meal 은 1회 8초 제한이라 응답이 빠른 모델이어야 한다).
 // 환경변수: GEMINI_API_KEY(Generative Language) 또는 VERTEX_PROJECT·VERTEX_LOCATION·VERTEX_ACCESS_TOKEN(Vertex AI).
 import { MEAL_PROMPT, MEAL_SCHEMA, type MealImage, type MealVisionAdapter, toBase64 } from './types.ts';
 
@@ -16,7 +18,7 @@ export class GeminiAdapter implements MealVisionAdapter {
   }
 
   url(): string {
-    const model = this.cfg.model ?? 'gemini-2.5-flash';
+    const model = this.cfg.model ?? 'gemini-3.5-flash-lite';
     if (this.cfg.vertex) {
       const { project, location } = this.cfg.vertex;
       return `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
