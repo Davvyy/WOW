@@ -213,7 +213,7 @@ class PushController {
   /// 판정은 점수(무효면 그날 대체값으로 재계산)·검토 상태·순위를 바꾼다. 경고·순위 제외는 참가 상태도 바뀌므로 세션까지.
   void _applyVerdict(String? verdict) {
     _refreshReviews();
-    if (verdict == 'warn' || verdict == 'exclude') _ref.invalidate(sessionProvider);
+    if (verdict == 'warn' || verdict == 'exclude') _ref.invalidate(sessionsProvider);
   }
 
   /// 검토가 생기거나(N-05: 그날 점수 '검토 중', 순위에서 집계 중) 끝나면(N-06) 바뀌는 것들

@@ -106,7 +106,7 @@ class OnboardingNotifier extends Notifier<OnboardingDraft> {
             pregnancy: d.pregnancy, eatingDisorder: d.eatingDisorder, terms: terms, sensitiveHealth: d.sensitiveHealth, overseasAi: overseasAi));
       if (ref.mounted) {
         state = state.copyWith(join: r);
-        ref.invalidate(sessionProvider); // 새 참가 정보로 세션 다시 읽기
+        ref.invalidate(sessionsProvider); // 새 참가 정보로 세션 다시 읽기
       }
       return null;
     } catch (e) {
@@ -118,8 +118,14 @@ class OnboardingNotifier extends Notifier<OnboardingDraft> {
 final onboardingProvider = NotifierProvider<OnboardingNotifier, OnboardingDraft>(OnboardingNotifier.new);
 
 /// 리더보드(최신 스냅샷)·내 점수 장부. 서버 모드는 PostgREST, 모의 모드는 프로토타입 값.
-final leaderboardProvider = FutureProvider<Leaderboard>((ref) => ref.watch(apiProvider).fetchLeaderboard());
-final ledgerProvider = FutureProvider<List<LedgerRow>>((ref) => ref.watch(apiProvider).fetchLedger());
+final leaderboardProvider = FutureProvider<Leaderboard>((ref) async {
+  await ref.watch(sessionProvider.future); // 선택한 챌린지가 바뀌면 다시 읽기
+  return ref.watch(apiProvider).fetchLeaderboard();
+});
+final ledgerProvider = FutureProvider<List<LedgerRow>>((ref) async {
+  await ref.watch(sessionProvider.future);
+  return ref.watch(apiProvider).fetchLedger();
+});
 
 /// 화면용: 값이 아직 없으면 모의 모드는 프로토타입 값으로 바로 그리고, 서버 모드는 null(로딩·오류 표시)
 Leaderboard? watchLeaderboard(WidgetRef ref) =>
@@ -242,23 +248,73 @@ ChallengePhase phaseOfStatus(String status) => switch (status) {
 /// 로그인 상태 변화(로그인·로그아웃마다 세션을 다시 읽는다)
 final authChangesProvider = StreamProvider<bool>((ref) => ref.watch(authServiceProvider).changes);
 
-/// 현재 챌린지 세션. 서버 모드는 my_challenge_summary, 모의 모드는 프로토타입 값.
-/// 값을 받으면 [applySession] 으로 curChallenge·curMe·engine 접근자를 바꾼다.
-final sessionProvider = FutureProvider<ChallengeSession?>((ref) async {
+/// 참가 중인 챌린지 세션 목록(최근 참가 순). 서버 모드는 my_challenges + challenge_session, 모의 모드는 월간 + 운영자 2개.
+final sessionsProvider = FutureProvider<List<ChallengeSession>>((ref) async {
   ref.watch(authChangesProvider);
   final api = ref.watch(apiProvider);
-  if (!api.isRemote) {
-    applySession(ChallengeSession.mock);
-    return ChallengeSession.mock;
-  }
-  if (!ref.read(authServiceProvider).isSignedIn) {
+  if (api.isRemote && !ref.read(authServiceProvider).isSignedIn) return const [];
+  return api.fetchSessions();
+});
+
+/// 지금 보고 있는 챌린지(null = 가장 최근 참가)
+class SelectedChallengeNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void select(String? challengeId) => state = challengeId;
+}
+
+final selectedChallengeProvider = NotifierProvider<SelectedChallengeNotifier, String?>(SelectedChallengeNotifier.new);
+
+/// 현재(선택한) 챌린지 세션. 값을 정하면 [applySession] 으로 curChallenge·curMe·engine 접근자를 바꾼다.
+final sessionProvider = FutureProvider<ChallengeSession?>((ref) async {
+  final list = await ref.watch(sessionsProvider.future);
+  final id = ref.watch(selectedChallengeProvider);
+  final s = list.where((x) => x.challengeId == id).firstOrNull ?? list.firstOrNull;
+  if (s == null) {
     resetSession();
     return null;
   }
-  final s = await api.fetchSession();
-  if (s != null) applySession(s);
+  applySession(s);
   return s;
 });
+
+/// 코드 없이 참가할 수 있는 월간 챌린지(홈 카드·P1)
+final openChallengesProvider = FutureProvider<List<OpenChallenge>>((ref) async {
+  ref.watch(sessionsProvider);
+  final api = ref.watch(apiProvider);
+  if (api.isRemote && !ref.read(authServiceProvider).isSignedIn) return const [];
+  return api.fetchOpenChallenges();
+});
+
+/// 참가·나가기. 성공하면 목록을 다시 읽고 선택을 맞춘다. 성공 null, 아니면 안내 문구.
+class ChallengesActions {
+  ChallengesActions(this._ref);
+  final Ref _ref;
+
+  Future<String?> join(JoinRequest req) async {
+    try {
+      final r = await _ref.read(apiProvider).joinChallenge(req);
+      _ref.invalidate(sessionsProvider);
+      _ref.read(selectedChallengeProvider.notifier).select(r.challengeId);
+      return null;
+    } catch (e) {
+      return apiErrorText(e);
+    }
+  }
+
+  Future<String?> leave(String challengeId) async {
+    try {
+      await _ref.read(apiProvider).leaveChallenge(challengeId);
+      _ref.invalidate(sessionsProvider);
+      _ref.read(selectedChallengeProvider.notifier).select(null);
+      return null;
+    } catch (e) {
+      return apiErrorText(e);
+    }
+  }
+}
+
+final challengesActionsProvider = Provider<ChallengesActions>((ref) => ChallengesActions(ref));
 
 class PhaseNotifier extends Notifier<ChallengePhase> {
   @override

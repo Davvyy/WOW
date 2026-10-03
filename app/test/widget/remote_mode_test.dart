@@ -25,6 +25,11 @@ class _RemoteFake extends MockChalloryApi {
   @override
   bool get isRemote => true;
   @override
+  Future<List<ChallengeSession>> fetchSessions() async {
+    final s = await fetchSession();
+    return s == null ? const [] : [s];
+  }
+  @override
   Future<ChallengeSession?> fetchSession() async => noSession
       ? null
       : sessionFromSummary(
