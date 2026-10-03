@@ -107,3 +107,6 @@ void applySession(ChallengeSession s) => _current = s;
 
 /// 테스트·로그아웃용
 void resetSession() => _current = ChallengeSession.mock;
+
+/// 모의 세션(서버 id 가 아닌 'mock-p' 같은 값)인지. 서버 호출은 이런 세션을 "세션 없음"으로 본다.
+bool isMockSession(ChallengeSession s) => identical(s, ChallengeSession.mock) || identical(s, ChallengeSession.mockMonthly);

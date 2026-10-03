@@ -7,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/engine/engine.dart';
 import '../../data/mock/mock_data.dart' show Leaderboard;
 import '../../data/models.dart';
-import '../../state/session.dart' show ChallengeSession, currentSession;
+import '../../state/session.dart' show ChallengeSession, currentSession, isMockSession;
 import 'challory_api.dart';
 import 'server_mapping.dart';
 
@@ -18,6 +18,10 @@ class SupabaseChalloryApi implements ChalloryApi {
 
   @override
   bool get isRemote => true;
+
+  /// 서버에서 받은 세션의 참가자·챌린지 id. 모의 세션('mock-p' 등)은 서버 uuid 가 아니므로 "없음"으로 본다.
+  String? get _myParticipantId => isMockSession(currentSession) ? null : currentSession.participantId;
+  String? get _myChallengeId => isMockSession(currentSession) ? null : currentSession.challengeId;
 
   Future<Map<String, dynamic>> _fn(String name, Object? body, {Map<String, String> headers = const {}, HttpMethod method = HttpMethod.post}) async {
     try {
@@ -76,7 +80,7 @@ class SupabaseChalloryApi implements ChalloryApi {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw const ApiException(401, '로그인이 필요해요');
     // 선택한 챌린지(세션의 참가 행)가 있으면 그 행, 없으면 가장 최근 참가
-    final picked = currentSession.challengeId != null ? currentSession.participantId : null;
+    final picked = _myChallengeId != null ? _myParticipantId : null;
     var q = _client.from('participants')
         .select('id, nickname, challenge_id, rank_eligible, leaderboard_visible, status, challenges(start_date, status)')
         .eq('user_id', uid).not('status', 'in', '(kicked,left)');
@@ -199,13 +203,14 @@ class SupabaseChalloryApi implements ChalloryApi {
 
   @override
   Future<void> sendCheer(String toParticipantId) async {
-    final s = currentSession;
-    if (s.participantId == null || s.challengeId == null) throw const ApiException(422, '챌린지 정보를 아직 불러오지 못했어요');
+    final from = _myParticipantId;
+    final challenge = _myChallengeId;
+    if (from == null || challenge == null) throw const ApiException(422, '챌린지 정보를 아직 불러오지 못했어요');
     try {
       // RLS: 본인 participant 로만, 같은 챌린지 대상, 오늘(KST) 날짜. UNIQUE(from, local_date) = 하루 1회
       await _client.from('cheers').insert({
-        'challenge_id': s.challengeId,
-        'from_participant_id': s.participantId,
+        'challenge_id': challenge,
+        'from_participant_id': from,
         'to_participant_id': toParticipantId,
         'local_date': _kstToday(),
       });
@@ -216,7 +221,7 @@ class SupabaseChalloryApi implements ChalloryApi {
 
   @override
   Future<String?> cheeredToday() async {
-    final me = currentSession.participantId;
+    final me = _myParticipantId;
     if (me == null) return null;
     try {
       final row = await _client.from('cheers').select('to_participant_id').eq('from_participant_id', me).eq('local_date', _kstToday()).maybeSingle();
@@ -228,7 +233,7 @@ class SupabaseChalloryApi implements ChalloryApi {
 
   @override
   Future<List<MyReview>> fetchMyReviews() async {
-    final me = currentSession.participantId;
+    final me = _myParticipantId;
     if (me == null) return const [];
     try {
       final rows = await _client.from('reviews')
@@ -242,7 +247,7 @@ class SupabaseChalloryApi implements ChalloryApi {
 
   @override
   Future<void> submitAppeal(String reviewId, String text) async {
-    final me = currentSession.participantId;
+    final me = _myParticipantId;
     try {
       // RLS: 본인 검토 · open · 72h 이내. UNIQUE(review_id) = 1회
       await _client.from('appeals').insert({'review_id': reviewId, 'participant_id': me, 'text': text.trim()});
