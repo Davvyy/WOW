@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import '../../core/engine/engine.dart' show MealSlot;
 
@@ -24,6 +25,20 @@ class PushMessage {
   MealSlot? get slot => MealSlot.values.where((s) => s.name == data['slot']).firstOrNull;
 
   String? get reviewId => data['review_id'];
+
+  /// 알림의 챌린지(D53): challenge_ids(FCM 은 JSON 배열 문자열) 또는 challenge_id. 이전 서버는 없음.
+  List<String> get challengeIds {
+    final many = data['challenge_ids'];
+    if (many != null) {
+      try {
+        final v = jsonDecode(many);
+        if (v is List) return [for (final x in v) if (x is String) x];
+      } catch (_) {}
+      return const [];
+    }
+    final one = data['challenge_id'];
+    return one == null ? const [] : [one];
+  }
 
   /// approve · warn · void · exclude
   String? get verdict => data['verdict'];

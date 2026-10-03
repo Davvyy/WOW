@@ -361,4 +361,22 @@ void main() {
     expect(find.text('점심 분석이 끝났어요'), findsOneWidget);
     expect(find.text('확인하기'), findsOneWidget);
   });
+
+  group('알림의 챌린지', () {
+    test('challenge_ids(JSON 배열 문자열)와 challenge_id 를 읽는다', () {
+      expect(const PushMessage(data: {'type': 'N-01', 'challenge_ids': '["c1","c2"]'}).challengeIds, ['c1', 'c2']);
+      expect(const PushMessage(data: {'type': 'N-06', 'challenge_id': 'c3'}).challengeIds, ['c3']);
+      expect(const PushMessage(data: {'type': 'N-06'}).challengeIds, isEmpty);
+      expect(const PushMessage(data: {'type': 'N-01', 'challenge_ids': 'not-json'}).challengeIds, isEmpty);
+    });
+
+    test('판정 알림을 열면 그 챌린지를 선택', () async {
+      final c = ProviderContainer(overrides: [apiProvider.overrideWithValue(MockChalloryApi())]);
+      addTearDown(c.dispose);
+      await c.read(sessionProvider.future);
+      await c.read(pushControllerProvider).handle(
+          const PushMessage(data: {'type': 'N-06', 'review_id': 'r1', 'verdict': 'approve', 'challenge_id': 'mock-monthly'}), opened: true);
+      expect(c.read(selectedChallengeProvider), 'mock-monthly');
+    });
+  });
 }

@@ -183,6 +183,12 @@ class PushController {
 
   /// 받은 푸시 처리. N-01·N-02·N-04·N-05·N-06 을 다룬다(공지 N-03 등은 화면에 들어올 때 다시 읽는다).
   Future<void> handle(PushMessage m, {required bool opened}) async {
+    // 연 알림이 특정 챌린지 것이면 그 챌린지를 본다(기록 공유 알림 N-02·N-04 는 홈 그대로)
+    if (opened && !m.isAnalysisDone && !m.isReminder) {
+      final mine = (_ref.read(sessionsProvider).value ?? const []).map((s) => s.challengeId).toSet();
+      final id = m.challengeIds.where(mine.contains).firstOrNull;
+      if (id != null) _ref.read(selectedChallengeProvider.notifier).select(id);
+    }
     if (m.isAnalysisDone) {
       final slot = await _ref.read(mealsProvider.notifier).applyAnalysisPush(m.mealId!, hint: m.slot);
       if (slot != null) _emit(DraftReady(slot, opened: opened));
