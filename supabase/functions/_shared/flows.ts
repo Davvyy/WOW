@@ -64,18 +64,20 @@ export interface DeletedMeal {
 
 export interface DeleteMealDeps {
   deleteMeal(mealId: string): Promise<DeletedMeal & { purge_path?: string | null }>;
-  removeObjects(paths: string[]): Promise<void>;
+  /** 실패한 경로를 돌려준다(removeInBatches 수집 모드). */
+  removeObjects(paths: string[]): Promise<string[]>;
+  /** unmark_photos_purged: 다음 자동 파기(purge-due)가 다시 지우게 purged_at 을 되돌린다. */
+  unmarkPurged(paths: string[]): Promise<void>;
 }
 
-export async function deleteMealFlow(deps: DeleteMealDeps, mealId: string): Promise<DeletedMeal> {
-  const r = await deps.deleteMeal(mealId); // DB: 그룹 삭제·재계산·검토 정리·사진 purged_at(한 트랜잭션)
-  if (r.purge_path) {
-    try {
-      await deps.removeObjects([r.purge_path]);
-    } catch (e) {
-      // DB 는 이미 지워졌다 → 실패를 돌려주면 재시도가 404 가 된다. 남은 객체는 로그로 남긴다.
-      console.error('meal-delete storage remove', r.purge_path, e instanceof Error ? e.message : e);
-    }
-  }
-  return { meal_id: r.meal_id, deleted: r.deleted, local_date: r.local_date, slot: r.slot };
+export async function deleteMealFlow(deps: DeleteMealDeps, mealId: string): Promise<DeletedMeal & { photo_retry?: true }> {
+  const r = await deps.deleteMeal(mealId); // DB: 그룹 삭제·재계산·사진 purged_at(한 트랜잭션)
+  const body: DeletedMeal = { meal_id: r.meal_id, deleted: r.deleted, local_date: r.local_date, slot: r.slot };
+  if (!r.purge_path) return body;
+  const failed = await deps.removeObjects([r.purge_path]).catch(() => [r.purge_path as string]);
+  if (failed.length === 0) return body;
+  // DB 는 이미 지워졌다 → 200 을 돌려주고(재시도는 404 가 된다) 원본은 다음 자동 파기에서 지운다.
+  console.error('meal-delete storage remove failed', failed);
+  await deps.unmarkPurged(failed).catch((e) => console.error('meal-delete unmark failed', failed, e instanceof Error ? e.message : e));
+  return { ...body, photo_retry: true };
 }

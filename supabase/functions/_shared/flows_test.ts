@@ -100,7 +100,8 @@ Deno.test('끼니 삭제: DB 다음 purge_path 만 Storage 에서 지우고 계�
   const row = { meal_id: 'm1', deleted: 2, local_date: '2026-10-13', slot: 'lunch' };
   const deps = (purge: string | null) => ({
     deleteMeal: (id: string) => { order.push(`db:${id}`); return Promise.resolve({ ...row, purge_path: purge }); },
-    removeObjects: (p: string[]) => { order.push(`storage:${p.join(',')}`); return Promise.resolve(); },
+    removeObjects: (p: string[]) => { order.push(`storage:${p.join(',')}`); return Promise.resolve([] as string[]); },
+    unmarkPurged: (p: string[]) => { order.push(`unmark:${p.join(',')}`); return Promise.resolve(); },
   });
   assertEquals(await deleteMealFlow(deps('c/p/x.jpg'), 'm1'), row);
   assertEquals(order, ['db:m1', 'storage:c/p/x.jpg']);
@@ -109,11 +110,19 @@ Deno.test('끼니 삭제: DB 다음 purge_path 만 Storage 에서 지우고 계�
   assertEquals(order, ['db:m1']);
 });
 
-Deno.test('끼니 삭제: Storage 삭제가 실패해도 DB 는 이미 지워져 성공 본문을 돌려준다', async () => {
+Deno.test('끼니 삭제: Storage 삭제가 실패하면 파기 표시를 되돌리고 200 본문에 photo_retry', async () => {
   const row = { meal_id: 'm1', deleted: 1, local_date: '2026-10-13', slot: 'snack' };
-  const deps = {
-    deleteMeal: () => Promise.resolve({ ...row, purge_path: 'c/p/y.jpg' }),
-    removeObjects: () => Promise.reject(new HttpError(502, 'storage remove: boom')),
-  };
-  assertEquals(await deleteMealFlow(deps, 'm1'), row);
+  for (const removeObjects of [
+    () => Promise.resolve(['c/p/y.jpg']),
+    () => Promise.reject(new HttpError(502, 'storage remove: boom')),
+  ]) {
+    const unmarked: string[][] = [];
+    const deps = {
+      deleteMeal: () => Promise.resolve({ ...row, purge_path: 'c/p/y.jpg' }),
+      removeObjects,
+      unmarkPurged: (p: string[]) => { unmarked.push(p); return Promise.resolve(); },
+    };
+    assertEquals(await deleteMealFlow(deps, 'm1'), { ...row, photo_retry: true });
+    assertEquals(unmarked, [['c/p/y.jpg']]);
+  }
 });
