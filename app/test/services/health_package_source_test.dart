@@ -1,3 +1,4 @@
+import 'package:challory/services/health/health_models.dart';
 import 'package:challory/services/health/health_package_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health/health.dart';
@@ -38,7 +39,7 @@ class _FakeHealth implements Health {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-HealthDataPoint _steps(int count, String source, RecordingMethod method) => HealthDataPoint(
+HealthDataPoint _steps(int count, String source, RecordingMethod method, {String? sourceName}) => HealthDataPoint(
       uuid: '$source-$count-${method.name}',
       value: NumericHealthValue(numericValue: count),
       type: HealthDataType.STEPS,
@@ -48,7 +49,7 @@ HealthDataPoint _steps(int count, String source, RecordingMethod method) => Heal
       sourcePlatform: HealthPlatformType.googleHealthConnect,
       sourceDeviceId: 'device',
       sourceId: source,
-      sourceName: source,
+      sourceName: sourceName ?? source,
       recordingMethod: method,
     );
 
@@ -100,6 +101,38 @@ void main() {
       final days = await HealthPackageSource(health: health, isAndroid: true).fetchDays(now: now);
 
       expect(days.first.sessions.single.stepsInRange, 28);
+    });
+
+    test('걸음 기록의 sourceId 가 비어 있으면(플러그인 13.x) sourceName 의 패키지명을 출처로 쓴다', () async {
+      final health = _FakeHealth(aggregate: 19, records: [
+        _steps(19, '', RecordingMethod.automatic, sourceName: 'com.sec.android.app.shealth'),
+      ]);
+      final days = await HealthPackageSource(health: health, isAndroid: true).fetchDays(now: now);
+
+      expect(days.first.sources.map((s) => s.origin), ['com.sec.android.app.shealth']);
+      expect(days.first.sources.single.method, RecordMethod.automatic);
+    });
+
+    test('운동 세션 출처도 sourceId 가 비면 sourceName 을 쓴다', () async {
+      final health = _FakeHealth(aggregate: 28, records: [
+        _steps(28, 'com.sec.android.app.shealth', RecordingMethod.automatic),
+        HealthDataPoint(
+          uuid: 'walk-2',
+          value: WorkoutHealthValue(workoutActivityType: HealthWorkoutActivityType.WALKING),
+          type: HealthDataType.WORKOUT,
+          unit: HealthDataUnit.NO_UNIT,
+          dateFrom: DateTime.utc(2026, 10, 3, 1),
+          dateTo: DateTime.utc(2026, 10, 3, 2),
+          sourcePlatform: HealthPlatformType.googleHealthConnect,
+          sourceDeviceId: 'device',
+          sourceId: '',
+          sourceName: 'com.sec.android.app.shealth',
+          recordingMethod: RecordingMethod.automatic,
+        ),
+      ]);
+      final days = await HealthPackageSource(health: health, isAndroid: true).fetchDays(now: now);
+
+      expect(days.first.sessions.single.origin, 'com.sec.android.app.shealth');
     });
   });
 }

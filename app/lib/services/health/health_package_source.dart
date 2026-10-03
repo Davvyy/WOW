@@ -125,8 +125,9 @@ class HealthPackageSource implements HealthSource {
       final m = _method(p.recordingMethod);
       if (m == RecordMethod.manual) manualSeen = true;
       // 같은 출처에 자동·수동이 섞이면 수동이 우선 표기된다.
-      final prev = origins[p.sourceId];
-      if (prev == null || m == RecordMethod.manual) origins[p.sourceId] = m;
+      final origin = _origin(p);
+      final prev = origins[origin];
+      if (prev == null || m == RecordMethod.manual) origins[origin] = m;
     }
 
     // 3) 층수(수동 제외), 활동 칼로리(참고)
@@ -155,7 +156,7 @@ class HealthPackageSource implements HealthSource {
         end: p.dateTo,
         distanceM: v.totalDistance?.toDouble(),
         stepsInRange: inRange,
-        origin: p.sourceId,
+        origin: _origin(p),
         method: _method(p.recordingMethod),
       ));
     }
@@ -199,6 +200,10 @@ class HealthPackageSource implements HealthSource {
   }
 
   static double _num(HealthValue v) => v is NumericHealthValue ? v.numericValue.toDouble() : 0;
+
+  /// 출처 패키지명. Android(health 13.x)는 걸음 기록의 sourceId 를 비우고 패키지명을 sourceName 에 넣는다.
+  /// iOS 는 sourceId 가 번들 id 다.
+  static String _origin(HealthDataPoint p) => p.sourceId.isNotEmpty ? p.sourceId : p.sourceName;
 
   static RecordMethod _method(RecordingMethod m) => switch (m) {
         RecordingMethod.automatic => RecordMethod.automatic,
