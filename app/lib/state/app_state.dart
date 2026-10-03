@@ -338,6 +338,10 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
   MealsNotifier([List<MealRecord>? initial]) : _initial = initial;
   final List<MealRecord>? _initial;
 
+  /// 마지막 [capture] 로 서버 끼니가 만들어진 슬롯(서버가 서버 시각으로 정함). 대기열로 갔거나 오류면 null.
+  /// '지금 확정'은 이 슬롯의 P7 을 열어 분석을 기다린다.
+  MealSlot? lastCapturedSlot;
+
   @override
   List<MealRecord> build() {
     if (_initial != null) return _initial;
@@ -450,6 +454,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
   /// [photo] 가 있으면 업로드 파이프라인(리사이즈·EXIF 제거·SHA-256 → 서버 끼니 생성)을 탄다.
   /// 슬롯은 서버가 서버 시각으로 정하므로 응답 슬롯으로 옮긴다.
   Future<String?> capture(MealSlot slot, String time, {bool aiConsent = true, Uint8List? photo, DateTime? capturedAt}) async {
+    lastCapturedSlot = null;
     final base = of(slot).copyWith(time: time, items: const [], kcal: 0, corrected: false);
     _put(base.copyWith(status: MealStatus.captured, noAnalysis: !aiConsent, pendingUpload: photo != null));
     if (photo == null) {
@@ -476,6 +481,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
   }
 
   String? _applyCreated(MealSlot localSlot, CreatedMeal meal, bool aiConsent) {
+    lastCapturedSlot = meal.slot;
     final cur = of(localSlot);
     if (meal.slot != localSlot) _put(of(localSlot).copyWith(status: MealStatus.empty, pendingUpload: false, time: ''));
     _put(of(meal.slot).copyWith(status: MealStatus.captured, time: cur.time, serverId: meal.mealId, version: 1,
@@ -564,18 +570,6 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     return uploader.pending.length;
   }
 
-  /// 촬영 직후 "지금 확정" 경로: 분석을 기다리지 않고 바로 초안 상태로
-  void captureNow(MealSlot slot, String time) {
-    final items = mockDraftItems(slot);
-    _put(of(slot).copyWith(
-      status: MealStatus.draft,
-      time: time,
-      items: items,
-      aiKcal: mockAiTotal(slot),
-      title: items.map((i) => i.name).take(2).join(' · '),
-      noAnalysis: false,
-    ));
-  }
 }
 
 final mealsProvider = NotifierProvider<MealsNotifier, List<MealRecord>>(MealsNotifier.new);

@@ -89,8 +89,19 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       final meals = ref.read(mealsProvider.notifier);
       final consent = ref.read(aiConsentProvider);
       if (_confirmNow && consent) {
-        meals.captureNow(_slot, _timeNow());
-        context.pushReplacement(R.meal(_slot));
+        // 사진을 올려 서버 끼니를 만든 뒤(보통 1~2초) 그 끼니의 P7 에서 AI 분석을 기다린다
+        final messenger = ScaffoldMessenger.of(context);
+        final err = await meals.capture(_slot, _timeNow(), aiConsent: true, photo: photo, capturedAt: capturedAt);
+        if (!mounted) return;
+        if (err != null) messenger.showSnackBar(SnackBar(content: Text(err)));
+        final made = meals.lastCapturedSlot;
+        if (made != null) {
+          context.pushReplacement(R.meal(made));
+        } else if (photo == null && err == null) {
+          context.pushReplacement(R.meal(_slot)); // 카메라 없는 모의 경로: 잠시 뒤 모의 초안
+        } else {
+          context.go(R.home); // 연결이 불안정해 대기열로 감 → 홈에 "업로드 대기"로 보임
+        }
         return;
       }
       // 업로드는 기다리지 않는다(3초 내 홈 복귀). 결과 문구는 홈에서 토스트로.

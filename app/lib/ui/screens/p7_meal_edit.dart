@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,16 +33,56 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   late double _aiTotal;
   late MealRecord _origin;
 
+  /// AI 분석을 기다리는 중('지금 확정' 직후 · 분석 중 끼니를 연 경우). 초안이 오면 그 항목으로 바꾼다.
+  late bool _waiting;
+
+  /// 분석이 음식을 찾지 못함 → 검색으로 확정
+  bool _searchFallback = false;
+
+  /// 이 폰에 보관된 사진(공유용 7일 보관본). 없으면 색 배경
+  Uint8List? _photo;
+
   @override
   void initState() {
     super.initState();
     _origin = ref.read(mealsProvider.notifier).of(widget.slot);
-    if (widget.searchOnly) {
+    _waiting = !widget.searchOnly && _origin.status == MealStatus.captured && !_origin.noAnalysis && !_origin.pendingUpload;
+    if (widget.searchOnly || _waiting) {
       _items = const [];
       _aiTotal = 0;
     } else {
-      _items = _origin.items.isNotEmpty ? _origin.items : mockDraftItems(widget.slot);
-      _aiTotal = _origin.aiKcal ?? _items.fold(0.0, (a, i) => a + i.rawKcal);
+      _setDraft(_origin);
+    }
+    _loadPhoto();
+  }
+
+  Future<void> _loadPhoto() async {
+    final id = _origin.serverId;
+    if (id == null) return;
+    final bytes = await ref.read(sharePhotoStoreProvider).get(id);
+    if (mounted && bytes != null) setState(() => _photo = bytes);
+  }
+
+  void _setDraft(MealRecord m) {
+    _items = m.items.isNotEmpty ? m.items : mockDraftItems(widget.slot);
+    _aiTotal = m.aiKcal ?? _items.fold(0.0, (a, i) => a + i.rawKcal);
+  }
+
+  /// 기다리는 동안 끼니가 초안·분석 불가로 바뀌면 화면을 바꾼다
+  void _onMealChanged(MealRecord next) {
+    if (!_waiting) return;
+    if (next.status == MealStatus.draft) {
+      setState(() {
+        _waiting = false;
+        _origin = next;
+        _setDraft(next);
+      });
+    } else if (next.status == MealStatus.failed || next.noAnalysis) {
+      setState(() {
+        _waiting = false;
+        _origin = next;
+        _searchFallback = true;
+      });
     }
   }
 
@@ -163,6 +204,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final slot = widget.slot;
     final label = slotLabel[slot]!;
     final meals = ref.watch(mealsProvider);
+    ref.listen<MealRecord>(mealsProvider.select((l) => l.firstWhere((x) => x.slot == widget.slot)), (_, next) => _onMealChanged(next));
     final skipsUsed = ref.watch(skipsUsedProvider);
     final skipsToday = meals.where((m) => m.status == MealStatus.skipped && m.slot != slot).length;
     final remaining = engine.rules.skipPerWeek - skipsUsed - skipsToday;
@@ -175,7 +217,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final sure = _items.where((i) => i.confidence == Confidence.sure).length;
     final check = _items.where((i) => i.confidence == Confidence.check).length;
     final unchecked = _items.where((i) => !i.checked).length;
-    final searchMode = widget.searchOnly && _items.isEmpty;
+    final searchMode = (widget.searchOnly || _searchFallback) && _items.isEmpty;
 
     Widget photo() => Container(
           height: 150,
@@ -183,7 +225,10 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           alignment: Alignment.bottomLeft,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFB3552D), Color(0xFF7A3417), Color(0xFF3B1A0D)]),
+            image: _photo == null ? null : DecorationImage(image: MemoryImage(_photo!), fit: BoxFit.cover),
+            gradient: _photo != null
+                ? null
+                : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFB3552D), Color(0xFF7A3417), Color(0xFF3B1A0D)]),
           ),
           child: Semantics(
             label: '$label 사진',
@@ -194,6 +239,29 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
             ]),
           ),
         );
+
+    if (_waiting) {
+      return ChScaffold(
+        title: '$label 확인',
+        backFallback: R.home,
+        gap: 10,
+        children: [
+          photo(),
+          InfoBanner(
+            tone: Tone.brand,
+            icon: Icons.hourglass_top_rounded,
+            child: boldThen(context, 'AI가 음식을 보고 있어요.', ' 보통 몇 초 걸려요. 끝나면 항목이 여기에 나와요.'),
+          ),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Center(child: CircularProgressIndicator())),
+          ChButton('검색으로 기록', kind: BtnKind.secondary, icon: Icons.search_rounded, onPressed: () => setState(() {
+                _waiting = false;
+                _searchFallback = true;
+              })),
+          ChButton('홈에서 기다리기', kind: BtnKind.quiet, onPressed: () => context.go(R.home)),
+          const InlineNote(Icons.notifications_rounded, '홈으로 가도 분석은 계속돼요. 끝나면 알려드려요.'),
+        ],
+      );
+    }
 
     final children = <Widget>[
       photo(),
