@@ -64,11 +64,15 @@ LedgerRow ledgerRowFromServer(Map<String, dynamic> row, DateTime start,
 }
 
 /// 스냅샷 rows(서버 build_leaderboard) → [LeaderRow] 목록. 내 행([myParticipantId])은 me 표시.
-/// 내 행이 없을 때(검토 중이라 '집계 중'으로 가려짐 · 순위 비공개 · 기록 모드):
-///   [myScore] 로 순위를 계산해 넣는다. 검토 중이면 같은 순위의 '집계 중' 행 하나를 내 행으로 바꾼다.
-///   순위 제외(기록 모드·경고 3회)는 순위 0 으로 넣는다(화면은 '—').
+/// 내 행이 없을 때(검토 중이라 '집계 중'으로 가려짐 · 순위 비공개 · 기록 모드 · 아직 스냅샷 전):
+///   [myScore] 로 순위를 계산해 넣는다. [myScore] 는 스냅샷 점수와 같은 척도여야 한다
+///   (오늘 탭은 오늘 점수, 누적 탭은 순위 점수 = 일평균 × (1 + 참여율)).
+///   검토 중이면 같은 순위의 '집계 중' 행 하나를 내 행으로 바꾼다.
+///   순위 제외(기록 모드·경고 3회)와 순위 대기([myPending])는 순위 0 으로 넣는다(화면은 '—' · 대기 안내).
+///   [myAvg]·[myRate]·[myDays]·[myMinDays] 는 내 행 표시값(서버 stats 와 같음).
 List<LeaderRow> leaderRowsFromSnapshot(List<dynamic> rows,
-    {required String myParticipantId, required String myNickname, double? myScore, bool myUnderReview = false, bool myRankEligible = true}) {
+    {required String myParticipantId, required String myNickname, double? myScore, bool myUnderReview = false, bool myRankEligible = true,
+    bool myPending = false, double? myAvg, double? myRate, int? myDays, int? myMinDays}) {
   final out = <LeaderRow>[];
   var foundMe = false;
   for (final raw in rows) {
@@ -94,13 +98,16 @@ List<LeaderRow> leaderRowsFromSnapshot(List<dynamic> rows,
       minDays: (r['min_days'] as num?)?.toInt(),
     ));
   }
-  if (!foundMe && myScore != null) {
-    final rank = myRankEligible ? 1 + out.where((r) => !r.aggregating && (r.score ?? 0) > myScore).length : 0;
-    if (myUnderReview) {
+  if (!foundMe && (myScore != null || myPending)) {
+    final rank = myRankEligible && !myPending && myScore != null
+        ? 1 + out.where((r) => !r.aggregating && !r.pending && (r.score ?? 0) > myScore).length
+        : 0;
+    if (myUnderReview && rank > 0) {
       final i = out.indexWhere((r) => r.aggregating && r.rank == rank);
       if (i >= 0) out.removeAt(i);
     }
-    final mine = LeaderRow(rank: rank, name: myNickname, score: myScore, fill: 0, me: true, underReview: myUnderReview);
+    final mine = LeaderRow(rank: rank, name: myNickname, score: myScore, fill: 0, me: true, underReview: myUnderReview,
+        pending: myPending, avg: myAvg, rate: myRate, days: myDays, minDays: myMinDays);
     final at = rank == 0 ? out.length : out.indexWhere((r) => r.rank > rank);
     out.insert(at < 0 ? out.length : at, mine);
   }
@@ -129,11 +136,18 @@ Leaderboard leaderboardFromServer({
   bool myRankEligible = true,
   bool todayFinal = false,
   DateTime? asOf,
+  bool myPending = false,
+  double? myAvg,
+  double? myRate,
+  int? myDays,
+  int? myMinDays,
 }) {
   final today = leaderRowsFromSnapshot(todayRows, myParticipantId: myParticipantId, myNickname: myNickname, myScore: myToday,
       myUnderReview: myUnderReview, myRankEligible: myRankEligible);
+  // 누적 탭: [myCumulative] 는 순위 점수(stats.score). 순위 대기면 대기 행으로
   final cum = leaderRowsFromSnapshot(cumulativeRows, myParticipantId: myParticipantId, myNickname: myNickname, myScore: myCumulative,
-      myUnderReview: myUnderReview, myRankEligible: myRankEligible);
+      myUnderReview: myUnderReview, myRankEligible: myRankEligible, myPending: myPending, myAvg: myAvg, myRate: myRate, myDays: myDays,
+      myMinDays: myMinDays);
   return Leaderboard(total: cumulativeRows.length, today: today, cumulative: cum, todayFinal: todayFinal, asOf: asOf);
 }
 

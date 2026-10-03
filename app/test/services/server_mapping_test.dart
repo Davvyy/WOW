@@ -93,15 +93,62 @@ void main() {
       expect(lb.meIn(lb.today)!.score, 28.8);
     });
 
-    test('내가 검토 중이면 서버는 집계 중 → 내 점수로 순위를 계산해 그 자리에 내 행', () {
+    test('내가 검토 중이면 서버는 집계 중 → 내 순위 점수로 순위를 계산해 그 자리에 내 행', () {
       final raw = f['snapshot_cumulative_under_review'] as List;
       expect(raw.where((r) => (r as Map)['participant_id'] == pid), isEmpty, reason: '서버 스냅샷에는 내 이름이 없음');
-      final rows = leaderRowsFromSnapshot(raw, myParticipantId: pid, myNickname: '지수', myScore: 341.1, myUnderReview: true);
+      // 판정 전 순위 점수(stats.score): 반영 4일 합 341.1 → 일평균 85.3 × (1 + 참여율 1.0) = 170.6. 스냅샷 점수(순위 점수)와 같은 척도
+      final rows = leaderRowsFromSnapshot(raw, myParticipantId: pid, myNickname: '지수', myScore: 170.6, myUnderReview: true,
+          myAvg: 85.3, myRate: 1.0, myDays: 4, myMinDays: 2);
       final me = rows.firstWhere((r) => r.me);
       expect(me.underReview, isTrue);
-      expect(me.score, 341.1);
+      expect(me.score, 170.6);
+      expect(me.rank, 1, reason: '170.6 > 강남콩 159.2 — 서버가 집계 중으로 가린 1위 자리');
+      expect(rows.first.me, isTrue);
+      expect([me.avg, me.rate, me.days, me.minDays, me.pending], [85.3, 1.0, 4, 2, false]);
       expect(rows.where((r) => r.aggregating), hasLength(raw.where((r) => (r as Map)['aggregating'] == true).length - 1));
       expect(rows.length, raw.length);
+    });
+
+    test('스냅샷에 아직 없으면 순위 점수로 순위를 계산(일평균·참여율 표시값도 함께)', () {
+      final rows = leaderRowsFromSnapshot(f['snapshot_cumulative'] as List, myParticipantId: 'not-in-snapshot', myNickname: '나', myScore: 120,
+          myAvg: 60, myRate: 1.0, myDays: 4, myMinDays: 2);
+      final me = rows.firstWhere((r) => r.me);
+      expect(me.rank, 4, reason: '159.2 · 156.3 · 134.2 다음');
+      expect([me.avg, me.rate, me.days, me.minDays], [60, 1.0, 4, 2]);
+      expect(me.gapToPrev, 14.2);
+    });
+
+    test('순위 대기(pending)인데 스냅샷에 없으면 순위 0 · 대기 행으로', () {
+      final raw = f['snapshot_cumulative'] as List;
+      final rows = leaderRowsFromSnapshot(raw, myParticipantId: 'not-in-snapshot', myNickname: '나', myPending: true, myAvg: 30, myRate: 0.5,
+          myDays: 1, myMinDays: 2);
+      expect(rows, hasLength(raw.length + 1));
+      final me = rows.last;
+      expect(me.me, isTrue);
+      expect(me.rank, 0);
+      expect(me.pending, isTrue);
+      expect(me.score, isNull);
+      expect([me.avg, me.rate, me.days, me.minDays], [30, 0.5, 1, 2]);
+      expect(me.gapToPrev, isNull);
+    });
+
+    test('누적 대기 행은 누적 탭에만, 오늘 탭은 오늘 점수 그대로', () {
+      final lb = leaderboardFromServer(
+        todayRows: f['snapshot_today'] as List,
+        cumulativeRows: f['snapshot_cumulative'] as List,
+        myParticipantId: 'not-in-snapshot',
+        myNickname: '나',
+        myToday: 28.8,
+        myPending: true,
+        myDays: 1,
+        myMinDays: 2,
+      );
+      final cum = lb.meIn(lb.cumulative)!;
+      expect([cum.rank, cum.pending, cum.days, cum.minDays], [0, true, 1, 2]);
+      final today = lb.meIn(lb.today)!;
+      expect(today.pending, isFalse);
+      expect(today.score, 28.8);
+      expect(today.rank, greaterThan(0));
     });
 
     test('순위 제외(기록 모드·비공개)는 순위 0 으로 맨 끝', () {

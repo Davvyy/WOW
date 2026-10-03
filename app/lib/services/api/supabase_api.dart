@@ -268,23 +268,29 @@ class SupabaseChalloryApi implements ChalloryApi {
       final cid = me['challenge_id'] as String;
       final today = await _latestSnapshot(cid, 'today');
       final cum = await _latestSnapshot(cid, 'cumulative');
-      final scores = await _client.from('daily_scores').select('local_date, s_d, is_final, is_counted, under_review').eq('participant_id', me['id']);
+      final scores = await _client.from('daily_scores').select('local_date, s_d, under_review').eq('participant_id', me['id']);
       final todayDate = today?['local_date'] as String?;
       double? myToday;
-      var myCum = 0.0;
       var review = false;
       for (final r in scores) {
         if (r['local_date'] == todayDate) myToday = (r['s_d'] as num?)?.toDouble();
-        if (r['is_counted'] == true && r['is_final'] == true) myCum += (r['s_d'] as num?)?.toDouble() ?? 0;
         review |= r['under_review'] == true;
       }
+      // 누적 탭에 내 행이 없을 때(검토 중·스냅샷 전)의 대체 행: 스냅샷과 같은 척도인 순위 점수(stats.score).
+      // stats 가 없거나 순위 대기면 대기 행(순위 0). 세션이 이 참가 행의 것일 때만 쓴다.
+      final st = currentSession.participantId == me['id'] ? currentSession.stats : null;
       return leaderboardFromServer(
         todayRows: today?['rows'] as List? ?? const [],
         cumulativeRows: cum?['rows'] as List? ?? const [],
         myParticipantId: me['id'] as String,
         myNickname: me['nickname'] as String,
         myToday: myToday,
-        myCumulative: double.parse(myCum.toStringAsFixed(1)),
+        myCumulative: st?.score,
+        myPending: st == null || st.pending,
+        myAvg: st?.avg,
+        myRate: st?.rate,
+        myDays: st?.days,
+        myMinDays: st?.minDays,
         myUnderReview: review,
         myRankEligible: me['rank_eligible'] == true && me['leaderboard_visible'] == true,
         todayFinal: today?['is_final'] as bool? ?? false,
