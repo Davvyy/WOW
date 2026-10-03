@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../api/challory_api.dart';
 import '../health/health_source.dart' show newUuidV4;
+import '../share/meal_share.dart';
 import 'upload_queue_store.dart';
 
 export 'upload_queue_store.dart' show PendingCapture, PendingStore, MemoryPendingStore, FilePendingStore;
@@ -11,13 +12,16 @@ export 'upload_queue_store.dart' show PendingCapture, PendingStore, MemoryPendin
 /// 네트워크 단절·5xx 는 대기열에 넣고 같은 Idempotency-Key 로 다시 시도한다(재시도는 queued=true → 서버가 촬영 시각 기준 지연 업로드 규칙 적용).
 /// 대기열은 [PendingStore](기본: 앱 전용 폴더 파일)에 저장돼 앱을 다시 켜도 이어서 보낸다.
 class MealUploader {
-  MealUploader(this.api, {this.prepare, PendingStore? store, DateTime Function()? clock})
+  MealUploader(this.api, {this.prepare, PendingStore? store, this.shareStore, DateTime Function()? clock})
       : store = store ?? MemoryPendingStore(),
         _clock = clock ?? DateTime.now;
 
   final ChalloryApi api;
   final Future<PreparedPhoto> Function(Uint8List, DateTime)? prepare;
   final PendingStore store;
+
+  /// 끼니가 만들어지면 공유 카드용으로 사진을 7일 보관한다(없으면 보관 안 함)
+  final SharePhotoStore? shareStore;
   final DateTime Function() _clock;
   final List<PendingCapture> pending = [];
   bool _restored = false;
@@ -75,6 +79,9 @@ class MealUploader {
       }
       final meal = await api.createMeal(job.ticket!.photoId, queued: queued, idempotencyKey: job.mealKey);
       await _drop(job);
+      try {
+        await shareStore?.put(meal.mealId, job.photo.bytes);
+      } catch (_) {} // 보관이 안 돼도 기록은 끝났다(공유 카드는 사진 없이 만든다)
       return meal;
     } on ApiException catch (e) {
       if (!e.retryable) {

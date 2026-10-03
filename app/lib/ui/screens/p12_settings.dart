@@ -109,6 +109,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 로그아웃: 이 기기의 알림 등록을 지우고(다른 계정 알림이 오지 않게) 로그인을 끝낸다.
   Future<void> _logout() async {
     await ref.read(pushControllerProvider).stop();
+    await ref.read(sharePhotoStoreProvider).clear(); // 공유용 사진도 이 기기에서 지움
     await ref.read(authServiceProvider).signOut();
     if (mounted) context.go(R.p1);
   }
@@ -146,6 +147,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // 서버: 기록 즉시 삭제 · 일별 점수만 익명 보존 · 로그인 차단(05 API #22)
         await ref.read(apiProvider).deleteAccount('삭제');
         await ref.read(pushControllerProvider).stop(); // 기기 행은 서버가 지움, 저장해 둔 id 만 정리
+        await ref.read(sharePhotoStoreProvider).clear();
         if (!mounted) return;
         showToast(context, '계정을 삭제했어요');
         context.go(R.p1);

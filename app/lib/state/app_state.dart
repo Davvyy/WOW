@@ -20,6 +20,7 @@ import '../services/api/mock_api.dart';
 import '../services/api/supabase_api.dart';
 import '../services/auth/auth_service.dart';
 import '../services/photo/meal_uploader.dart';
+import '../services/share/meal_share.dart';
 import '../services/photo/photo_prep.dart';
 import '../services/score_simulator.dart';
 import 'session.dart';
@@ -185,7 +186,16 @@ final mealUploaderProvider = Provider<MealUploader>((ref) => MealUploader(
       store: AppConfig.hasSupabase
           ? FilePendingStore(() async => Directory('${(await getApplicationSupportDirectory()).path}/upload_queue'))
           : MemoryPendingStore(),
+      shareStore: ref.watch(sharePhotoStoreProvider),
     ));
+
+/// 공유 카드용 사진 7일 보관(서버 모드는 앱 전용 폴더, 모의 모드는 메모리)
+final sharePhotoStoreProvider = Provider<SharePhotoStore>((ref) => AppConfig.hasSupabase
+    ? FileSharePhotoStore(() async => Directory('${(await getApplicationSupportDirectory()).path}/share_photos'))
+    : MemorySharePhotoStore());
+
+/// 폰 기본 공유 창
+final mealSharerProvider = Provider<MealSharer>((ref) => const SystemMealSharer());
 
 String todayKst() => kstDateString(toKstWall(DateTime.now()));
 

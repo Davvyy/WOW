@@ -45,6 +45,9 @@ class R {
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
+/// 화면이 닫힌 뒤(예: 확정 직후 홈 스낵바)에도 시트를 열 수 있는 최상위 Navigator
+GlobalKey<NavigatorState> get rootNavigatorKey => _rootKey;
+
 /// 로그인 전에도 열 수 있는 화면(초대코드·규칙 미리 보기·검수 목록)
 const _publicPaths = {R.p1, R.rules, R.debug};
 

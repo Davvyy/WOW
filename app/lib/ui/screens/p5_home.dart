@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,6 +40,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (err != null && mounted) showToast(context, err);
       // 지난번에 못 보낸 사진(앱 전용 폴더에 저장됨)을 표시하고 이어서 보낸다
       if (await meals.restorePendingUploads() > 0) await meals.retryPendingUploads();
+      // 공유 카드용 사진은 7일만 보관
+      if (mounted) unawaited(ref.read(sharePhotoStoreProvider).prune());
     });
   }
 

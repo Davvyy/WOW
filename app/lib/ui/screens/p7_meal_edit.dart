@@ -10,7 +10,9 @@ import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
+import '../../services/share/meal_share.dart';
 import '../widgets/common.dart';
+import '../widgets/meal_share_card.dart';
 import '../../state/session.dart';
 
 
@@ -132,7 +134,19 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       messenger.showSnackBar(const SnackBar(content: Text('150 kcal 미만은 간식으로 기록돼요 · 끼니 슬롯은 채우지 않아요')));
     }
     final err = await pending;
-    if (err != null) messenger.showSnackBar(SnackBar(content: Text(err)));
+    if (err != null) {
+      messenger.showSnackBar(SnackBar(content: Text(err)));
+      return;
+    }
+    final slot = widget.slot;
+    messenger.showSnackBar(SnackBar(
+      content: Text('${slotLabel[slot]}을 확정했어요'),
+      duration: const Duration(seconds: 6),
+      action: SnackBarAction(label: '공유', onPressed: () {
+        final ctx = rootNavigatorKey.currentContext;
+        if (ctx != null) showMealShareSheet(ctx, slot);
+      }),
+    ));
   }
 
   Future<void> _skip() async {
@@ -241,7 +255,10 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     return ChScaffold(
       title: slot == MealSlot.snack ? '간식 확인' : '$label 확인',
       backFallback: R.home,
-      actions: [IconButton(onPressed: () => showToast(context, '사진 삭제는 서버 연동 후 지원돼요'), tooltip: '사진 삭제', icon: Icon(Icons.delete_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48))],
+      actions: [
+        if (canShareMeal(_origin))
+          IconButton(onPressed: () => showMealShareSheet(context, widget.slot), tooltip: '공유', icon: Icon(Icons.ios_share_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48)),
+        IconButton(onPressed: () => showToast(context, '사진 삭제는 서버 연동 후 지원돼요'), tooltip: '사진 삭제', icon: Icon(Icons.delete_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48))],
       gap: 10,
       cta: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (skipLimit && !searchMode)
