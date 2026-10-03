@@ -36,6 +36,12 @@ begin
   perform tests.ok(cp.status = 'confirmed' and cp.confirmed_kcal = 560, '확정이 복사본에 반영');
   perform tests.ok(exists (select 1 from daily_scores where participant_id = xp and local_date = '2026-10-13'), '공유 챌린지 점수 재계산');
 
+  -- 복사본 확정이 실패해 남은 경우: 같은 내용을 다시 보내면 복사본이 복구된다
+  update meals set status = 'draft', confirmed_kcal = null where id = cp.id;
+  perform confirm_meal(uid, m, items, (select version from meals where id = m), '2026-10-13 12:45+09');
+  select * into cp from meals where id = cp.id;
+  perform tests.ok(cp.status = 'confirmed' and cp.confirmed_kcal = 560, '같은 내용 재전송으로 복사본 복구');
+
   -- 건너뜀·직접 입력도 그룹으로
   perform skip_meal(uid, ji, '2026-10-13', 'breakfast', '2026-10-13 13:00+09');
   perform tests.ok(exists (select 1 from meals where participant_id = xp and local_date = '2026-10-13' and slot = 'breakfast' and status = 'skipped'

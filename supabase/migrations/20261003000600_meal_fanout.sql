@@ -140,7 +140,25 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------- 식사 확정 (API #12)
--- 원본(20261001000300_batch.sql)에 기록 공유(D52) 두 군데만 더했다: declare 의 c meals; 와 마지막 그룹 확정 블록.
+-- 기록 공유(D52): 대표 끼니를 확정하면 복사본도 같은 항목으로 확정한다(그 챌린지 규칙·수정 기한으로, 안 되면 건너뜀).
+-- 복사본 실패는 대표를 막지 않는다. 대표가 unchanged 로 돌아갈 때도 호출하므로, 같은 내용 재전송이 실패한 복사본을 복구한다.
+-- 이미 같은 값인 복사본은 자기 confirm_meal 에서 unchanged 로 끝나 멱등이다.
+create or replace function confirm_meal_copies(p_user uuid, p_meal meals, p_items jsonb, p_now timestamptz)
+  returns void language plpgsql as $$
+declare c meals;
+begin
+  if p_meal.id is distinct from p_meal.record_group_id then return; end if;
+  for c in select * from meals where record_group_id = p_meal.id and id <> p_meal.id and status not in ('void', 'skipped')
+  loop
+    begin
+      perform confirm_meal(p_user, c.id, p_items, c.version, p_now);
+    exception when others then
+      raise notice 'group copy % not confirmed: %', c.id, sqlerrm;
+    end;
+  end loop;
+end $$;
+
+-- 원본(20261001000300_batch.sql)에 기록 공유(D52) 한 군데만 더했다: 확정 후·unchanged 반환 전 confirm_meal_copies 호출.
 create or replace function confirm_meal(p_user uuid, p_meal uuid, p_items jsonb, p_version int, p_now timestamptz default now())
   returns jsonb language plpgsql as $$
 declare
@@ -157,7 +175,6 @@ declare
   v_ratio numeric;
   v_flags text[] := '{}';
   v_score daily_scores;
-  c meals;
 begin
   select * into m from meals where id = p_meal for update;
   if not found then raise exception 'meal not found' using errcode = 'PT404'; end if;
@@ -185,6 +202,7 @@ begin
   -- 같은 확정값·같은 항목이면 아무것도 바꾸지 않는다(멱등)
   if m.status in ('confirmed', 'auto', 'corrected') and m.confirmed_kcal = v_total
      and m.items_hash is not distinct from v_hash then
+    perform confirm_meal_copies(p_user, m, p_items, p_now); -- 같은 내용 재전송으로 앞서 실패한 복사본을 복구한다
     return jsonb_build_object('meal_id', m.id, 'confirmed_kcal', m.confirmed_kcal, 'delta_ratio', m.delta_ratio,
       'version', m.version, 'unchanged', true);
   end if;
@@ -216,17 +234,7 @@ begin
   end if;
 
   v_score := recompute_day(p.id, m.local_date, 'user_edit', null, p_user);
-  -- 기록 공유(D52): 대표 끼니를 확정하면 복사본도 같은 항목으로 확정한다(그 챌린지 규칙·수정 기한으로, 안 되면 건너뜀)
-  if m.id = m.record_group_id then
-    for c in select * from meals where record_group_id = m.id and id <> m.id and status not in ('void', 'skipped')
-    loop
-      begin
-        perform confirm_meal(p_user, c.id, p_items, c.version, p_now);
-      exception when others then
-        raise notice 'group copy % not confirmed: %', c.id, sqlerrm;
-      end;
-    end loop;
-  end if;
+  perform confirm_meal_copies(p_user, m, p_items, p_now);
   return jsonb_build_object('meal_id', m.id, 'confirmed_kcal', v_total, 'delta_ratio', v_ratio, 'version', m.version,
     'status', m.status, 'flags', to_jsonb(v_flags), 's_d', v_score.s_d, 'is_final', v_score.is_final);
 end $$;
@@ -312,6 +320,7 @@ begin
   return r || jsonb_build_object('local_date', v_date, 'slot', p_slot, 'manual_count_today', v_n);
 end $$;
 
-revoke execute on function active_participations(uuid, challenge_status[]), meals_group_default(), meals_group_sync()
+revoke execute on function active_participations(uuid, challenge_status[]), meals_group_default(), meals_group_sync(),
+  confirm_meal_copies(uuid, meals, jsonb, timestamptz)
   from public, anon, authenticated;
-grant execute on function active_participations(uuid, challenge_status[]) to service_role;
+grant execute on function active_participations(uuid, challenge_status[]), confirm_meal_copies(uuid, meals, jsonb, timestamptz) to service_role;
