@@ -94,6 +94,8 @@ void main() {
       child: MaterialApp.router(theme: buildTheme(Brightness.light), routerConfig: router),
     ));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('초대코드가 있어요'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'k7q2md');
     await tester.pumpAndSettle();
     expect(api.calls, contains('get_invite'));
@@ -103,6 +105,34 @@ void main() {
     expect(auth.calls, ['kakao']);
     expect(router.state.uri.path, R.p2);
     expect(find.widgetWithText(TextField, '지수'), findsWidgets);
+  });
+
+  testWidgets('P1: 이번 달 챌린지 참가하기 → 카카오 로그인 → P2(코드 없이 월간 표시 유지)', (tester) async {
+    tester.view.physicalSize = const Size(420, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final auth = MockAuthService();
+    final api = MockChalloryApi();
+    final router = buildRouter(initialLocation: R.p1);
+    addTearDown(router.dispose);
+    late ProviderContainer c;
+    await tester.pumpWidget(ProviderScope(
+      overrides: [authServiceProvider.overrideWithValue(auth), apiProvider.overrideWithValue(api)],
+      child: MaterialApp.router(theme: buildTheme(Brightness.light), routerConfig: router),
+    ));
+    await tester.pumpAndSettle();
+    c = ProviderScope.containerOf(tester.element(find.byType(Scaffold).first));
+    await tester.tap(find.text('카카오로 계속하기'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(auth.calls, isEmpty); // 아직 고르지 않음 → 비활성
+    await tester.tap(find.text('이번 달 챌린지 참가하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카카오로 계속하기'));
+    await tester.pumpAndSettle();
+    expect(auth.calls, ['kakao']);
+    expect(router.state.uri.path, R.p2);
+    expect(c.read(onboardingProvider).monthly, isTrue);
+    expect(c.read(onboardingProvider).nickname, '지수');
   });
 
   testWidgets('P1: 이미 참가 중이면 로그인 뒤 홈', (tester) async {
@@ -116,6 +146,8 @@ void main() {
       overrides: [authServiceProvider.overrideWithValue(MockAuthService()), apiProvider.overrideWithValue(api)],
       child: MaterialApp.router(theme: buildTheme(Brightness.light), routerConfig: router),
     ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('초대코드가 있어요'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'K7Q2MD');
     await tester.pumpAndSettle();

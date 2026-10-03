@@ -230,4 +230,13 @@ void main() {
     expect(logo.color, Colors.white); // 라이트 테마 onBrand
     expect(find.byIcon(Icons.local_fire_department_rounded), findsNothing);
   });
+
+  testWidgets('P1: 이번 달 챌린지 참가하기 버튼이 먼저, 초대코드 입력란은 눌러야 보인다', (tester) async {
+    await pumpApp(tester, location: R.p1);
+    expect(find.text('이번 달 챌린지 참가하기'), findsOneWidget);
+    expect(find.bySemanticsLabel('초대코드 6자리'), findsNothing);
+    await tester.tap(find.text('초대코드가 있어요'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('초대코드 6자리'), findsOneWidget);
+  });
 }

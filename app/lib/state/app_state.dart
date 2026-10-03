@@ -48,7 +48,7 @@ final authServiceProvider = Provider<AuthService>((_) {
 /// 온보딩(P1 코드 → 로그인 → P2 프로필·건강 동의 → P3 약관·국외 AI 동의 → 참가) 입력을 모아 두는 초안
 class OnboardingDraft {
   const OnboardingDraft({this.code = '', this.invite, this.nickname = '', this.sex = Sex.m, this.birthYear, this.heightCm, this.weightKg,
-      this.pregnancy = false, this.eatingDisorder = false, this.sensitiveHealth = false, this.join});
+      this.pregnancy = false, this.eatingDisorder = false, this.sensitiveHealth = false, this.join, this.monthly = false});
   final String code;
   final InviteSummary? invite;
   final String nickname;
@@ -61,10 +61,13 @@ class OnboardingDraft {
   final bool sensitiveHealth;
   final JoinResult? join;
 
+  /// 코드 없이 이번 달 챌린지로 참가(P1 기본 버튼)
+  final bool monthly;
+
   bool get profileReady => nickname.trim().length >= 2 && birthYear != null && heightCm != null && weightKg != null && sensitiveHealth;
 
   OnboardingDraft copyWith({String? code, InviteSummary? invite, String? nickname, Sex? sex, int? birthYear, double? heightCm, double? weightKg,
-          bool? pregnancy, bool? eatingDisorder, bool? sensitiveHealth, JoinResult? join}) =>
+          bool? pregnancy, bool? eatingDisorder, bool? sensitiveHealth, JoinResult? join, bool? monthly}) =>
       OnboardingDraft(
         code: code ?? this.code,
         invite: invite ?? this.invite,
@@ -77,6 +80,7 @@ class OnboardingDraft {
         eatingDisorder: eatingDisorder ?? this.eatingDisorder,
         sensitiveHealth: sensitiveHealth ?? this.sensitiveHealth,
         join: join ?? this.join,
+        monthly: monthly ?? this.monthly,
       );
 }
 
@@ -86,6 +90,11 @@ class OnboardingNotifier extends Notifier<OnboardingDraft> {
 
   void setInvite(String code, InviteSummary? invite, {String? nickname}) =>
       state = OnboardingDraft(code: code, invite: invite, nickname: nickname ?? state.nickname);
+
+  void setNickname(String nickname) => state = state.copyWith(nickname: nickname);
+
+  /// 코드 대신 이번 달 챌린지로 참가하기로 표시
+  void chooseMonthly() => state = OnboardingDraft(monthly: true, nickname: state.nickname);
 
   void setProfile({required String nickname, required Sex sex, required int birthYear, required double heightCm, required double weightKg,
           required bool pregnancy, required bool eatingDisorder, required bool sensitiveHealth}) =>
@@ -101,8 +110,14 @@ class OnboardingNotifier extends Notifier<OnboardingDraft> {
       return '기본 정보를 먼저 입력해 주세요';
     }
     try {
+      String? challengeId;
+      if (d.monthly) {
+        final open = await api.fetchOpenChallenges();
+        challengeId = open.where((o) => o.joinable && o.myStatus == null).firstOrNull?.challengeId;
+        if (challengeId == null) return '지금 참가할 수 있는 이번 달 챌린지가 없어요';
+      }
       final r = await api.joinChallenge(JoinRequest(
-            code: d.code, nickname: d.nickname, sex: d.sex, birthYear: d.birthYear!, heightCm: d.heightCm!, weightKg: d.weightKg!,
+            code: d.monthly ? null : d.code, challengeId: challengeId, nickname: d.nickname, sex: d.sex, birthYear: d.birthYear!, heightCm: d.heightCm!, weightKg: d.weightKg!,
             pregnancy: d.pregnancy, eatingDisorder: d.eatingDisorder, terms: terms, sensitiveHealth: d.sensitiveHealth, overseasAi: overseasAi));
       if (ref.mounted) {
         state = state.copyWith(join: r);
