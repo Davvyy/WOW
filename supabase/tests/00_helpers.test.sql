@@ -43,5 +43,17 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', p_user, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', p_user::text, true);
 end $$;
+-- 시험용 참가자 1명(새 사용자·users 행 포함). 신체값은 고정(여 1990년생 160 cm 55 kg).
+create or replace function tests.new_participant(p_challenge uuid, p_nick text, p_joined timestamptz) returns uuid
+  language plpgsql security definer set search_path = public as $$
+declare u uuid := gen_random_uuid(); v uuid;
+begin
+  insert into auth.users (id) values (u);
+  insert into users (id, provider, nickname) values (u, 'kakao', p_nick);
+  insert into participants (challenge_id, user_id, nickname, sex, birth_year, age, height_cm, weight_locked, bmr_locked, joined_at)
+  values (p_challenge, u, p_nick, 'F', 1990, 36, 160, 55, bmr_kcal('F', 55, 160, 36), p_joined)
+  returning id into v;
+  return v;
+end $$;
 grant usage on schema tests to authenticated, anon;
 grant execute on all functions in schema tests to authenticated, anon;
