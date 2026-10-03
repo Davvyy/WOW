@@ -77,7 +77,7 @@ class _StartScreenState extends ConsumerState<StartScreen> {
       setState(() {
         _checked = code;
         _invite = inv;
-        _st = inv == null ? _CodeState.wrong : (!inv.recruiting || inv.full ? _CodeState.closed : _CodeState.valid);
+        _st = inv == null ? _CodeState.wrong : (!inv.joinable || inv.full ? _CodeState.closed : _CodeState.valid);
       });
       ref.read(onboardingProvider.notifier).setInvite(code, inv);
     } catch (_) {
@@ -252,7 +252,7 @@ class _StartScreenState extends ConsumerState<StartScreen> {
                   ]),
                   Wrap(spacing: 6, runSpacing: 6, children: [
                     ChChip('${fmtMd(inv.startDate)} ~ ${fmtMd(inv.endDate)} · ${inv.days}일', icon: Icons.calendar_month_rounded),
-                    ChChip('${inv.joined}/${inv.capacity}명 참가', icon: Icons.group_rounded),
+                    ChChip(inv.capacity == null ? '${inv.joined}명 참가' : '${inv.joined}/${inv.capacity}명 참가', icon: Icons.group_rounded),
                   ]),
                   ChLink('규칙 미리 보기', onTap: () => context.go(R.rules)),
                 ], gap: 10)),

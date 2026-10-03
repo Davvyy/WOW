@@ -20,6 +20,10 @@ class ChallengeSession {
     this.editWindowHours = 48,
     this.appealHours = 72,
     this.rankEligible = true,
+    this.kind = 'operator',
+    this.checkStart,
+    this.stats,
+    this.joinOpen = true,
   });
 
   final ChallengeInfo challenge;
@@ -40,6 +44,20 @@ class ChallengeSession {
   final int editWindowHours;
   final int appealHours;
   final bool rankEligible;
+
+  /// challenges.kind: 'operator'(코드로 참가) · 'monthly'(월간, 코드 없이 참가)
+  final String kind;
+
+  /// 내 점검(점수 집계) 시작일. 서버가 주지 않으면 null
+  final DateTime? checkStart;
+
+  /// 내 순위 통계. 이전 서버는 null
+  final RankStats? stats;
+
+  /// 참가 접수 중인지(challenges.join_open)
+  final bool joinOpen;
+
+  bool get monthly => kind == 'monthly';
 
   ChalloryEngine get engine => ChalloryEngine(rules);
 

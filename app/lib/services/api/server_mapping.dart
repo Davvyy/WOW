@@ -87,6 +87,11 @@ List<LeaderRow> leaderRowsFromSnapshot(List<dynamic> rows,
       aggregating: agg,
       me: me,
       participantId: pid,
+      pending: r['pending'] as bool? ?? false,
+      avg: (r['avg'] as num?)?.toDouble(),
+      rate: (r['rate'] as num?)?.toDouble(),
+      days: (r['days'] as num?)?.toInt(),
+      minDays: (r['min_days'] as num?)?.toInt(),
     ));
   }
   if (!foundMe && myScore != null) {
@@ -106,7 +111,8 @@ List<LeaderRow> leaderRowsFromSnapshot(List<dynamic> rows,
     if (above != null) {
       final m = out[mi];
       out[mi] = LeaderRow(rank: m.rank, name: m.name, score: m.score, fill: m.fill, watch: m.watch, me: true, tie: m.tie,
-          participantId: m.participantId, underReview: m.underReview, gapToPrev: double.parse((above.score! - (m.score ?? 0)).toStringAsFixed(1)));
+          participantId: m.participantId, underReview: m.underReview, pending: m.pending, avg: m.avg, rate: m.rate, days: m.days,
+          minDays: m.minDays, gapToPrev: double.parse((above.score! - (m.score ?? 0)).toStringAsFixed(1)));
     }
   }
   return out;
@@ -178,7 +184,7 @@ ChallengeSession sessionFromSummary(Map<String, dynamic> j, {String platformLabe
       start: start,
       end: end,
       days: days,
-      capacity: (ch['capacity'] as num).toInt(),
+      capacity: (ch['capacity'] as num?)?.toInt() ?? 0,
       joined: (j['joined'] as num?)?.toInt() ?? 0,
       today: DateTime(now.year, now.month, now.day),
       dayIndex: dayIndex,
@@ -202,6 +208,10 @@ ChallengeSession sessionFromSummary(Map<String, dynamic> j, {String platformLabe
     ),
     rules: rulesJson.isEmpty ? EngineRules.defaults : EngineRules.fromJson(rulesJson),
     status: ch['status'] as String,
+    kind: ch['kind'] as String? ?? 'operator',
+    joinOpen: ch['join_open'] as bool? ?? true,
+    checkStart: p['check_start'] == null ? null : DateTime.parse(p['check_start'] as String),
+    stats: j['stats'] == null ? null : RankStats.fromJson(Map<String, dynamic>.from(j['stats'] as Map)),
     participantId: p['id'] as String?,
     challengeId: ch['id'] as String?,
     rulesMd: (ch['rules_md'] as String?) ?? '',

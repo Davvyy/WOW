@@ -99,18 +99,23 @@ abstract class ChalloryApi {
 
 class InviteSummary {
   const InviteSummary({required this.challengeId, required this.name, required this.status, required this.startDate,
-      required this.endDate, required this.capacity, required this.joined, required this.days});
+      required this.endDate, this.capacity, required this.joined, required this.days, this.kind = 'operator', this.joinOpen = true,
+      required this.joinable});
   final String challengeId;
   final String name;
   final String status;
   final DateTime startDate;
   final DateTime endDate;
-  final int capacity;
+  final int? capacity;
   final int joined;
   final int days;
+  final String kind;
+  final bool joinOpen;
 
-  bool get recruiting => status == 'recruiting';
-  bool get full => joined >= capacity;
+  /// 지금 참가할 수 있는지(서버 판정). 이전 서버는 모집 중일 때만
+  final bool joinable;
+
+  bool get full => capacity != null && joined >= capacity!;
 
   factory InviteSummary.fromJson(Map<String, dynamic> j) => InviteSummary(
         challengeId: j['challenge_id'] as String,
@@ -118,17 +123,25 @@ class InviteSummary {
         status: j['status'] as String,
         startDate: DateTime.parse(j['start_date'] as String),
         endDate: DateTime.parse(j['end_date'] as String),
-        capacity: (j['capacity'] as num).toInt(),
+        capacity: (j['capacity'] as num?)?.toInt(),
         joined: (j['joined'] as num).toInt(),
         days: (j['days'] as num).toInt(),
+        kind: j['kind'] as String? ?? 'operator',
+        joinOpen: j['join_open'] as bool? ?? true,
+        joinable: j['joinable'] as bool? ?? (j['status'] == 'recruiting'),
       );
 }
 
 class JoinRequest {
-  const JoinRequest({required this.code, required this.nickname, required this.sex, required this.birthYear, required this.heightCm,
+  const JoinRequest({this.code, this.challengeId, required this.nickname, required this.sex, required this.birthYear, required this.heightCm,
       required this.weightKg, this.pregnancy = false, this.eatingDisorder = false, required this.terms, required this.sensitiveHealth,
-      required this.overseasAi});
-  final String code;
+      required this.overseasAi, this.autoContinue})
+      : assert(code != null || challengeId != null);
+
+  /// 운영자 챌린지 초대 코드. 월간 챌린지는 [challengeId] 로 참가한다
+  final String? code;
+  final String? challengeId;
+  final bool? autoContinue;
   final String nickname;
   final Sex sex;
   final int birthYear;
@@ -141,7 +154,7 @@ class JoinRequest {
   final bool overseasAi;
 
   Map<String, dynamic> toJson() => {
-        'code': code,
+        if (challengeId != null) 'challenge_id': challengeId else 'code': code,
         'nickname': nickname,
         'sex': sex == Sex.m ? 'M' : 'F',
         'birth_year': birthYear,
@@ -150,21 +163,27 @@ class JoinRequest {
         'pregnancy': pregnancy,
         'eating_disorder': eatingDisorder,
         'consents': {'terms': terms, 'sensitive_health': sensitiveHealth, 'overseas_ai': overseasAi},
+        if (autoContinue != null) 'auto_continue': autoContinue,
       };
 }
 
 class JoinResult {
-  const JoinResult({required this.participantId, required this.challengeId, required this.bmr, required this.recordMode});
+  const JoinResult({required this.participantId, required this.challengeId, required this.bmr, required this.recordMode,
+      this.kind = 'operator', this.checkStart});
   final String participantId;
   final String challengeId;
   final int bmr;
   final bool recordMode;
+  final String kind;
+  final DateTime? checkStart;
 
   factory JoinResult.fromJson(Map<String, dynamic> j) => JoinResult(
         participantId: j['participant_id'] as String,
         challengeId: j['challenge_id'] as String,
         bmr: (j['bmr'] as num).toInt(),
         recordMode: j['record_mode'] as bool? ?? false,
+        kind: j['kind'] as String? ?? 'operator',
+        checkStart: j['check_start'] == null ? null : DateTime.parse(j['check_start'] as String),
       );
 }
 

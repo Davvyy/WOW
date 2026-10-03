@@ -278,6 +278,11 @@ class LeaderRow {
     this.gapToPrev,
     this.participantId,
     this.underReview = false,
+    this.pending = false,
+    this.avg,
+    this.rate,
+    this.days,
+    this.minDays,
   });
   final int rank;
   final String name;
@@ -295,6 +300,15 @@ class LeaderRow {
 
   /// 본인 행만: 검토 중(잠정 유지, 타인에게는 '집계 중')
   final bool underReview;
+
+  /// 순위 대기(최소 참여일 전, rank 0)
+  final bool pending;
+
+  /// 누적 행: 일평균 점수·참여율·참여일·최소 참여일 (서버가 주지 않으면 null)
+  final double? avg;
+  final double? rate;
+  final int? days;
+  final int? minDays;
 }
 
 /// 운영자 공지(N-03). 서버 notifications(type N-03, 본인 행) 한 건.
@@ -343,4 +357,55 @@ class FoodHit {
   final int kcal;
   final String? foodCode;
   final bool recent;
+}
+
+/// 순위 통계(서버 participant_rank_stats, D49): 순위 점수 = 일평균 × (1 + 참여율). 최소 참여일 전이면 순위 대기.
+class RankStats {
+  const RankStats({required this.days, required this.avail, required this.minDays, this.avg, this.rate, required this.pending, this.score});
+  final int days;
+  final int avail;
+  final int minDays;
+  final double? avg;
+  final double? rate;
+  final bool pending;
+  final double? score;
+
+  factory RankStats.fromJson(Map<String, dynamic> j) => RankStats(
+        days: (j['days'] as num?)?.toInt() ?? 0,
+        avail: (j['avail'] as num?)?.toInt() ?? 0,
+        minDays: (j['min_days'] as num?)?.toInt() ?? 1,
+        avg: (j['avg'] as num?)?.toDouble(),
+        rate: (j['rate'] as num?)?.toDouble(),
+        pending: j['pending'] as bool? ?? true,
+        score: (j['score'] as num?)?.toDouble(),
+      );
+}
+
+/// 코드 없이 참가할 수 있는 월간 챌린지(open_challenges)
+class OpenChallenge {
+  const OpenChallenge({required this.challengeId, required this.name, required this.kind, required this.startDate, required this.endDate,
+      required this.days, required this.joined, required this.joinable, this.myStatus});
+  final String challengeId;
+  final String name;
+  final String kind;
+  final DateTime startDate;
+  final DateTime endDate;
+  final int days;
+  final int joined;
+  final bool joinable;
+
+  /// 내 참가 상태(active·left 등). 참가한 적 없으면 null
+  final String? myStatus;
+
+  factory OpenChallenge.fromJson(Map<String, dynamic> j) => OpenChallenge(
+        challengeId: j['challenge_id'] as String,
+        name: j['name'] as String,
+        kind: j['kind'] as String? ?? 'monthly',
+        startDate: DateTime.parse(j['start_date'] as String),
+        endDate: DateTime.parse(j['end_date'] as String),
+        days: (j['days'] as num).toInt(),
+        joined: (j['joined'] as num?)?.toInt() ?? 0,
+        joinable: j['joinable'] as bool? ?? false,
+        myStatus: j['me'] as String?,
+      );
 }

@@ -38,7 +38,8 @@ class MockChalloryApi implements ChalloryApi {
     calls.add('get_invite');
     final ch = mockChallenge;
     InviteSummary s(String status, int joined) => InviteSummary(challengeId: 'mock-challenge', name: ch.name, status: status,
-        startDate: ch.start, endDate: ch.end, capacity: ch.capacity, joined: joined, days: ch.days);
+        startDate: ch.start, endDate: ch.end, capacity: ch.capacity, joined: joined, days: ch.days,
+        joinable: status == 'recruiting');
     return switch (code.toUpperCase()) {
       'K7Q2MD' => s('recruiting', ch.joined),
       'FULL00' => s('recruiting', ch.capacity),
