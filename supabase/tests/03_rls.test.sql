@@ -137,7 +137,7 @@ begin
   perform tests.ok((r ->> 'record_mode')::boolean, 'BMI 17.6 → 기록 모드');
   perform tests.eq((select rank_eligible from participants where id = (r ->> 'participant_id')::uuid), false, '기록 모드 → 순위 제외');
   perform tests.eq((select count(*)::int from consents where type = 'overseas_ai'), 0, '국외 AI 미동의 → 동의 행 없음');
-  perform tests.throws('select join_challenge(''{"code":"K7Q2MD","nickname":"a","sex":"M","birth_year":1990,"height_cm":170,"weight_kg":70,"consents":{"terms":true,"sensitive_health":true}}'')', 'PT404', '모집 중이 아니면 참가 불가');
+  perform tests.throws('select join_challenge(''{"code":"NOPE00","nickname":"a","sex":"M","birth_year":1990,"height_cm":170,"weight_kg":70,"consents":{"terms":true,"sensitive_health":true}}'')', 'PT404', '없는 코드는 참가 불가');
 end $$;
 select tests.login('00000000-0000-4000-a000-000000000002');
 do $$
