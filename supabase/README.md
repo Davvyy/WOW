@@ -90,7 +90,7 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 - 키가 없으면 `analyze-meal` 은 모의 어댑터(프로토타입 점심 초안 6항목)를, `notify` 는 로그 발송을 쓴다.
 - 푸시는 `FCM_SERVICE_ACCOUNT`(Firebase 콘솔 › 프로젝트 설정 › 서비스 계정 › 새 비공개 키 생성으로 받은 JSON 전체)로 보낸다. 함수가 이 키로 서명한 JWT 를 Google 토큰 엔드포인트에 보내 FCM 액세스 토큰을 받고, 만료 1분 전까지 인스턴스 안에서 재사용한다(`_shared/push.ts`). 정적 액세스 토큰은 1시간 뒤 만료되므로 쓰지 않는다. JSON 이 깨졌거나 필드가 빠지면 오류 로그를 남기고 로그 발송으로 대신한다.
 - Gemini 기본 모델은 `gemini-3.5-flash-lite` 이고 `GEMINI_MODEL` 시크릿으로 바꾼다. 2.5 모델은 예전에 쓰던 사용자에게만 열려 새 키로는 404 가 난다. `analyze-meal` 은 호출 1회 8초·최대 2회라 응답이 빠른 모델이어야 한다. 무료 등급은 보낸 사진이 Google 제품 개선에 쓰이므로 실제 참가자를 받기 전 유료 등급으로 바꾼다.
-- 음식 DB: 시드의 `food_db_cache` 30건은 **예시 값**이다. 실제 식약처 음식 표준데이터(15100070)는 CSV를 내려받아 `food_db_cache(food_code, name_kr, category, serving_g, kcal, ...)` 로 적재하고 동의어 100개를 `food_synonyms` 에 넣는다.
+- 음식 DB: 시드의 `food_db_cache` 29건은 **예시 값**(가짜 코드 `D000001` 형식)이다. 실제 데이터는 공공데이터포털 「전국통합식품영양성분정보(음식)표준데이터」(15100070)의 파일 데이터 CSV 를 받아 `node supabase/seed/load_food_db.mjs <CSV> > food_db.sql` → `npx --yes supabase@2 db query --linked -f food_db.sql` 로 넣는다. 일반 음식만(프랜차이즈·간편조리세트 제외) 이름당 1건, 1인분 값(기준량당 × 식품중량), `이름_세부` 형식 이름의 동의어(`김밥_참치` → 참치김밥)를 함께 넣고 예시 음식은 지운다(규칙은 스크립트 머리말·docs/02 D42, 테스트 `node --test supabase/seed/load_food_db_test.mjs`). 다시 돌려도 값만 갱신된다. 2026-10-01 등록 파일 기준 음식 1,927건·동의어 710개.
 
 ## 식사 사진 흐름 (05 §6)
 
