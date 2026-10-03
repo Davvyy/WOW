@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import '../../core/engine/engine.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
-import '../../state/session.dart' show ChallengeSession;
+import '../../state/session.dart' show ChallengeSession, currentSession;
 import 'challory_api.dart';
 
 /// 서버 없이 같은 흐름을 돌리는 모의 구현(SUPABASE_URL 미설정 · 테스트).
@@ -157,7 +157,9 @@ class MockChalloryApi implements ChalloryApi {
     return [for (final (n, k) in mockFoodDb.take(6)) FoodHit(name: n, kcal: k, recent: true)];
   }
 
-  String? cheeredTo;
+  /// 오늘 보낸 응원(챌린지마다 하루 1회, 서버 cheers 와 같음). 키는 지금 세션의 challengeId.
+  final _cheers = <String?, String>{};
+  String? get cheeredTo => _cheers[currentSession.challengeId];
   final reviews = <MyReview>[];
   final appeals = <String, String>{};
   String? objection;
@@ -166,7 +168,7 @@ class MockChalloryApi implements ChalloryApi {
   Future<void> sendCheer(String toParticipantId) async {
     _maybeFail('cheers');
     if (cheeredTo != null) throw const ApiException(409, '오늘은 이미 응원했어요');
-    cheeredTo = toParticipantId;
+    _cheers[currentSession.challengeId] = toParticipantId;
   }
 
   @override

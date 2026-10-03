@@ -41,12 +41,6 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   bool _today = true;
 
-  @override
-  void initState() {
-    super.initState();
-    if (ref.read(apiProvider).isRemote) Future.microtask(() => ref.read(heartedTodayProvider.notifier).load());
-  }
-
   Future<void> _heart(LeaderRow row) async {
     final err = await ref.read(heartedTodayProvider.notifier).send(row);
     if (!mounted) return;

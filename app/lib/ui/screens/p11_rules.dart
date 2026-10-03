@@ -1,4 +1,4 @@
-import 'dart:math' show min;
+import 'dart:math' show max, min;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -39,6 +39,10 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
     super.initState();
     _result = engine.simulate(_input()); // 첫 프레임부터 값이 있도록 로컬 계산
     _recompute();
+    // 탭은 IndexedStack 에 남아 있으므로 선택한 챌린지가 바뀌면 그 규칙·잠긴 BMR 로 다시 계산한다
+    ref.listenManual(sessionProvider.select((s) => s.value), (_, _) {
+      if (mounted) _onInput();
+    });
   }
 
   @override
@@ -87,11 +91,12 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    ref.watch(sessionProvider); // 아래 engine·currentSession·curChallenge·curMe 는 선택한 챌린지 값
     final r = engine.rules;
     final m = fmtM(meM);
     final ss = currentSession; // 서버 challenge_rules·rules_md (모의: 프로토타입 값)
     final (bs, be, le, de) = ss.slotStarts;
-    final minRankDays = min(7, (curChallenge.days - 3) ~/ 2); // 순위 진입 최소 참여일
+    final minRankDays = max(1, min(7, (curChallenge.days - 3) ~/ 2)); // 순위 진입 최소 참여일
     final cards = [
       ('①', '먹은 걸 찍어요', '세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 $m kcal로, 간식은 찍은 만큼 더해져요.', '대체값 $m · 간식 ${fmtInt(r.snackKcal)} 미만', const Color(0xFF0B6E70)),
       ('②', '움직여요', '걸음·달리기·계단 자동 기록만 인정. 하루 활동 최대 ${fmtInt(r.c)} kcal.', '활동 상한 ${fmtInt(r.c)} · 걸음 ${fmtInt(r.stepsCap)}', const Color(0xFF1F5E8F)),

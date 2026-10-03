@@ -664,8 +664,14 @@ final todayResultProvider = Provider<SimulateResult>((ref) {
 
 // ---------- 날짜 선택(1~8, 8=오늘) ----------
 class DayNotifier extends Notifier<int> {
+  /// 선택한 챌린지(또는 그 챌린지의 오늘)가 바뀌면 그 챌린지의 오늘로 돌아간다.
+  /// 같은 챌린지를 다시 읽는 것(참가·판정 푸시)으로는 고른 날짜를 바꾸지 않는다.
   @override
-  int build() => curChallenge.dayIndex;
+  int build() {
+    ref.watch(sessionProvider.select((s) => (s.value?.challengeId, s.value?.challenge.dayIndex)));
+    return curChallenge.dayIndex;
+  }
+
   void set(int d) => state = d.clamp(1, curChallenge.dayIndex);
 }
 
@@ -674,14 +680,24 @@ final selectedDayProvider = NotifierProvider<DayNotifier, int>(DayNotifier.new);
 // ---------- 응원(하루 1회) ----------
 /// 오늘 응원한 대상(participant_id, 모의 행은 닉네임). 보내는 사람 기준 하루 1회(cheers UNIQUE(from, local_date)).
 class HeartNotifier extends Notifier<String?> {
+  int _gen = 0;
+
+  /// 응원은 챌린지마다 하루 1회: 선택한 챌린지가 바뀌면 비우고 그 챌린지에서 오늘 보낸 응원을 읽는다.
   @override
-  String? build() => null;
+  String? build() {
+    final id = ref.watch(sessionProvider.select((s) => s.value?.challengeId));
+    final gen = ++_gen;
+    if (id != null) Future.microtask(() => _load(gen));
+    return null;
+  }
 
   /// 서버에서 오늘 보낸 응원을 읽어 온다(앱 재실행·다른 기기)
-  Future<void> load() async {
+  Future<void> _load(int gen) async {
+    if (!ref.mounted || gen != _gen) return;
     try {
       final to = await ref.read(apiProvider).cheeredToday();
-      if (ref.mounted && to != null) state = to;
+      // 그새 다른 챌린지로 바뀌었으면 버린다
+      if (ref.mounted && gen == _gen && to != null) state = to;
     } on ApiException {
       // 표시용 — 못 읽으면 보낼 때 서버가 409 로 막는다
     }
