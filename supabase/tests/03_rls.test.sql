@@ -130,6 +130,9 @@ begin
   r := join_challenge('{"code":"WINTER","nickname":"고딩","sex":"M","birth_year":2009,"height_cm":172,"weight_kg":60,"consents":{"terms":true,"sensitive_health":true,"overseas_ai":true}}');
   perform tests.ok((r ->> 'record_mode')::boolean, '만 19세 미만(보수 판정) → 기록 모드');
   perform tests.eq((r ->> 'bmr')::int, 1600, '참가 시 BMR 잠금(raw 1,595 → round10 1,600)');
+  -- 온보딩을 다시 거치거나 재시도해도 같은 결과(동의가 쌓이지 않음)
+  r := join_challenge('{"code":"WINTER","nickname":"고딩","sex":"M","birth_year":2009,"height_cm":172,"weight_kg":60,"consents":{"terms":true,"sensitive_health":true,"overseas_ai":true}}');
+  perform tests.eq((select count(*)::int from consents where user_id = auth.uid()), 3, '다시 참가해도 동의는 종류별 1건');
 end $$;
 select tests.login('00000000-0000-4000-a000-000000000003');
 do $$ begin
