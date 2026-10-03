@@ -510,3 +510,9 @@ entrypoint = "./functions/purge-photos/index.ts"
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/notify/index.ts"
+
+# pg_cron(pg_net)이 매일 03:30 KST 에 x-cron-secret 으로 호출(사진 자동 파기) → notify 와 같이 JWT 검사 끔, 함수가 CRON_SECRET 으로 막음
+[functions.purge-due]
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/purge-due/index.ts"
