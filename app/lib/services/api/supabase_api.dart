@@ -361,7 +361,7 @@ class SupabaseChalloryApi implements ChalloryApi {
 
   static const _mealCols = 'id, slot, status, version, engine, ai_kcal, confirmed_kcal, captured_at, late_upload, '
       'meal_items(chosen_name, name_candidates, food_code, count, portion_multiplier, has_broth, needs_check, ai_kcal, serving_kcal, '
-      'candidate_kcal, candidate_food_codes)';
+      'candidate_kcal, candidate_food_codes, confirmed_kcal, eaten, broth_off, bite_fraction)';
 
   @override
   Future<ServerMeal?> fetchMeal(String mealId) async {

@@ -390,6 +390,16 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       ],
       gap: 10,
       cta: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // 체크를 모두 풀면 확정할 수 없다(0 kcal 확정 방지) — 왜 버튼이 꺼졌는지 알린다
+        if (!searchMode && _items.isNotEmpty && total <= 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(children: [
+              Icon(Icons.info_rounded, size: 14, color: c.warn),
+              const SizedBox(width: 4),
+              Expanded(child: Txt.cap('체크한 음식이 없어요. 먹은 것을 체크해 주세요.${live?.serverId != null ? ' 먹지 않았다면 위의 휴지통으로 기록을 지워 주세요.' : ''}', color: c.warn)),
+            ]),
+          ),
         if (skipLimit && !searchMode)
           Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Icon(Icons.info_rounded, size: 14, color: c.warn), const SizedBox(width: 4), Expanded(child: Txt.cap('이번 주 건너뜀 ${engine.rules.skipPerWeek}회를 모두 썼어요. 안 먹은 끼니는 $m kcal로 계산돼요.', color: c.warn))])),
         Row(children: [

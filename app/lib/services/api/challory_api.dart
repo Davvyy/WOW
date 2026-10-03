@@ -261,7 +261,8 @@ class CreatedMeal {
 /// 서버 초안 항목(meal_items)
 class ServerMealItem {
   const ServerMealItem({required this.candidates, required this.candidateKcal, required this.candidateFoodCodes, required this.count,
-      required this.portionMultiplier, required this.hasBroth, required this.needsCheck, required this.aiKcal});
+      required this.portionMultiplier, required this.hasBroth, required this.needsCheck, required this.aiKcal,
+      this.chosen = 0, this.eaten = true, this.brothOff = false});
   final List<String> candidates;
   final List<double> candidateKcal;
   final List<String?> candidateFoodCodes;
@@ -271,15 +272,29 @@ class ServerMealItem {
   final bool needsCheck;
   final double aiKcal;
 
+  /// 고른 후보 인덱스(chosen_name 의 자리)
+  final int chosen;
+
+  /// 먹음 체크(확정 때 저장된 eaten)
+  final bool eaten;
+  final bool brothOff;
+
   factory ServerMealItem.fromJson(Map<String, dynamic> j) {
     final ai = (j['ai_kcal'] as num?)?.toDouble() ?? 0;
     final chosen = (j['chosen_name'] as String?) ?? ((j['name_candidates'] as List?)?.firstOrNull as String? ?? '음식');
     var cands = [for (final c in (j['name_candidates'] as List? ?? const [])) c as String];
     var kcals = [for (final k in (j['candidate_kcal'] as List? ?? const [])) (k as num).toDouble()];
     var codes = [for (final c in (j['candidate_food_codes'] as List? ?? const [])) c as String?];
+    final count = (j['count'] as num?)?.toInt() ?? 1;
+    final mult = (j['portion_multiplier'] as num?)?.toDouble() ?? 1;
+    final brothOff = j['broth_off'] as bool? ?? false;
     if (kcals.length != cands.length || cands.isEmpty) {
-      // 후보 kcal 이 없는 행(구버전·직접 입력): 선택 이름 하나만
-      final serving = (j['serving_kcal'] as num?)?.toDouble() ?? ai;
+      // 후보 kcal 이 없는 행(구버전·직접 입력): 선택 이름 하나만. 1인분 kcal 이 없는 옛 확정 행은 확정 kcal 에서 되살린다.
+      final confirmed = (j['confirmed_kcal'] as num?)?.toDouble();
+      final bite = (j['bite_fraction'] as num?)?.toDouble() ?? 1;
+      final factor = mult * count * bite * (brothOff ? EngineRules.defaults.brothFactor : 1);
+      final serving = (j['serving_kcal'] as num?)?.toDouble() ??
+          (confirmed != null && factor > 0 ? confirmed / factor : ai);
       cands = [chosen];
       kcals = [serving];
       codes = [j['food_code'] as String?];
@@ -288,11 +303,14 @@ class ServerMealItem {
       candidates: cands,
       candidateKcal: kcals,
       candidateFoodCodes: codes.length == cands.length ? codes : List.filled(cands.length, null),
-      count: (j['count'] as num?)?.toInt() ?? 1,
-      portionMultiplier: (j['portion_multiplier'] as num?)?.toDouble() ?? 1,
-      hasBroth: j['has_broth'] as bool? ?? false,
+      count: count,
+      portionMultiplier: mult,
+      hasBroth: (j['has_broth'] as bool? ?? false) || brothOff,
       needsCheck: j['needs_check'] as bool? ?? false,
       aiKcal: ai,
+      chosen: cands.indexOf(chosen).clamp(0, cands.length - 1),
+      eaten: j['eaten'] as bool? ?? true,
+      brothOff: brothOff,
     );
   }
 }

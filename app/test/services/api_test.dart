@@ -14,6 +14,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
+/// 서버 confirm_meal 이 보낸 항목을 meal_items 에 저장한 모양(20261004000700): 1인분·후보·국물·먹음 여부를 남긴다
+Map<String, dynamic> _storedByConfirm(Map<String, dynamic> w) => {
+      'chosen_name': w['chosen_name'],
+      'name_candidates': w['name_candidates'] ?? const <String>[],
+      'food_code': w['food_code'],
+      'candidate_kcal': w['candidate_kcal'] ?? const <num>[],
+      'candidate_food_codes': w['candidate_food_codes'] ?? const <String?>[],
+      'serving_kcal': w['serving_kcal'],
+      'count': w['count'] ?? 1,
+      'portion_multiplier': w['portion_multiplier'] ?? 1,
+      'broth_off': w['broth_off'] ?? false,
+      'has_broth': w['has_broth'] ?? w['broth_off'] ?? false,
+      'eaten': w['eaten'] ?? true,
+      'needs_check': false,
+      'ai_kcal': null,
+      'confirmed_kcal': wireTotal([{...w, 'eaten': true}]),
+    };
+
 PreparedPhoto fakePhoto() => PreparedPhoto(bytes: Uint8List.fromList([1, 2, 3]), sha256: 'a' * 64, width: 1568, height: 1176, capturedAt: DateTime.utc(2026, 10, 13, 3, 20));
 
 void main() {
@@ -63,6 +81,43 @@ void main() {
       expect(it.kind, ItemKind.soup);
       expect(it.copyWith(cand: 1).kcal, 480);
       expect(mealItemToWire(it.copyWith(cand: 2))['food_code'], 'D000012');
+    });
+    test('확정된 항목(1인분 kcal 없는 옛 행)은 확정 kcal 로 되살리고 먹음 여부를 따른다', () {
+      Map<String, dynamic> row({required bool eaten}) => {
+            'chosen_name': '시리얼', 'name_candidates': ['시리얼', '켈로그 첵스초코', '과자'], 'candidate_kcal': <num>[],
+            'count': 1, 'portion_multiplier': 1, 'ai_kcal': null, 'serving_kcal': null, 'confirmed_kcal': 162, 'eaten': eaten,
+          };
+      final on = mealItemFromServer(ServerMealItem.fromJson(row(eaten: true)), 0);
+      expect(on.name, '시리얼');
+      expect(on.kcal, 162);
+      final off = mealItemFromServer(ServerMealItem.fromJson(row(eaten: false)), 0);
+      expect(off.checked, isFalse);
+      expect(off.rawKcal, 162);
+      expect(off.kcal, 0);
+    });
+    test('확정 → 서버 저장 → 다시 열기: 고른 후보·분량·국물·체크가 그대로, 다시 보내도 같은 합계', () {
+      final draft = lunchDraftItems(gimChecked: false);
+      final edited = [
+        for (final it in draft)
+          switch (it.kind) {
+            ItemKind.rice => it.copyWith(mult: 1.5),
+            ItemKind.soup => it.copyWith(brothOff: true, cand: it.candidates.length > 1 ? 1 : 0),
+            ItemKind.count => it.copyWith(count: 3),
+            ItemKind.side => it,
+          },
+      ];
+      final wire = [for (final it in edited) mealItemToWire(it)];
+      final reopened = [
+        for (var i = 0; i < wire.length; i++) mealItemFromServer(ServerMealItem.fromJson(_storedByConfirm(wire[i])), i),
+      ];
+      for (var i = 0; i < edited.length; i++) {
+        expect(reopened[i].name, edited[i].name, reason: edited[i].name);
+        expect(reopened[i].checked, edited[i].checked, reason: edited[i].name);
+        expect(reopened[i].rawKcal, closeTo(edited[i].rawKcal, 0.05), reason: edited[i].name);
+        expect(reopened[i].candidates, edited[i].candidates, reason: edited[i].name);
+      }
+      expect(wireTotal([for (final it in reopened) mealItemToWire(it)]), wireTotal(wire));
+      expect(reopened.where((i) => !i.checked).map((i) => i.name), [draft.last.name], reason: '김은 먹지 않음 그대로');
     });
   });
 

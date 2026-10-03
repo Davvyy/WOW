@@ -16,6 +16,10 @@ Map<String, dynamic> mealItemToWire(MealItem it) {
     'food_code': ?code,
     'serving_kcal': it.candKcal[it.cand],
     'name_candidates': it.candidates,
+    // 다시 열었을 때 후보 칩·국물 토글이 그대로 나오게 서버가 함께 저장한다
+    'candidate_kcal': it.candKcal,
+    if (it.foodCodes.length == it.candidates.length) 'candidate_food_codes': it.foodCodes,
+    'has_broth': it.kind == ItemKind.soup,
     'count': count,
     'portion_multiplier': mult,
     'broth_off': it.kind == ItemKind.soup && it.brothOff,
@@ -26,7 +30,7 @@ Map<String, dynamic> mealItemToWire(MealItem it) {
 
 /// 서버 초안 항목 → P7 편집 항목
 MealItem mealItemFromServer(ServerMealItem s, int index) {
-  final name = s.candidates.first;
+  final name = s.candidates[s.chosen];
   final kind = s.hasBroth
       ? ItemKind.soup
       : (name.endsWith('밥') ? ItemKind.rice : (s.count > 1 ? ItemKind.count : ItemKind.side));
@@ -41,6 +45,9 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
     count: s.count,
     mult: kind == ItemKind.count || kind == ItemKind.side ? 1 : s.portionMultiplier,
     confidence: s.needsCheck ? Confidence.check : Confidence.sure,
+    cand: s.chosen,
+    checked: s.eaten,
+    brothOff: kind == ItemKind.soup && s.brothOff,
   );
 }
 
