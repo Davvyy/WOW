@@ -112,6 +112,7 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 앱은 Kakao·Apple ID 토큰을 `grant_type=id_token` 으로 넘기거나(네이티브), 브라우저 OAuth 로 로그인한다(app/README.md "로그인·참가").
 
 - Dashboard > Authentication > Providers: **Kakao**(REST API 키·Client Secret), **Apple**(Services ID·키) 활성화
+- Kakao 의 **REST API Key** 칸에는 `<REST API 키>,<네이티브 앱 키>` 처럼 쉼표로 두 키를 넣는다(공백 없이, REST 키가 앞). 앱이 카카오 SDK 로 받은 ID 토큰은 `aud` 가 네이티브 앱 키라서, REST 키만 있으면 `Unacceptable audience in id_token` 으로 거절된다. Auth 는 이 값을 목록으로 읽어 ID 토큰 `aud` 와 대조하고(`internal/api/token_oidc.go`), 브라우저 OAuth 는 첫 번째 값을 쓴다(`internal/api/provider/kakao.go`).
 - Authentication > URL Configuration > Redirect URLs: `app.challory://login-callback`
 - 로그인만으로는 `public.users` 행이 생기지 않는다. 참가 RPC `join_challenge` 가 users·profiles·consents·participants 를 한 번에 만든다.
 

@@ -169,7 +169,8 @@ P2 닉네임·성별·생년·키·체중·안전 체크·건강 정보 동의 �
 - ID 토큰 경로는 nonce 를 씁니다: 제공자에게는 SHA-256 해시, Supabase 에는 원본(재사용 공격 방지).
 - 브라우저 OAuth 는 딥링크 `app.challory://login-callback` 으로 돌아옵니다(Android intent-filter·iOS URL 스킴 등록됨).
 - 서버 모드에서는 라우터가 로그인 전 화면 접근을 막습니다(P1·규칙 미리 보기만 공개). 로그아웃·계정 삭제 뒤에는 P1 로 돌아갑니다. 모의 모드는 가드 없이 모든 화면을 엽니다(검수용).
-- 사전 준비(코드 밖): Supabase Dashboard > Authentication > Providers 에서 Kakao·Apple 켜기, Redirect URLs 에 `app.challory://login-callback` 추가, 카카오 디벨로퍼스에서 OpenID Connect 활성화(ID 토큰), Apple Developer 에서 Sign in with Apple 기능·Services ID(Android 브라우저 경로용).
+- 사전 준비(코드 밖): Supabase Dashboard > Authentication > Providers 에서 Kakao·Apple 켜기(Kakao 는 REST 키와 네이티브 앱 키를 쉼표로 함께, supabase/README.md "로그인(Auth) 설정"), Redirect URLs 에 `app.challory://login-callback` 추가, 카카오 디벨로퍼스에서 OpenID Connect 활성화(ID 토큰), Apple Developer 에서 Sign in with Apple 기능·Services ID(Android 브라우저 경로용).
+- 카카오 디벨로퍼스 [앱] > [플랫폼 키] > [네이티브 앱 키]에 패키지명 `app.challory.challory` 와 빌드하는 PC마다의 키 해시를 등록한다. 없으면 카카오톡 로그인이 `misconfigured` 로 끝난다. debug 키 해시: `keytool -exportcert -alias androiddebugkey -keystore ~/.android/debug.keystore -storepass android -keypass android | openssl sha1 -binary | openssl base64`(Windows 는 Git Bash). 릴리스·스토어 서명 키 해시도 따로 추가한다.
 
 ### 현재 세션(`lib/state/session.dart`)
 
