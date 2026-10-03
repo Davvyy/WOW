@@ -11,6 +11,9 @@ import 'common.dart';
 /// 동시 참가 상한(D47)
 const kMaxConcurrent = 3;
 
+/// 상한에 세는 상태(서버 join_challenge 와 같음). 마감·발표된 챌린지는 세지 않는다.
+const kActiveStatuses = {'recruiting', 'checking', 'running'};
+
 /// 홈 맨 위: 참가 중인 챌린지 카드(누르면 그 챌린지를 본다) + 이번 달 참가 + 초대코드 참가.
 class ChallengeCards extends ConsumerWidget {
   const ChallengeCards({super.key});
@@ -35,7 +38,7 @@ class ChallengeCards extends ConsumerWidget {
     final open = (ref.watch(openChallengesProvider).value ?? const <OpenChallenge>[])
         .where((o) => o.myStatus == null && o.joinable)
         .firstOrNull;
-    final full = list.length >= kMaxConcurrent;
+    final full = list.where((s) => kActiveStatuses.contains(s.status)).length >= kMaxConcurrent;
     Widget card(int i, ChallengeSession s) {
       // 같은 id 가 여러 번 있으면(테스트 목록) 첫 카드만 선택 표시
       final sel = current?.challengeId == s.challengeId && i == list.indexWhere((x) => x.challengeId == s.challengeId);
@@ -87,7 +90,8 @@ class ChallengeCards extends ConsumerWidget {
   }
 }
 
-/// 두 번째 이후 참가: 체중만 확인하고 참가(프로필·동의는 첫 참가 때 받은 것을 쓴다)
+/// 두 번째 이후 참가: 체중과 안전 체크 2문항을 확인하고 참가(프로필·필수 동의는 첫 참가 때 받은 것을 쓴다).
+/// 국외 AI 동의는 여기서 보내지 않는다(false): 서버에 있는 기존 동의 행이 그대로 쓰인다.
 Future<void> showJoinSheet(BuildContext context, {OpenChallenge? monthly, InviteSummary? invite, String? code}) =>
     showChSheet<void>(context, builder: (_) => _JoinSheet(monthly: monthly, invite: invite, code: code));
 
@@ -104,6 +108,8 @@ class _JoinSheetState extends ConsumerState<_JoinSheet> {
   late final _w = TextEditingController(text: fmtFixed(curMe.weightKg, 1));
   String? _err;
   bool _busy = false;
+  bool _pregnant = false;
+  bool _eatingDisorder = false;
 
   String get _name => widget.monthly?.name ?? widget.invite?.name ?? '';
 
@@ -129,9 +135,11 @@ class _JoinSheetState extends ConsumerState<_JoinSheet> {
         birthYear: me.birthYear,
         heightCm: me.heightCm,
         weightKg: kg,
+        pregnancy: _pregnant,
+        eatingDisorder: _eatingDisorder,
         terms: true,
         sensitiveHealth: true,
-        overseasAi: ref.read(aiConsentProvider)));
+        overseasAi: false)); // 동의를 새로 넣지 않는다: 기존 동의 행이 있으면 서버가 그대로 쓴다
     if (!mounted) return;
     if (err != null) {
       setState(() {
@@ -147,16 +155,38 @@ class _JoinSheetState extends ConsumerState<_JoinSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Txt.title('$_name 참가'),
-        const SizedBox(height: 8),
-        const Txt('참가하는 날부터 3일은 점검 기간이에요. 체중을 확인해 주세요'),
-        const SizedBox(height: 12),
-        ChInput(controller: _w, label: '체중', unit: 'kg', maxLength: 5),
-        if (_err != null) Padding(padding: const EdgeInsets.only(top: 6), child: Txt.cap(_err!, color: context.c.critical)),
-        const SizedBox(height: 12),
-        ChButton('참가하기', onPressed: _busy ? null : _join),
-      ]);
+  Widget build(BuildContext context) {
+    final c = context.c;
+    // P2 와 같은 안전 체크 2문항(체크하면 기록 모드)
+    Widget safety(String text, String label, bool value, ValueChanged<bool> onChanged) => Row(children: [
+          ChCheck(value: value, onChanged: _busy ? null : (v) => setState(() => onChanged(v)), label: label),
+          const SizedBox(width: 4),
+          Expanded(child: Txt(text)),
+        ]);
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Txt.title('$_name 참가'),
+      const SizedBox(height: 8),
+      const Txt('참가하는 날부터 3일은 점검 기간이에요. 체중을 확인해 주세요'),
+      const SizedBox(height: 12),
+      ChInput(controller: _w, label: '체중', unit: 'kg', maxLength: 5),
+      const SizedBox(height: 12),
+      const Txt.title('안전 체크 2문항'),
+      safety('현재 임신 또는 수유 중이에요', '임신 또는 수유 중', _pregnant, (v) => _pregnant = v),
+      safety('섭식장애 진단·치료 경험이 있어요', '섭식장애 진단·치료 경험', _eatingDisorder, (v) => _eatingDisorder = v),
+      if (_pregnant || _eatingDisorder)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: InfoBanner(
+            tone: Tone.review,
+            icon: Icons.visibility_off_rounded,
+            child: boldThen(context, '기록 모드로 참가해요.', ' 점수는 보이고 순위에는 들어가지 않아요. 이유는 아무에게도 보이지 않아요.', color: c.review),
+          ),
+        ),
+      if (_err != null) Padding(padding: const EdgeInsets.only(top: 6), child: Txt.cap(_err!, color: c.critical)),
+      const SizedBox(height: 12),
+      ChButton('참가하기', onPressed: _busy ? null : _join),
+    ]);
+  }
 }
 
 Future<void> _showCodeSheet(BuildContext context) => showChSheet<void>(context, builder: (_) => const _CodeSheet());
@@ -189,8 +219,9 @@ class _CodeSheetState extends ConsumerState<_CodeSheet> {
     try {
       inv = await ref.read(apiProvider).getInvite(code);
     } catch (_) {
-      if (mounted) setState(() => _busy = false);
-      rethrow;
+      // 버튼 핸들러라 다시 던지지 않는다: 안내하고 다시 누를 수 있게
+      if (mounted) setState(() { _busy = false; _err = '연결이 불안정해요. 잠시 뒤 다시 입력해 주세요'; });
+      return;
     }
     if (!mounted) return;
     if (inv == null) return setState(() { _busy = false; _err = '코드를 다시 확인해 주세요'; });

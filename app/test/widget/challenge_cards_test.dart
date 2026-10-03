@@ -1,6 +1,8 @@
 // 홈 챌린지 카드: 참가 목록·선택·공유 안내·이번 달 참가·동시 3개
 import 'dart:async';
 
+import 'package:challory/core/engine/engine.dart';
+import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/services/api/challory_api.dart';
 import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/state/app_state.dart';
@@ -8,6 +10,7 @@ import 'package:challory/state/session.dart';
 import 'package:challory/ui/widgets/challenge_cards.dart';
 import 'package:challory/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'screens_test.dart' show pumpApp, pumpWidgetScreen;
@@ -99,6 +102,90 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('코드를 다시 확인해 주세요'), findsOneWidget);
   });
+
+  Future<MockChalloryApi> openMonthlySheet(WidgetTester tester, {List<Override> extra = const []}) async {
+    final api = MockChalloryApi()..sessions.removeWhere((s) => s.monthly);
+    await pumpWidgetScreen(tester, const Scaffold(body: ChallengeCards()), overrides: [apiProvider.overrideWithValue(api), ...extra]);
+    await tester.tap(find.text('이번 달 챌린지 참가하기'));
+    await tester.pumpAndSettle();
+    return api;
+  }
+
+  Finder check(String label) => find.byWidgetPredicate((w) => w is ChCheck && w.label == label);
+
+  testWidgets('두 번째 참가 시트는 국외 AI 동의를 보내지 않는다(기존 동의는 서버에 그대로)', (tester) async {
+    final api = await openMonthlySheet(tester, extra: [aiConsentProvider.overrideWith(_AiOn.new)]);
+    await tester.tap(find.text('참가하기'));
+    await tester.pumpAndSettle();
+    expect(api.lastJoin!.overseasAi, isFalse);
+  });
+
+  testWidgets('두 번째 참가 시트도 안전 체크 2문항을 묻는다(기본 해제)', (tester) async {
+    final api = await openMonthlySheet(tester);
+    expect(find.text('현재 임신 또는 수유 중이에요'), findsOneWidget);
+    expect(find.text('섭식장애 진단·치료 경험이 있어요'), findsOneWidget);
+    expect(tester.widget<ChCheck>(check('임신 또는 수유 중')).value, isFalse);
+    expect(tester.widget<ChCheck>(check('섭식장애 진단·치료 경험')).value, isFalse);
+    await tester.tap(find.text('참가하기'));
+    await tester.pumpAndSettle();
+    expect(api.lastJoin!.pregnancy, isFalse);
+    expect(api.lastJoin!.eatingDisorder, isFalse);
+  });
+
+  testWidgets('임신·수유에 체크하면 pregnancy: true 로 참가', (tester) async {
+    final api = await openMonthlySheet(tester);
+    await tester.tap(check('임신 또는 수유 중'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('기록 모드로 참가해요'), findsOneWidget);
+    await tester.tap(find.text('참가하기'));
+    await tester.pumpAndSettle();
+    expect(api.lastJoin!.pregnancy, isTrue);
+    expect(api.lastJoin!.eatingDisorder, isFalse);
+  });
+
+  testWidgets('3개 중 하나가 마감 중(closing)이면 이번 달 참가·초대코드 참가가 그대로 보인다', (tester) async {
+    final api = MockChalloryApi();
+    final closing = ChallengeSession(challenge: mockChallenge, me: mockMe, rules: EngineRules.defaults, status: 'closing',
+        challengeId: 'closing-1', participantId: 'p-closing');
+    api.sessions
+      ..removeWhere((s) => s.monthly)
+      ..addAll([closing, ChallengeSession.mock]);
+    expect(api.sessions, hasLength(3));
+    await pumpWidgetScreen(tester, const Scaffold(body: ChallengeCards()), overrides: [apiProvider.overrideWithValue(api)]);
+    expect(find.text('초대코드로 참가'), findsOneWidget);
+    expect(find.text('동시에 3개까지 참가할 수 있어요'), findsNothing);
+    await tester.dragUntilVisible(find.text('이번 달 챌린지 참가하기'), find.byType(ListView), const Offset(-200, 0));
+    expect(find.text('이번 달 챌린지 참가하기'), findsOneWidget); // 카드 3장 뒤(가로 목록 끝)
+  });
+
+  testWidgets('초대코드 조회 중 연결이 끊기면 안내하고 다시 누를 수 있다', (tester) async {
+    final api = _OfflineInviteApi();
+    await pumpWidgetScreen(tester, const Scaffold(body: ChallengeCards()), overrides: [apiProvider.overrideWithValue(api)]);
+    await tester.tap(find.text('초대코드로 참가'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'K7Q2MD');
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('연결이 불안정해요. 잠시 뒤 다시 입력해 주세요'), findsOneWidget);
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    expect(api.inviteCalls, 2, reason: '바쁨 표시가 풀려 다시 조회한다');
+  });
+}
+
+class _OfflineInviteApi extends MockChalloryApi {
+  int inviteCalls = 0;
+  @override
+  Future<InviteSummary?> getInvite(String code) async {
+    inviteCalls++;
+    throw const ApiException(0, 'offline');
+  }
+}
+
+class _AiOn extends AiConsentNotifier {
+  @override
+  bool build() => true;
 }
 
 /// 응답을 직접 풀어 줄 때까지 getInvite 를 붙잡아 둔다
