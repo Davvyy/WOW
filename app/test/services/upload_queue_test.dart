@@ -13,6 +13,7 @@ import 'package:challory/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 PreparedPhoto photo([int seed = 1]) => PreparedPhoto(
     bytes: Uint8List.fromList(List.generate(64, (i) => (i * seed) % 256)), sha256: 'a' * 64, width: 1568, height: 1176,
@@ -20,8 +21,10 @@ PreparedPhoto photo([int seed = 1]) => PreparedPhoto(
 
 /// 단계별로 오류를 흉내 내는 서버
 class _FlakyApi extends MockChalloryApi {
+  _FlakyApi({super.clock});
   final failOn = <String, ApiException>{}; // 'upload' | 'meals' → 한 번 던질 오류
   final queuedFlags = <bool>[];
+  final snackFlags = <bool>[];
   final uploadKeys = <String>[];
   int uploads = 0;
 
@@ -41,13 +44,16 @@ class _FlakyApi extends MockChalloryApi {
   }
 
   @override
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey}) {
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false}) {
     queuedFlags.add(queued);
+    snackFlags.add(snack);
     final e = _take('meals');
     if (e != null) throw e;
-    return super.createMeal(photoId, queued: queued, idempotencyKey: idempotencyKey);
+    return super.createMeal(photoId, queued: queued, idempotencyKey: idempotencyKey, snack: snack);
   }
 }
+
+Uint8List _jpeg() => Uint8List.fromList(img.encodeJpg(img.Image(width: 200, height: 150)));
 
 void main() {
   late Directory dir;
@@ -124,6 +130,36 @@ void main() {
     api.failOn.clear();
     expect(await up.retryPending(), isEmpty, reason: '상한 도달');
     expect(await up.retryPending(force: true), hasLength(1));
+  });
+
+  test('간식으로 찍은 사진은 대기열에서 다시 보낼 때도 간식으로(D55)', () async {
+    final api = _FlakyApi()..failOn['meals'] = const ApiException(0, 'offline');
+    expect(await MealUploader(api, store: FilePendingStore.at(dir)).submit(photo(), localTag: 'snack'), isNull);
+    final done = await MealUploader(api, store: FilePendingStore.at(dir)).retryPending();
+    expect(done.single.$1, 'snack');
+    expect(api.snackFlags, [true, true]);
+    await MealUploader(api, store: FilePendingStore.at(dir)).submit(photo(2), localTag: 'lunch');
+    expect(api.snackFlags.last, isFalse, reason: '끼니 칸은 서버 시각 그대로');
+  });
+
+  testWidgets('07:00 에 간식을 골라 찍으면 간식 칸에, 아침을 고르면 아침 칸에(D55)', (tester) async {
+    final api = _FlakyApi(clock: () => DateTime.utc(2026, 10, 12, 22)); // KST 07:00
+    final c = ProviderContainer(overrides: [apiProvider.overrideWithValue(api)]);
+    addTearDown(c.dispose);
+    final n = c.read(mealsProvider.notifier);
+    n.reset([for (final s in MealSlot.values) MealRecord(slot: s)]);
+
+    await tester.runAsync(() => n.capture(MealSlot.snack, '07:00', photo: _jpeg(), capturedAt: DateTime.now()));
+    expect(api.snackFlags, [true]);
+    expect(n.lastCapturedSlot, MealSlot.snack);
+    expect(n.of(MealSlot.snack).serverId, isNotNull);
+    expect(n.of(MealSlot.snack).status, MealStatus.captured);
+    expect(n.of(MealSlot.breakfast).serverId, isNull, reason: '아침 칸은 그대로 빈 칸');
+
+    await tester.runAsync(() => n.capture(MealSlot.breakfast, '07:00', photo: _jpeg(), capturedAt: DateTime.now()));
+    expect(api.snackFlags, [true, false]);
+    expect(n.lastCapturedSlot, MealSlot.breakfast);
+    expect(n.of(MealSlot.breakfast).serverId, isNotNull);
   });
 
   testWidgets('재실행 후 홈 끼니 칸에 "업로드 대기" 표시', (tester) async {

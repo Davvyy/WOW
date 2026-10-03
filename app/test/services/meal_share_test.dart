@@ -114,6 +114,6 @@ void main() {
 
 class _OfflineApi extends MockChalloryApi {
   @override
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey}) async =>
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false}) async =>
       throw const ApiException(0, 'offline');
 }

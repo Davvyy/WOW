@@ -160,12 +160,12 @@ class _QueuedSpyApi extends MockChalloryApi {
   String? failOn;
   final queuedFlags = <bool>[];
   @override
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey}) {
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false}) {
     queuedFlags.add(queued);
     if (failOn == 'meals') {
       calls.add('meals');
       throw const ApiException(0, 'offline');
     }
-    return super.createMeal(photoId, queued: queued, idempotencyKey: idempotencyKey);
+    return super.createMeal(photoId, queued: queued, idempotencyKey: idempotencyKey, snack: snack);
   }
 }

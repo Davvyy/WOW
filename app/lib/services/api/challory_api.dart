@@ -78,7 +78,8 @@ abstract class ChalloryApi {
   Future<void> uploadPhoto(PhotoUploadTicket ticket, Uint8List bytes);
 
   /// API #9 끼니 생성(서버 재검증 · 슬롯 태그 · 지연 업로드 규칙)
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey});
+  /// [snack] 이면 촬영 화면에서 간식을 고른 것: 간식 슬롯으로 저장. 아니면 서버 시각으로 슬롯을 정한다(D55).
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false});
 
   /// 끼니 1건 + 초안 항목(분석 완료 확인용)
   Future<ServerMeal?> fetchMeal(String mealId);

@@ -524,7 +524,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
 
   /// P6 촬영 직후: 분석 중(captured) → AI 초안(draft). 국외 AI 미동의면 분석 없이 저장.
   /// [photo] 가 있으면 업로드 파이프라인(리사이즈·EXIF 제거·SHA-256 → 서버 끼니 생성)을 탄다.
-  /// 슬롯은 서버가 서버 시각으로 정하므로 응답 슬롯으로 옮긴다.
+  /// 슬롯은 서버가 서버 시각으로 정하므로 응답 슬롯으로 옮긴다. 간식을 고른 경우만 간식 슬롯으로 저장된다(D55).
   Future<String?> capture(MealSlot slot, String time, {bool aiConsent = true, Uint8List? photo, DateTime? capturedAt}) async {
     lastCapturedSlot = null;
     final base = of(slot).copyWith(time: time, items: const [], kcal: 0, corrected: false);

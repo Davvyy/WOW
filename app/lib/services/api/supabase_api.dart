@@ -355,8 +355,9 @@ class SupabaseChalloryApi implements ChalloryApi {
   }
 
   @override
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey}) async =>
-      CreatedMeal.fromJson(await _fn('meals', {'photo_id': photoId, 'queued': queued}, headers: {'Idempotency-Key': idempotencyKey}));
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false}) async =>
+      CreatedMeal.fromJson(await _fn('meals', {'photo_id': photoId, 'queued': queued, if (snack) 'slot': 'snack'},
+          headers: {'Idempotency-Key': idempotencyKey}));
 
   static const _mealCols = 'id, slot, status, version, engine, ai_kcal, confirmed_kcal, captured_at, late_upload, '
       'meal_items(chosen_name, name_candidates, food_code, count, portion_multiplier, has_broth, needs_check, ai_kcal, serving_kcal, '

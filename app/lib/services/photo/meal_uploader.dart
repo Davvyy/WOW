@@ -77,7 +77,9 @@ class MealUploader {
         job.uploaded = true;
         await _persistIfQueued(job);
       }
-      final meal = await api.createMeal(job.ticket!.photoId, queued: queued, idempotencyKey: job.mealKey);
+      // 촬영 화면에서 간식을 고른 경우만 서버에 알린다(D55). localTag 는 대기열에 저장돼 재시도에도 남는다.
+      final meal = await api.createMeal(job.ticket!.photoId, queued: queued, idempotencyKey: job.mealKey,
+          snack: job.localTag == 'snack');
       await _drop(job);
       try {
         await shareStore?.put(meal.mealId, job.photo.bytes);

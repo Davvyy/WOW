@@ -220,11 +220,11 @@ class MockChalloryApi implements ChalloryApi {
   Future<void> uploadPhoto(PhotoUploadTicket t, Uint8List bytes) async => _maybeFail('upload');
 
   @override
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey}) async {
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false}) async {
     _maybeFail('meals');
     final id = 'meal-${++_seq}';
     final now = _clock();
-    final slot = slotForKst(now);
+    final slot = snack ? MealSlot.snack : slotForKst(now);
     _meals[id] = _MockMeal(slot, now);
     return CreatedMeal(mealId: id, slot: slot, localDate: '${now.year}-${now.month}-${now.day}', analyze: true);
   }
