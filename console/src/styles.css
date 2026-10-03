@@ -72,7 +72,9 @@ a { color: var(--brand); }
 
 /* ---------- 검수 바(제품 UI 밖) ---------- */
 .hbar { position: sticky; top: 0; z-index: 40; min-height: 44px; background: var(--h-bg); color: var(--h-fg); border-bottom: 1px solid var(--h-border); display: flex; align-items: center; gap: 10px; padding: 6px 16px; flex-wrap: wrap; }
-.hbar .mark { width: 22px; height: 22px; border-radius: 6px; background: var(--h-accent); color: #fff; display: inline-grid; place-items: center; font-family: var(--font-num); font-weight: 700; font-size: 13px; }
+.hbar .mark { width: 22px; height: 22px; border-radius: 6px; background: var(--h-accent); color: #fff; display: inline-grid; place-items: center; }
+/* 앱 아이콘과 같은 마크(C 링 + 불꽃, public/brand-mark.png)를 글자색으로 칠한다. 바탕·글자색은 놓인 자리가 정한다 */
+.brandmark::before { content: ''; width: 100%; height: 100%; background: currentColor; -webkit-mask: url('/brand-mark.png') center / contain no-repeat; mask: url('/brand-mark.png') center / contain no-repeat; }
 .hbar .ttl { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .hbar .ttl small { color: var(--h-fg-2); font-weight: 500; }
 .hbar .sec { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--h-fg-2); font-weight: 600; margin-left: 10px; }
@@ -91,7 +93,7 @@ a { color: var(--brand); }
 .app { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 44px); }
 .sidenav { background: var(--surface); border-right: 1px solid var(--border); padding: 14px 10px 18px; position: sticky; top: 44px; height: calc(100vh - 44px); overflow: auto; display: flex; flex-direction: column; gap: 4px; }
 .sidenav .brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; }
-.sidenav .brand .logo { width: 32px; height: 32px; border-radius: 10px; background: var(--brand); color: var(--on-brand); display: grid; place-items: center; font-family: var(--font-num); font-weight: 700; font-size: 18px; flex: none; }
+.sidenav .brand .logo { width: 32px; height: 32px; border-radius: 10px; background: var(--brand); color: var(--on-brand); display: grid; place-items: center; flex: none; }
 .sidenav .brand .t { font-weight: 700; font-size: 15px; line-height: 1.2; }
 .sidenav .brand .s { color: var(--fg-2); font-size: 12px; }
 .sidenav .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-2); font-weight: 600; padding: 8px 10px 4px; }
@@ -330,7 +332,7 @@ textarea.ta.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .dry .row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--fg-2); }
 .dry .row b { color: var(--fg); font-family: var(--font-num); font-size: 14px; }
 .push { background: var(--surface); border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; }
-.push .app { width: 32px; height: 32px; border-radius: 8px; background: var(--brand); color: var(--on-brand); display: grid; place-items: center; font-family: var(--font-num); font-weight: 700; flex: none; min-height: 0; }
+.push .app { width: 32px; height: 32px; border-radius: 8px; background: var(--brand); color: var(--on-brand); display: grid; place-items: center; flex: none; min-height: 0; }
 .push .t { font-weight: 700; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
 .push .t small { color: var(--fg-2); font-weight: 500; }
 .push .b { font-size: 13px; line-height: 1.5; }

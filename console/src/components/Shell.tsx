@@ -22,7 +22,7 @@ function ReviewBar() {
   const m = api.mock;
   return (
     <div className="hbar" role="region" aria-label="검수 패널">
-      <span className="mark">C</span>
+      <span className="mark brandmark" aria-hidden="true" />
       <span className="ttl">챌로리 운영자 콘솔 <small>{api.kind === 'mock' ? '모의 데이터' : 'Supabase 연결'}</small></span>
       {m ? (
         <>
@@ -59,7 +59,7 @@ function SideNav() {
   const n = pend ?? 0;
   return (
     <nav className="sidenav" aria-label="콘솔 메뉴">
-      <div className="brand"><span className="logo">C</span><div><div className="t">챌로리 콘솔</div><div className="s">운영자 웹</div></div></div>
+      <div className="brand"><span className="logo brandmark" aria-hidden="true" /><div><div className="t">챌로리 콘솔</div><div className="s">운영자 웹</div></div></div>
       <NavLink className="item" to="/" end aria-label="OP0 챌린지 목록">
         <Ms name="dashboard" /><span><span className="id">OP0</span><span className="nm">챌린지 목록</span></span><span />
       </NavLink>

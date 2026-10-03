@@ -204,7 +204,7 @@ function VerdictForm({ r, now }: { r: ReviewItem; now: string }) {
       </div>
 
       <div className="push" id="pushPreview" aria-live="polite">
-        <div className="app">C</div>
+        <div className="app brandmark" aria-hidden="true" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="t"><span>당사자에게만 보내요 · N-06</span><small>{r.nickname}</small></div>
           <div className="b">{msg ? `“${msg.text}”` : <span className="muted">판정과 사유 템플릿을 선택하면 알림 문구가 완성돼요 · 사유 문장 + 판정 문장 + 점수 영향 문장</span>}</div>
