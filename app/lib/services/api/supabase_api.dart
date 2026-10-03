@@ -103,13 +103,13 @@ class SupabaseChalloryApi implements ChalloryApi {
   Future<List<ChallengeSession>> fetchSessions() async {
     final list = await _rpc('my_challenges', const {}) as List? ?? const [];
     final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'Apple 건강' : 'Health Connect';
-    final out = <ChallengeSession>[];
-    for (final item in list) {
-      final id = (Map<String, dynamic>.from(item as Map)['challenge'] as Map)['id'] as String;
-      final j = await _rpc('challenge_session', {'p_challenge': id});
-      if (j != null) out.add(sessionFromSummary(Map<String, dynamic>.from(j as Map), platformLabel: platform));
-    }
-    return out;
+    // 챌린지마다 한 번씩 동시에 읽고, 순서는 my_challenges 그대로(최근 참가 순)
+    final ids = [for (final item in list) (Map<String, dynamic>.from(item as Map)['challenge'] as Map)['id'] as String];
+    final res = await Future.wait([for (final id in ids) _rpc('challenge_session', {'p_challenge': id})]);
+    return [
+      for (final j in res)
+        if (j != null) sessionFromSummary(Map<String, dynamic>.from(j as Map), platformLabel: platform),
+    ];
   }
 
   @override
