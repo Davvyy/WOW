@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:challory/core/engine/engine.dart';
 import 'package:challory/core/format.dart';
 import 'package:challory/data/mock/mock_data.dart';
+import 'package:challory/data/models.dart';
 import 'package:challory/state/session.dart';
 import 'package:challory/router.dart';
 import 'package:challory/services/api/mock_api.dart';
@@ -143,6 +146,31 @@ void main() {
       await tester.tap(find.text('다시 볼게요'));
       await tester.pumpAndSettle();
       expect(find.text('AI 추정보다 50% 넘게 낮아요'), findsNothing);
+    });
+
+    // 자동 확정된 끼니: AI 200 kcal. 간식은 1.3×AI(대체값 하한 없음, D55), 끼니는 max(M_p, 1.3×AI)
+    List<MealRecord> autoMeals(MealSlot slot, double kcal) => [
+          for (final s in MealSlot.values)
+            s == slot
+                ? MealRecord(slot: s, status: MealStatus.auto, kcal: kcal, aiKcal: 200, time: '09:00', title: '자동 확정',
+                    items: mockDraftItems(s))
+                : MealRecord(slot: s),
+        ];
+
+    testWidgets('자동 확정 간식: 1.3×AI 로 안내하고 대체값(max)을 말하지 않는다(D55)', (tester) async {
+      await pumpApp(tester, location: R.meal(MealSlot.snack), overrides: [mealsProvider.overrideWith(() => MealsNotifier(autoMeals(MealSlot.snack, 260)))]);
+      expect(find.textContaining('자동 확정 260 kcal'), findsOneWidget);
+      expect(find.textContaining('1.3×AI 200'), findsOneWidget);
+      expect(find.textContaining('09:00까지 확정하지 않으면 1.3×AI kcal로 자동 확정돼요'), findsOneWidget);
+      expect(find.textContaining('max('), findsNothing);
+    });
+
+    testWidgets('자동 확정 끼니: max(M_p, 1.3×AI) 안내는 그대로', (tester) async {
+      final v = math.max(meM, 260.0);
+      await pumpApp(tester, location: R.meal(MealSlot.lunch), overrides: [mealsProvider.overrideWith(() => MealsNotifier(autoMeals(MealSlot.lunch, v)))]);
+      expect(find.textContaining('자동 확정 ${fmtInt(v)} kcal'), findsOneWidget);
+      expect(find.textContaining('max(${fmtM(meM)}, 1.3×AI 200)'), findsOneWidget);
+      expect(find.textContaining('09:00까지 확정하지 않으면 max(${fmtM(meM)}, 1.3×AI) kcal로 자동 확정돼요'), findsOneWidget);
     });
   });
 

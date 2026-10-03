@@ -214,7 +214,11 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final isSnackLevel = total > 0 && total < engine.rules.snackKcal;
     final auto = _origin.status == MealStatus.auto;
     final m = fmtM(meM);
-    final autoVal = engine.autoConfirmValue(curMe.bmr, _aiTotal);
+    // 간식은 대체값이 없어 1.3×AI 그대로 자동 확정(D55). 끼니는 max(M_p, 1.3×AI).
+    final isSnackSlot = slot == MealSlot.snack;
+    final autoVal = isSnackSlot ? engine.rules.autoConfirm * _aiTotal : engine.autoConfirmValue(curMe.bmr, _aiTotal);
+    final autoRule = isSnackSlot ? '1.3×AI' : 'max($m, 1.3×AI)';
+    final autoRuleAi = isSnackSlot ? '1.3×AI ${fmtInt(_aiTotal)}' : 'max($m, 1.3×AI ${fmtInt(_aiTotal)})';
     final sure = _items.where((i) => i.confidence == Confidence.sure).length;
     final check = _items.where((i) => i.confidence == Confidence.check).length;
     final unchecked = _items.where((i) => !i.checked).length;
@@ -305,7 +309,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           InfoBanner(
             tone: Tone.warn,
             icon: Icons.schedule_rounded,
-            child: boldThen(context, '자동 확정 ${fmtInt(autoVal)} kcal', ' · 09:00까지 확정하지 않아 max($m, 1.3×AI ${fmtInt(_aiTotal)})으로 계산됐어요. 아래 항목을 고쳐 저장하면 확정값으로 바뀌어요(48시간 안).', color: c.warn),
+            child: boldThen(context, '자동 확정 ${fmtInt(autoVal)} kcal', ' · 09:00까지 확정하지 않아 $autoRuleAi으로 계산됐어요. 아래 항목을 고쳐 저장하면 확정값으로 바뀌어요(48시간 안).', color: c.warn),
           ),
         if (isSnackLevel)
           InfoBanner(
@@ -316,7 +320,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
         for (var i = 0; i < _items.length; i++) _ItemCard(item: _items[i], onChange: (f) => _update(i, f), onSearch: () => _openSearch(replaceIndex: i), onRemove: () => setState(() => _items = [..._items]..removeAt(i))),
         ChButton('항목 추가 — 검색 · 최근 음식 · 직접 입력', kind: BtnKind.secondary, icon: Icons.add_rounded, onPressed: _openSearch),
         const InlineNote(Icons.check_box_rounded, '먹은 것만 체크해 두세요. 체크를 풀면 그 항목은 계산에서 빠져요. 이름을 바꾸면 kcal도 함께 바뀌어요.'),
-        InlineNote(Icons.schedule_rounded, '09:00까지 확정하지 않으면 max($m, 1.3×AI) kcal로 자동 확정돼요. 그 뒤 48시간 안에는 고칠 수 있어요.'),
+        InlineNote(Icons.schedule_rounded, '09:00까지 확정하지 않으면 $autoRule kcal로 자동 확정돼요. 그 뒤 48시간 안에는 고칠 수 있어요.'),
         const Disclaimer('모든 kcal은 추정이에요 · 확정값만 순위에 반영돼요'),
       ],
     ];
