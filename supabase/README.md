@@ -17,7 +17,8 @@ supabase/
 │   ├── 20261001000800~1100              식사 항목 후보 · 내 챌린지 요약 · 결과 이의 · 최근 음식
 │   ├── 20261001001200_push_devices.sql  푸시 기기 등록(register_device) · 알림 한 건 즉시 집기(claim_notification)
 │   ├── 20261001001300_reminder_payload.sql  N-02 리마인드 payload(kind=confirm·sync, slot, pending)·끼니 이름 문장
-│   └── 20261001001400_consent_once.sql  유효 동의는 사용자·종류·버전당 1건(중복 정리·부분 유니크 인덱스, 다시 참가해도 쌓이지 않음)
+│   ├── 20261001001400_consent_once.sql  유효 동의는 사용자·종류·버전당 1건(중복 정리·부분 유니크 인덱스, 다시 참가해도 쌓이지 않음)
+│   └── 20261001001500_create_challenge.sql  새 챌린지(RPC create_challenge: 운영자만 · 기간 7~30일 · 정원 30~100명 · 초안 + 기본 규칙 행)
 ├── functions/                           Edge Functions(Deno)
 │   ├── _shared/                         AI 어댑터(Gemini·Claude·모의) · 분석 파이프라인 · 멱등성 · 배치 검증 · 푸시 · CSV
 │   ├── photo-upload-url/  meals/  meal-manual/  meal-confirm/  meal-skip/  analyze-meal/  sync-activity/  reports/  account/
