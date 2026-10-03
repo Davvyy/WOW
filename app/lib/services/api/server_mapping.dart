@@ -80,7 +80,7 @@ List<LeaderRow> leaderRowsFromSnapshot(List<dynamic> rows,
     out.add(LeaderRow(
       rank: (r['rank'] as num).toInt(),
       name: agg ? '집계 중' : (r['nickname'] as String? ?? ''),
-      score: agg ? null : _d(r['score']),
+      score: agg ? null : (r['score'] as num?)?.toDouble(),
       fill: (r['fill'] as num?)?.toInt() ?? 0,
       watch: r['badge'] == 'watch',
       tie: r['tie'] as bool? ?? false,
@@ -106,7 +106,7 @@ List<LeaderRow> leaderRowsFromSnapshot(List<dynamic> rows,
   }
   // 위 순위까지 격차(점수가 보이는 바로 위 행)
   final mi = out.indexWhere((r) => r.me);
-  if (mi > 0) {
+  if (mi > 0 && !out[mi].pending) {
     final above = out.take(mi).where((r) => !r.aggregating && r.score != null && (r.score! > (out[mi].score ?? 0))).lastOrNull;
     if (above != null) {
       final m = out[mi];

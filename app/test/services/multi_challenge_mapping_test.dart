@@ -19,6 +19,7 @@ Map<String, dynamic> summary({String kind = 'monthly', Object? capacity, Map<Str
     };
 
 void main() {
+  inviteWithoutCapacity();
   test('세션: 종류·점검 시작일·순위 통계, 월간 정원은 0', () {
     final s = sessionFromSummary(summary());
     expect(s.kind, 'monthly');
@@ -52,6 +53,8 @@ void main() {
     expect(rows[1].me, isTrue);
     expect(rows[1].pending, isTrue);
     expect(rows[1].rank, 0);
+    expect(rows[1].score, isNull);
+    expect(rows[1].gapToPrev, isNull);
     expect([rows[1].days, rows[1].minDays], [2, 7]);
   });
 
@@ -84,5 +87,14 @@ void main() {
         weightKg: base.weightKg, terms: true, sensitiveHealth: true, overseasAi: false).toJson();
     expect(c['code'], 'OPONE1');
     expect(c.containsKey('challenge_id'), isFalse);
+  });
+}
+
+void inviteWithoutCapacity() {
+  test('초대 요약: 정원이 없으면(월간) capacity null, 가득 차지 않음', () {
+    final m = InviteSummary.fromJson({'challenge_id': 'c-oct', 'name': '10월 챌린지', 'kind': 'monthly', 'status': 'running',
+      'start_date': '2026-10-01', 'end_date': '2026-10-31', 'capacity': null, 'joined': 500, 'days': 31});
+    expect(m.capacity, isNull);
+    expect(m.full, isFalse);
   });
 }

@@ -253,7 +253,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         addBox(Align(alignment: Alignment.centerLeft, child: ChChip('최종 결과 · 이의 기간 ~${ch.objectionUntil}', tone: Tone.good, icon: Icons.verified_rounded)));
         final fin = watchFinalRows(ref);
         final finMe = myFinalRow(fin);
-        addBox(podium(fin.where((r) => !r.aggregating).take(3).toList()));
+        addBox(podium(fin.where((r) => !r.aggregating && r.score != null).take(3).toList()));
         if (finMe != null) slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: 68, color: c.bg, child: rowW(finMe, pinned: false))));
         slivers.add(SliverList(delegate: SliverChildListDelegate([for (final r in fin.skip(3)) if (!r.me) rowW(r)])));
         addBox(Center(child: Txt.cap('최종 ${ref.read(apiProvider).isRemote ? fin.where((r) => !r.aggregating).length : lb.total - 2}명 · 결과 이의는 점수 장부에서 1회')), bottom: 0);
@@ -269,7 +269,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           child: today ? const ChChip('잠정 · 매시간 갱신 · 내일 09:00 확정', icon: Icons.schedule_rounded) : ChChip('확정 · ${ch.today.month}.${ch.today.day} 09:00', tone: Tone.good, icon: Icons.check_rounded),
         ));
         final others = list.where((r) => !r.me).toList();
-        final top3 = others.where((r) => !r.aggregating).take(3).toList();
+        final top3 = others.where((r) => !r.aggregating && r.score != null).take(3).toList();
         final rest = list.where((r) => (r.rank > 3 || r.aggregating) && !r.me).toList();
         addBox(podium(top3));
         slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: 76, color: c.bg, child: rowW(me, pinned: true))));

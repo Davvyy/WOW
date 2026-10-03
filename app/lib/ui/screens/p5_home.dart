@@ -154,8 +154,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } else if (phase == ChallengePhase.published) {
       final f = myFinal;
       ringEmpty = true;
-      ringLabel = '최종 ${f.rank}위, 누적 ${fmtK1(f.score!)}점';
-      ringCenter = Column(mainAxisSize: MainAxisSize.min, children: [NumText(fmtK1(f.score!), size: 44, weight: FontWeight.w700, unit: '점'), Txt.cap('28일 누적 · 최종 ${f.rank}위')]);
+      ringLabel = '최종 ${f.rank}위, 누적 ${fmtK1(f.score ?? 0)}점';
+      ringCenter = Column(mainAxisSize: MainAxisSize.min, children: [NumText(fmtK1(f.score ?? 0), size: 44, weight: FontWeight.w700, unit: '점'), Txt.cap('28일 누적 · 최종 ${f.rank}위')]);
     } else if (zeroMeal) {
       ringEmpty = true;
       ringLabel = '끼니를 1개 이상 확정하면 점수가 생겨요';
