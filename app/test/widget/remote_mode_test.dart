@@ -143,10 +143,13 @@ void main() {
     expect(find.text('가을 걷기 챌린지'), findsWidgets);
   });
 
-  testWidgets('참가 중인 챌린지가 없으면 초대코드 안내', (tester) async {
+  testWidgets('참가 중인 챌린지가 없으면 이번 달 챌린지·초대코드 안내 → P1', (tester) async {
     await _pump(tester, R.home, _RemoteFake(noSession: true));
     expect(find.text('참가 중인 챌린지가 없어요'), findsOneWidget);
-    expect(find.text('초대코드 입력'), findsOneWidget);
+    expect(find.text('이번 달 챌린지에 참가하거나 초대코드로 참가할 수 있어요'), findsOneWidget);
+    await tester.tap(find.text('참가하러 가기'));
+    await tester.pumpAndSettle();
+    expect(find.text('이번 달 챌린지 참가하기'), findsOneWidget, reason: 'P1');
   });
 
   testWidgets('P9 응원: 서버 participant_id 로 보내고 하루 1회', (tester) async {

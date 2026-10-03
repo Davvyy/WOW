@@ -63,16 +63,13 @@ class SupabaseChalloryApi implements ChalloryApi {
   Future<JoinResult> joinChallenge(JoinRequest req) async =>
       JoinResult.fromJson(Map<String, dynamic>.from(await _rpc('join_challenge', {'p': req.toJson()}) as Map));
 
+  /// 셸 게이트가 보는 세션 목록(my_challenges)과 같은 기준: 보관·취소·초안 챌린지는 세지 않는다.
+  /// 다르면 게이트(참가 없음) ↔ P1(참가 있음 → 홈)을 오간다.
   @override
   Future<bool> hasParticipation() async {
-    final uid = _client.auth.currentUser?.id;
-    if (uid == null) return false;
-    try {
-      final rows = await _client.from('participants').select('id').eq('user_id', uid).not('status', 'in', '(kicked,left)').limit(1);
-      return rows.isNotEmpty;
-    } catch (e) {
-      throw ApiException(0, e.toString());
-    }
+    if (_client.auth.currentUser == null) return false;
+    final list = await _rpc('my_challenges', const {}) as List?;
+    return list != null && list.isNotEmpty;
   }
 
   /// 로그인 사용자의 현재 참가(가장 최근). 강퇴·탈퇴 제외.

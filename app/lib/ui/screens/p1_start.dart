@@ -84,6 +84,7 @@ class _StartScreenState extends ConsumerState<StartScreen> {
         _st = inv == null ? _CodeState.wrong : (!inv.joinable || inv.full ? _CodeState.closed : _CodeState.valid);
       });
       ref.read(onboardingProvider.notifier).setInvite(code, inv);
+      if (_st == _CodeState.valid) _continueIfSignedIn();
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -132,7 +133,14 @@ class _StartScreenState extends ConsumerState<StartScreen> {
     context.go(R.p2);
   }
 
-  /// 코드 없이 이번 달 챌린지로: 입력해 둔 코드는 비우고 로그인 단계로
+  /// 이미 로그인했으면(게이트에서 돌아옴 · 재실행) 로그인 버튼을 기다리지 않고 바로 다음 단계로
+  void _continueIfSignedIn() {
+    if (_busy || !ref.read(authServiceProvider).isSignedIn) return;
+    setState(() => _busy = true);
+    _afterLogin();
+  }
+
+  /// 코드 없이 이번 달 챌린지로: 입력해 둔 코드는 비우고 로그인 단계로(이미 로그인했으면 바로 다음 단계)
   void _chooseMonthly() {
     ref.read(onboardingProvider.notifier).chooseMonthly();
     setState(() {
@@ -143,6 +151,7 @@ class _StartScreenState extends ConsumerState<StartScreen> {
       _invite = null;
       _st = _CodeState.empty;
     });
+    _continueIfSignedIn();
   }
 
   void _paste() {

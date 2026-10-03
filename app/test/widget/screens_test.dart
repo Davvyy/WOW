@@ -4,6 +4,7 @@ import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/state/session.dart';
 import 'package:challory/router.dart';
 import 'package:challory/services/api/mock_api.dart';
+import 'package:challory/services/auth/auth_service.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/ui/screens/p11_rules.dart';
 import 'package:challory/ui/screens/p9_leaderboard.dart';
@@ -257,5 +258,37 @@ void main() {
     await tester.tap(find.text('초대코드가 있어요'));
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('초대코드 6자리'), findsOneWidget);
+  });
+
+  group('P1: 이미 로그인한 사용자', () {
+    testWidgets('이번 달 챌린지 참가하기를 누르면 로그인 없이 P2', (tester) async {
+      final auth = MockAuthService(true);
+      final c = await pumpApp(tester, location: R.p1, overrides: [authServiceProvider.overrideWithValue(auth)]);
+      await tester.tap(find.text('이번 달 챌린지 참가하기'));
+      await tester.pumpAndSettle();
+      expect(find.text('기본 정보'), findsOneWidget, reason: 'P2');
+      expect(auth.calls, isEmpty, reason: '로그인 버튼을 다시 누르지 않는다');
+      expect(c.read(onboardingProvider).monthly, isTrue);
+    });
+
+    testWidgets('유효한 초대코드를 넣으면 로그인 없이 P2', (tester) async {
+      final auth = MockAuthService(true);
+      final c = await pumpApp(tester, location: R.p1, overrides: [authServiceProvider.overrideWithValue(auth)]);
+      await tester.tap(find.text('초대코드가 있어요'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'K7Q2MD');
+      await tester.pumpAndSettle();
+      expect(find.text('기본 정보'), findsOneWidget, reason: 'P2');
+      expect(auth.calls, isEmpty);
+      expect(c.read(onboardingProvider).code, 'K7Q2MD');
+    });
+
+    testWidgets('로그인 전이면 여전히 로그인 버튼을 기다린다', (tester) async {
+      await pumpApp(tester, location: R.p1);
+      await tester.tap(find.text('이번 달 챌린지 참가하기'));
+      await tester.pumpAndSettle();
+      expect(find.text('기본 정보'), findsNothing);
+      expect(find.text('카카오로 계속하기'), findsOneWidget);
+    });
   });
 }

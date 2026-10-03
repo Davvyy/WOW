@@ -59,8 +59,8 @@ class AppShell extends ConsumerWidget {
       error: (e, _) => card(Icons.cloud_off_rounded, '챌린지를 불러오지 못했어요', apiErrorText(e),
           action: ChButton('다시 불러오기', small: true, kind: BtnKind.quiet, onPressed: () => ref.invalidate(sessionsProvider))),
       data: (v) => v == null
-          ? card(Icons.group_add_rounded, '참가 중인 챌린지가 없어요', '초대코드로 챌린지에 참가해 주세요',
-              action: ChButton('초대코드 입력', small: true, onPressed: () => context.go(R.p1)))
+          ? card(Icons.group_add_rounded, '참가 중인 챌린지가 없어요', '이번 달 챌린지에 참가하거나 초대코드로 참가할 수 있어요',
+              action: ChButton('참가하러 가기', small: true, onPressed: () => context.go(R.p1)))
           : child,
     );
   }
