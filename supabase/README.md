@@ -94,6 +94,13 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 - Gemini 기본 모델은 `gemini-3.5-flash-lite` 이고 `GEMINI_MODEL` 시크릿으로 바꾼다. 2.5 모델은 예전에 쓰던 사용자에게만 열려 새 키로는 404 가 난다. `analyze-meal` 은 호출 1회 8초·최대 2회라 응답이 빠른 모델이어야 한다. 무료 등급은 보낸 사진이 Google 제품 개선에 쓰이므로 실제 참가자를 받기 전 유료 등급으로 바꾼다.
 - 음식 DB: 시드의 `food_db_cache` 29건은 **예시 값**(가짜 코드 `D000001` 형식)이다. 실제 데이터는 공공데이터포털 「전국통합식품영양성분정보(음식)표준데이터」(15100070)의 파일 데이터 CSV 를 받아 `node supabase/seed/load_food_db.mjs <CSV> > food_db.sql` → `npx --yes supabase@2 db query --linked -f food_db.sql` 로 넣는다. 일반 음식만(프랜차이즈·간편조리세트 제외) 이름당 1건, 1인분 값(기준량당 × 식품중량), `이름_세부` 형식 이름의 동의어(`김밥_참치` → 참치김밥)를 함께 넣고 예시 음식은 지운다(규칙은 스크립트 머리말·docs/02 D42, 테스트 `node --test supabase/seed/load_food_db_test.mjs`). 다시 돌려도 값만 갱신된다. 2026-10-01 등록 파일 기준 음식 1,927건·동의어 710개.
 
+### 월간·동시 참가(docs/02 D46~D54)
+
+- 월간 챌린지는 `run_lifecycle`(00:00 KST)이 `ensure_monthly_challenge()` 로 매달 1일에 만든다. 운영자는 `app_settings.monthly_operator_id`(마이그레이션이 가장 먼저 만든 운영자 계정으로 채움). 바꾸려면 `update app_settings set value = to_jsonb('<uuid>'::uuid) where key = 'monthly_operator_id';`
+- 참가: 운영자 챌린지는 초대코드, 월간은 `join_challenge({challenge_id})`. 모집·점검·진행 중 언제든, 동시 3개까지. 나가기 `leave_challenge(id)`.
+- 기록 공유: 끼니는 `record_group_id`(대표 끼니)로 묶이고, 걸음은 참가별 파생 배치 id 로 들어간다. Edge 함수는 바뀌지 않는다.
+- 테스트(로컬 Postgres 없음): Docker `postgres:16` 컨테이너에서 `tests/run.sh` 를 돌린다(저장소를 읽기 전용으로 붙이고 컨테이너 안 복사본에서 실행).
+
 ## 식사 사진 흐름 (05 §6)
 
 ```
