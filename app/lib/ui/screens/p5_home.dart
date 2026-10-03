@@ -11,6 +11,7 @@ import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
+import '../widgets/challenge_cards.dart';
 import '../widgets/common.dart';
 import '../widgets/meal_slot_card.dart';
 import '../widgets/ring.dart';
@@ -145,8 +146,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     double ringRatio = sim.score.ratio;
     if (phase == ChallengePhase.recruiting) {
       ringEmpty = true;
-      ringLabel = '시작 전, 10월 6일에 시작해요';
-      ringCenter = Column(mainAxisSize: MainAxisSize.min, children: [NumText('—', size: 44, weight: FontWeight.w700), const Txt.cap('10월 6일에 시작해요')]);
+      final startText = '${ch.start.month}월 ${ch.start.day}일에 시작해요';
+      ringLabel = '시작 전, $startText';
+      ringCenter = Column(mainAxisSize: MainAxisSize.min, children: [NumText('—', size: 44, weight: FontWeight.w700), Txt.cap(startText)]);
     } else if (phase == ChallengePhase.closing) {
       ringEmpty = true;
       ringLabel = '최종 집계 중, 링 잠금';
@@ -246,7 +248,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ChallengePhase.recruiting => ChCard(
                 color: c.brandSoft,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
-                  Txt.title('10월 6일 ${weekdayKo(10, 6)}요일에 시작해요'),
+                  Txt.title('${ch.start.month}월 ${ch.start.day}일 ${weekdayKo(ch.start.month, ch.start.day, year: ch.start.year)}요일에 시작해요'),
                   const Txt.cap('첫 3일은 점검 기간이라 누적에 들어가지 않아요. 지금 연결 상태를 확인해 두면 첫날부터 걸음이 반영돼요.'),
                   ChLink('연결 상태 확인', onTap: () => context.push(R.p4)),
                 ], gap: 6)),
@@ -255,7 +257,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: c.reviewSoft,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
                   Txt.title('최종 집계 중 · 운영자 확인 후 발표돼요', color: c.review),
-                  const Txt.cap('마지막 날 기록은 11.3 09:00에 확정됐어요. 미결 검토가 끝나면 결과가 발표되고 7일 이의 기간이 시작돼요.'),
+                  Txt.cap('마지막 날 기록은 ${fmtMd(ch.end.add(const Duration(days: 1)))} 09:00에 확정됐어요. 미결 검토가 끝나면 결과가 발표되고 7일 이의 기간이 시작돼요.'),
                 ], gap: 6)),
               ),
             _ => ChCard(
@@ -334,6 +336,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 최신 공지(N-03) 1건. 읽지 않았으면 빨간 점, 누르면 전문 + 읽음 처리
     final latestNotice = ref.watch(noticesProvider).value?.firstOrNull;
     final body = <Widget>[
+      const ChallengeCards(),
       if (_noticeOpen && !lifecycle && latestNotice != null)
         InfoBanner(
           tone: Tone.neutral,

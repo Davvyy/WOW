@@ -32,8 +32,8 @@ class AppShell extends ConsumerWidget {
   }
 
   Widget _gate(BuildContext context, WidgetRef ref, Widget child) {
+    final s = ref.watch(sessionProvider); // 모의 모드도 지켜본다: 챌린지를 바꾸면 아래 화면이 다시 그려진다
     if (!ref.read(apiProvider).isRemote) return child;
-    final s = ref.watch(sessionProvider);
     final c = context.c;
     Widget card(IconData icon, String title, String body, {Widget? action}) => Scaffold(
           backgroundColor: c.bg,
