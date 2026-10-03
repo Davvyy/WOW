@@ -21,7 +21,7 @@ supabase/
 │   └── 20261001001500_create_challenge.sql  새 챌린지(RPC create_challenge: 운영자만 · 기간 7~30일 · 정원 30~100명 · 초안 + 기본 규칙 행)
 ├── functions/                           Edge Functions(Deno)
 │   ├── _shared/                         AI 어댑터(Gemini·Claude·모의) · 분석 파이프라인 · 멱등성 · 배치 검증 · 푸시 · CSV
-│   ├── photo-upload-url/  meals/  meal-manual/  meal-confirm/  meal-skip/  analyze-meal/  sync-activity/  reports/  account/
+│   ├── photo-upload-url/  meals/  meal-manual/  meal-confirm/  meal-delete/  meal-skip/  analyze-meal/  sync-activity/  reports/  account/
 │   ├── verdict/  notify/  announce/  export/  purge-photos/  purge-due/
 │   └── deno.json                        deno task check / deno task test
 ├── seed/generate_seed.mjs               seed.sql 생성기(프로토타입 예시 → 원천 값만)
@@ -75,7 +75,7 @@ deno task test    # 단위 테스트(모의 어댑터, 네트워크·키 불필�
 supabase link --project-ref <ref>
 supabase db push                      # migrations/ 적용
 supabase db query --linked -f supabase/seed.sql   # (선택) 프로토타입 예시 데이터(psql 없이 Management API 로). psql 이 있으면 psql "$DATABASE_URL" -f 도 같음
-supabase functions deploy --use-api photo-upload-url meals meal-manual meal-confirm meal-skip analyze-meal sync-activity reports account \
+supabase functions deploy --use-api photo-upload-url meals meal-manual meal-confirm meal-delete meal-skip analyze-meal sync-activity reports account \
   verdict notify announce export purge-photos purge-due   # --use-api: Docker 없이 서버에서 번들
 supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
   AI_ENGINE=gemini VERTEX_PROJECT=... VERTEX_LOCATION=asia-northeast3 VERTEX_ACCESS_TOKEN=...   # 또는 GEMINI_API_KEY
