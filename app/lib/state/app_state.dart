@@ -586,16 +586,34 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     if (id == null) return '아직 서버에 올라가지 않은 기록이에요';
     state = [...state]..removeAt(i);
     final api = ref.read(apiProvider);
-    try {
-      await api.deleteMeal(id, idempotencyKey: newUuidV4());
-      if (!ref.mounted) return null;
+    void deleted() {
       if (api.isRemote) ref.invalidate(ledgerProvider); // 서버가 그날 점수를 다시 계산함
       unawaited(_forgetPhoto(id));
+    }
+
+    try {
+      await api.deleteMeal(id, idempotencyKey: newUuidV4());
+      if (ref.mounted) deleted();
       return null;
+    } on ApiException catch (e) {
+      // 404: 이미 지워진 끼니(첫 응답을 못 받고 다시 누른 경우 등) → 지운 것으로 본다
+      if (e.status == 404) {
+        if (ref.mounted) deleted();
+        return null;
+      }
+      _restoreAfterDelete(i, prev);
+      return e.status == 0 ? '연결이 불안정해요. 잠시 뒤 다시 지워 주세요' : apiErrorText(e);
     } catch (e) {
-      if (ref.mounted) state = [...state]..insert(i.clamp(0, state.length), prev);
+      _restoreAfterDelete(i, prev);
       return apiErrorText(e);
     }
+  }
+
+  /// 서버가 지우기를 거절함: 제자리에 되돌린다. 그새 새로고침이 같은 끼니를 다시 가져왔으면 두 번 넣지 않는다.
+  void _restoreAfterDelete(int i, MealRecord prev) {
+    if (!ref.mounted) return;
+    if (state.any((m) => m.localKey == prev.localKey || m.serverId == prev.serverId)) return;
+    state = [...state]..insert(i.clamp(0, state.length), prev);
   }
 
   /// 지운 끼니의 공유용 사진(이 폰 7일 보관본)도 지운다

@@ -1,4 +1,5 @@
 // 한 슬롯에 끼니가 여러 개: 모두 목록에 남고, 끼니 하나만 바꾸고 지운다.
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:challory/core/engine/engine.dart';
@@ -7,6 +8,7 @@ import 'package:challory/data/models.dart';
 import 'package:challory/services/api/challory_api.dart';
 import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/services/photo/meal_uploader.dart';
+import 'package:challory/services/share/meal_share.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,6 +37,7 @@ ServerMeal _row(String id, int hour, double kcal) => ServerMeal(
 List<MealRecord> _breakfasts(ProviderContainer c) => [for (final m in c.read(mealsProvider)) if (m.slot == MealSlot.breakfast && m.status != MealStatus.empty) m];
 
 void main() {
+  _fixRound1();
   test('loadToday: 아침 3건을 모두 촬영 시각 순으로 남긴다', () async {
     final api = _RemoteMeals([_row('b-2', 8, 300), _row('b-1', 7, 200), _row('b-3', 9, 400)]);
     final c = ProviderContainer(overrides: [apiProvider.overrideWithValue(api)]);
@@ -133,6 +136,74 @@ void main() {
       expect(b.first.status, MealStatus.confirmed);
       expect(b.first.kcal, 420);
       expect(b.last.status, MealStatus.draft);
+    });
+  });
+}
+
+/// 서버 모드에서 지우기 응답을 정해 둔다. [gate] 를 채우면 응답 전에 기다린다.
+class _DeleteApi extends MockChalloryApi {
+  _DeleteApi(this.error);
+  final ApiException? error;
+  Future<void>? gate;
+  @override
+  bool get isRemote => true;
+  @override
+  Future<List<ServerMeal>> fetchMealsOn(String localDate) async => const [];
+  @override
+  Future<void> deleteMeal(String mealId, {required String idempotencyKey}) async {
+    calls.add('meal-delete');
+    if (gate != null) await gate;
+    if (error != null) throw error!;
+  }
+}
+
+void _fixRound1() {
+  group('지우기 응답 처리', () {
+    const meal = MealRecord(slot: MealSlot.lunch, status: MealStatus.confirmed, kcal: 600, title: '비빔밥', serverId: 'm-9', version: 2);
+
+    ProviderContainer make(_DeleteApi api, MemorySharePhotoStore shares) {
+      final c = ProviderContainer(overrides: [
+        apiProvider.overrideWithValue(api),
+        sharePhotoStoreProvider.overrideWithValue(shares),
+        mealsProvider.overrideWith(() => MealsNotifier([meal])),
+      ]);
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    test('404(이미 지워짐)는 지운 것으로: 행은 빠진 채, 장부 다시 읽기, 보관 사진 삭제, 성공(null)', () async {
+      final api = _DeleteApi(const ApiException(404, '기록을 찾지 못했어요'));
+      final shares = MemorySharePhotoStore()..photos['m-9'] = Uint8List.fromList([1]);
+      final c = make(api, shares);
+      final sub = c.listen(ledgerProvider, (_, _) {});
+      addTearDown(sub.close);
+      await pumpEventQueue();
+      final ledgerReads = api.calls.where((x) => x == 'ledger').length;
+      expect(await c.read(mealsProvider.notifier).delete('m-9'), isNull);
+      await pumpEventQueue();
+      expect(c.read(mealsProvider), isEmpty);
+      expect(shares.photos.containsKey('m-9'), isFalse);
+      expect(api.calls.where((x) => x == 'ledger').length, ledgerReads + 1, reason: '장부를 다시 읽는다');
+    });
+
+    test('연결 끊김(0)은 지우기 전용 문구 · 행은 되돌림', () async {
+      final api = _DeleteApi(const ApiException(0, 'offline'));
+      final c = make(api, MemorySharePhotoStore());
+      expect(await c.read(mealsProvider.notifier).delete('m-9'), '연결이 불안정해요. 잠시 뒤 다시 지워 주세요');
+      expect([for (final m in c.read(mealsProvider)) m.serverId], ['m-9']);
+    });
+
+    test('지우는 중에 새로고침으로 같은 끼니가 다시 들어왔으면 실패해도 두 번 넣지 않는다', () async {
+      final gate = Completer<void>();
+      final api = _DeleteApi(const ApiException(422, '판정된 기록은 지울 수 없어요'))..gate = gate.future;
+      final c = make(api, MemorySharePhotoStore());
+      final n = c.read(mealsProvider.notifier);
+      final pending = n.delete('m-9');
+      expect(c.read(mealsProvider), isEmpty);
+      n.reset([meal]); // 새로고침이 그 끼니를 다시 가져옴
+      gate.complete();
+      expect(await pending, '판정된 기록은 지울 수 없어요');
+      expect([for (final m in c.read(mealsProvider)) m.serverId], ['m-9']);
     });
   });
 }
