@@ -30,12 +30,26 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# 런처 아이콘: 원본은 assets/icon/make_icon.ps1 로 만들고 `dart run flutter_launcher_icons` 로 크기별 생성
+flutter_launcher_icons:
+  android: ic_launcher
+  ios: true
+  image_path: assets/icon/app_icon.png
+  remove_alpha_ios: true
+  min_sdk_android: 26
+  adaptive_icon_background: "#0B6E70"
+  adaptive_icon_foreground: assets/icon/app_icon_foreground.png
+  adaptive_icon_foreground_inset: 0 # 전경 원본이 이미 108dp 캔버스 기준
+  adaptive_icon_monochrome: assets/icon/app_icon_monochrome.png
 
 flutter:
   uses-material-design: true
   assets:
     - assets/fonts/OFL-Pretendard.txt
     - assets/fonts/OFL-BarlowSemiCondensed.txt
+    - assets/icon/app_icon_monochrome.png
   fonts:
     - family: Pretendard
       fonts:
