@@ -6,6 +6,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// FCM 은 선택 기능이라 Firebase 설정 파일이 있을 때만 적용한다(없으면 푸시 없이 빌드)
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 /** flutter build/run 의 --dart-define 값(gradle 속성 dart-defines, base64 목록)을 읽는다. */
 fun dartDefine(key: String): String? =
     (project.findProperty("dart-defines") as String?)

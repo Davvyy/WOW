@@ -139,7 +139,7 @@ analyze-meal 초안 저장 → N-04 큐 → 바로 발송(data: type=N-04, meal_
 ```
 
 - 권한을 거부했거나 FCM 설정이 없으면 서버가 N-04 를 `no_push` 로 건너뜁니다. 이때 앱은 지금처럼 촬영 직후 짧게(1.5초 간격 최대 10회) 확인하고, 홈에 들어올 때 다시 읽어 초안을 채웁니다(06 흐름 2 대체 경로).
-- FCM 설정(직접 해야 함): Firebase 프로젝트에 Android·iOS 앱을 추가하고 `flutterfire configure` 로 `android/app/google-services.json`·`ios/Runner/GoogleService-Info.plist` 와 Gradle 플러그인(`com.google.gms.google-services`)을 넣은 뒤 `--dart-define=FCM=true` 로 빌드합니다. iOS 는 Xcode 에서 Push Notifications 와 Background Modes › Remote notifications 를 켜고, Firebase 콘솔에 APNs 인증 키를 올립니다. 서버에는 Firebase 서비스 계정 키 JSON 을 담은 `FCM_SERVICE_ACCOUNT` 시크릿이 필요합니다(supabase/README.md).
+- FCM 설정(직접 해야 함): Firebase 프로젝트에 Android·iOS 앱(`app.challory.challory`)을 추가하고 Firebase 콘솔에서 받은 `android/app/google-services.json`·`ios/Runner/GoogleService-Info.plist` 를 넣은 뒤 `--dart-define=FCM=true` 로 빌드합니다. Android Gradle 플러그인(`com.google.gms.google-services`)은 이미 들어 있고 `google-services.json` 이 있을 때만 적용되므로, 파일이 없으면 푸시 없이 빌드됩니다. 이 파일은 프로젝트별 설정이라 저장소에 넣지 않습니다(`android/.gitignore`). iOS 는 Xcode 에서 Push Notifications 와 Background Modes › Remote notifications 를 켜고, Firebase 콘솔에 APNs 인증 키를 올립니다. 서버에는 Firebase 서비스 계정 키 JSON 을 담은 `FCM_SERVICE_ACCOUNT` 시크릿이 필요합니다(supabase/README.md).
 - P12 는 OS 알림 권한이 거부 상태면 상단에 "알림이 꺼져 있어요" 배너를 띄우고, "알림 켜기"로 권한 창을 다시 띄웁니다(OS 가 막았으면 설정 앱 안내).
 - Android 13+ 알림 권한(`POST_NOTIFICATIONS`)은 `firebase_messaging` 매니페스트에 들어 있습니다.
 
