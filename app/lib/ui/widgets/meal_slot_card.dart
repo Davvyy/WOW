@@ -8,16 +8,15 @@ import '../../data/models.dart';
 import 'common.dart';
 import '../../state/session.dart';
 
-/// 식사 카드(슬롯) — docs/06 §5.4. 썸네일 56 · 끼니명 · kcal · 상태 배지.
+/// 끼니 1건의 상태별 표시(썸네일 56 · 설명 · 상태 배지 · 오른쪽 kcal). 슬롯 카드와 끼니 행이 함께 쓴다.
 /// 05 meals.status 매핑: 분석 중=captured · 확정 대기=captured(noAnalysis)/failed · 초안=draft ·
 /// 확정=confirmed/corrected · 자동 확정=auto · 건너뜀=skipped · void는 정정 이력으로만.
-class MealSlotCard extends StatelessWidget {
-  const MealSlotCard({super.key, required this.meal, this.onTap, this.photo});
-  final MealRecord meal;
-
-  /// 이 폰에 보관된 실제 사진(없으면 아이콘 썸네일). 사진 기반 상태(분석 중~확정)에서만 쓴다.
-  final Uint8List? photo;
-  final VoidCallback? onTap;
+class _MealLook {
+  _MealLook._(this.thumb, this.desc, this.badge, this.right);
+  final Widget thumb;
+  final String desc;
+  final Widget? badge;
+  final Widget? right;
 
   static List<Color> _gradient(MealSlot s) => switch (s) {
         MealSlot.breakfast => const [Color(0xFFD6A84A), Color(0xFF946A1C)],
@@ -26,11 +25,9 @@ class MealSlotCard extends StatelessWidget {
         MealSlot.snack => const [Color(0xFF7A5A4A), Color(0xFF3F2A22)],
       };
 
-  @override
-  Widget build(BuildContext context) {
+  /// [photo]: 이 폰에 보관된 실제 사진(없으면 아이콘 썸네일). 사진 기반 상태(분석 중~확정)에서만 쓴다.
+  factory _MealLook.of(BuildContext context, MealRecord m, Uint8List? photo) {
     final c = context.c;
-    final m = meal;
-    final label = slotLabel[m.slot]!;
     final subM = fmtM(meM);
 
     Widget thumbEmpty(IconData icon) => Container(
@@ -145,10 +142,30 @@ class MealSlotCard extends StatelessWidget {
         ]);
         right = kcalRight(fmtInt(m.kcal), 'kcal');
     }
+    return _MealLook._(thumb, desc, badge, right);
+  }
+}
+
+/// 식사 카드(슬롯) — docs/06 §5.4. 썸네일 56 · 끼니명 · kcal · 상태 배지.
+/// 기록이 없는 슬롯과 지난 날(장부 값, 슬롯당 한 줄)에 쓴다. 오늘 기록이 있는 슬롯은 [MealSlotGroupCard].
+class MealSlotCard extends StatelessWidget {
+  const MealSlotCard({super.key, required this.meal, this.onTap, this.photo});
+  final MealRecord meal;
+
+  /// 이 폰에 보관된 실제 사진(없으면 아이콘 썸네일). 사진 기반 상태(분석 중~확정)에서만 쓴다.
+  final Uint8List? photo;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final m = meal;
+    final label = slotLabel[m.slot]!;
+    final look = _MealLook.of(context, m, photo);
 
     return Semantics(
       button: onTap != null,
-      label: '$label $desc',
+      label: '$label ${look.desc}',
       excludeSemantics: true,
       child: Material(
         color: c.surface,
@@ -159,23 +176,131 @@ class MealSlotCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(children: [
-              thumb,
+              look.thumb,
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [
                     Txt(label, weight: FontWeight.w600),
                     if (m.time.isNotEmpty) Txt(m.time, size: 13, color: c.fg2),
-                    ?badge,
+                    ?look.badge,
                   ]),
                   const SizedBox(height: 2),
-                  Txt.cap(desc, maxLines: 2),
+                  Txt.cap(look.desc, maxLines: 2),
                 ]),
               ),
-              if (right != null) ...[const SizedBox(width: 8), right],
+              if (look.right != null) ...[const SizedBox(width: 8), look.right!],
             ]),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 슬롯 카드 안의 끼니 한 줄: 썸네일 56 · 음식 이름(없으면 상태 문구) · 시각·상태 배지 · kcal. 누르면 그 끼니(P7).
+class MealRow extends StatelessWidget {
+  const MealRow({super.key, required this.meal, this.onTap, this.photo});
+  final MealRecord meal;
+  final Uint8List? photo;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final m = meal;
+    final look = _MealLook.of(context, m, photo);
+    return Semantics(
+      button: onTap != null,
+      label: '${slotLabel[m.slot]}${m.time.isEmpty ? '' : ' ${m.time}'} ${look.desc}',
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(children: [
+              look.thumb,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Txt(look.desc, weight: FontWeight.w600, maxLines: 2),
+                  const SizedBox(height: 2),
+                  Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                    if (m.time.isNotEmpty) Txt(m.time, size: 13, color: c.fg2),
+                    ?look.badge,
+                  ]),
+                ]),
+              ),
+              if (look.right != null) ...[const SizedBox(width: 8), look.right!],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 오늘 기록이 있는 슬롯 카드: 머리글(아침 · 반영 kcal 합계) + 끼니마다 한 줄([MealRow]) + '추가'(같은 슬롯으로 촬영).
+class MealSlotGroupCard extends StatelessWidget {
+  const MealSlotGroupCard({super.key, required this.slot, required this.meals, required this.onTapMeal, this.onAdd, this.photoOf});
+  final MealSlot slot;
+
+  /// 이 슬롯의 끼니(촬영 시각 순, 1건 이상)
+  final List<MealRecord> meals;
+  final void Function(MealRecord meal) onTapMeal;
+  final VoidCallback? onAdd;
+
+  /// 끼니의 보관 사진(없으면 null → 아이콘 썸네일)
+  final Uint8List? Function(MealRecord meal)? photoOf;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final label = slotLabel[slot]!;
+    final counted = meals.where((m) => isCountedStatus(m.status));
+    final total = counted.fold<double>(0, (a, m) => a + m.kcal);
+    return Material(
+      color: c.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Semantics(
+            header: true,
+            label: counted.isEmpty ? label : '$label ${fmtInt(total)} kcal',
+            excludeSemantics: true,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+              Txt(label, weight: FontWeight.w600),
+              if (counted.isNotEmpty) ...[
+                Txt(' · ', color: c.fg2),
+                NumText(fmtInt(total), size: 15, weight: FontWeight.w700, unit: 'kcal'),
+              ],
+            ]),
+          ),
+          const SizedBox(height: 4),
+          for (final m in meals) MealRow(meal: m, photo: photoOf?.call(m), onTap: () => onTapMeal(m)),
+          if (onAdd != null)
+            Semantics(
+              button: true,
+              label: '$label 추가',
+              excludeSemantics: true,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: onAdd,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Row(children: [
+                    Icon(Icons.add_rounded, size: 20, color: c.brand),
+                    const SizedBox(width: 6),
+                    Txt('추가', weight: FontWeight.w600, color: c.brand),
+                  ]),
+                ),
+              ),
+            ),
+        ]),
       ),
     );
   }

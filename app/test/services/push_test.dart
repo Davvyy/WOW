@@ -96,7 +96,9 @@ void main() {
     final d = await ready;
     expect(d.slot, MealSlot.lunch);
     expect(d.opened, isFalse);
-    final lunch = n.of(MealSlot.lunch);
+    expect(d.mealId, meal.mealId);
+    final lunch = n.byKey(meal.mealId)!;
+    expect(lunch.slot, MealSlot.lunch);
     expect(lunch.status, MealStatus.draft);
     expect(lunch.items, isNotEmpty);
     expect(lunch.aiKcal, mockAiTotal(MealSlot.lunch));

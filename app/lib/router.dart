@@ -40,7 +40,11 @@ class R {
   static const ledger = '/p10';
   static const settings = '/p12';
   static const debug = '/debug';
-  static String meal(MealSlot slot, {bool search = false}) => '/p7/${slot.name}${search ? '?search=1' : ''}';
+  /// P7: [meal] 은 끼니 키(로컬 키 또는 서버 id). 없으면 [slot] 에 새로 기록한다(빈 슬롯·검색 기록).
+  static String meal(MealSlot slot, {String? meal, bool search = false}) {
+    final q = {'meal': ?meal, if (search) 'search': '1'};
+    return Uri(path: '/p7/${slot.name}', queryParameters: q.isEmpty ? null : q).toString();
+  }
 }
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -85,7 +89,11 @@ GoRouter buildRouter({String initialLocation = R.p1, AuthService? auth}) {
       GoRoute(
         path: '/p7/:slot',
         parentNavigatorKey: _rootKey,
-        builder: (_, s) => MealEditScreen(slot: _slotOf(s.pathParameters['slot']) ?? MealSlot.lunch, searchOnly: s.uri.queryParameters['search'] == '1'),
+        builder: (_, s) => MealEditScreen(
+          slot: _slotOf(s.pathParameters['slot']) ?? MealSlot.lunch,
+          mealKey: s.uri.queryParameters['meal'],
+          searchOnly: s.uri.queryParameters['search'] == '1',
+        ),
       ),
       GoRoute(
         path: R.ledger,

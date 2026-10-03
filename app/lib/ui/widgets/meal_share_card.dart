@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/engine/engine.dart';
 import '../../core/format.dart';
 import '../../data/models.dart';
 import '../../services/health/health_models.dart' show toKstWall;
@@ -90,14 +89,17 @@ class MealShareCard extends StatelessWidget {
   }
 }
 
-/// 공유 미리보기 시트. [slot] 의 현재 끼니로 카드를 만들고, '공유하기'를 누르면 PNG 로 그려 폰 공유 창에 넘긴다.
-/// 확정 직후 홈 스낵바에서도 열 수 있도록 끼니 대신 슬롯을 받는다(P7 화면이 이미 닫혀 있어도 됨).
-Future<void> showMealShareSheet(BuildContext context, MealSlot slot) =>
-    showChSheet<void>(context, builder: (_) => _MealShareSheet(slot: slot));
+/// 공유 미리보기 시트. [mealKey] 끼니(로컬 키 또는 서버 id)로 카드를 만들고, '공유하기'를 누르면 PNG 로 그려 폰 공유 창에 넘긴다.
+/// 확정 직후 홈 스낵바에서도 열 수 있도록 끼니 대신 키를 받는다(P7 화면이 이미 닫혀 있어도 됨). 그 끼니가 없으면 열지 않는다.
+Future<void> showMealShareSheet(BuildContext context, String mealKey) async {
+  final meal = ProviderScope.containerOf(context, listen: false).read(mealsProvider.notifier).byKey(mealKey);
+  if (meal == null) return;
+  await showChSheet<void>(context, builder: (_) => _MealShareSheet(meal: meal));
+}
 
 class _MealShareSheet extends ConsumerStatefulWidget {
-  const _MealShareSheet({required this.slot});
-  final MealSlot slot;
+  const _MealShareSheet({required this.meal});
+  final MealRecord meal;
 
   @override
   ConsumerState<_MealShareSheet> createState() => _MealShareSheetState();
@@ -105,7 +107,7 @@ class _MealShareSheet extends ConsumerStatefulWidget {
 
 class _MealShareSheetState extends ConsumerState<_MealShareSheet> {
   final _boundary = GlobalKey();
-  late final MealRecord _meal = ref.read(mealsProvider.notifier).of(widget.slot);
+  late final MealRecord _meal = widget.meal;
   late final DateTime _day = toKstWall(DateTime.now());
   MealShareData? _data;
   bool _busy = false;
@@ -135,7 +137,7 @@ class _MealShareSheetState extends ConsumerState<_MealShareSheet> {
       if (bytes == null) throw StateError('png');
       final day = '${_day.year}${_day.month.toString().padLeft(2, '0')}${_day.day.toString().padLeft(2, '0')}';
       await ref.read(mealSharerProvider).shareImage(bytes.buffer.asUint8List(),
-          fileName: 'challory_${day}_${widget.slot.name}.png', text: data.caption);
+          fileName: 'challory_${day}_${_meal.slot.name}.png', text: data.caption);
       if (mounted) nav.pop();
     } catch (_) {
       if (mounted) showToast(context, '공유 창을 열지 못했어요 · 잠시 후 다시 해 주세요');

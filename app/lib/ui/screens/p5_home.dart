@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,11 +47,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  /// 오늘 카드는 이 폰에 보관된 사진이 있으면 썸네일로 보여 준다(지난 날은 서버 끼니 id 가 없어 그대로)
-  Widget _slotCard(MealRecord m, bool isToday, VoidCallback? onTap) {
-    final id = isToday ? m.serverId : null;
-    final photo = id == null ? null : ref.watch(mealPhotoProvider(id)).value;
-    return MealSlotCard(meal: m, onTap: onTap, photo: photo);
+  /// 오늘 끼니의 보관 사진(이 폰, 서버 끼니 id 기준). 없으면 null → 아이콘 썸네일
+  Uint8List? _photoOf(MealRecord m) {
+    final id = m.serverId;
+    return id == null ? null : ref.watch(mealPhotoProvider(id)).value;
+  }
+
+  /// 오늘 슬롯 카드: 기록이 없으면 지금처럼 촬영 칸, 있으면 끼니마다 한 줄 + '추가'.
+  /// 지난 날은 장부 값으로 슬롯당 한 줄(누를 수 없음).
+  Widget _slotCard(MealSlot s, List<MealRecord> dayMeals, bool isToday) {
+    void camera() => context.push('${R.camera}?slot=${s.name}');
+    if (!isToday) return MealSlotCard(meal: dayMeals.firstWhere((m) => m.slot == s, orElse: () => MealRecord(slot: s)));
+    final list = mealsIn(dayMeals, s);
+    if (list.isEmpty) return MealSlotCard(meal: MealRecord(slot: s), onTap: camera);
+    final photos = {for (final m in list) m.key: _photoOf(m)}; // 홈 build 안에서 읽어 사진이 바뀌면 다시 그린다
+    return MealSlotGroupCard(
+      slot: s,
+      meals: list,
+      photoOf: (m) => photos[m.key],
+      onAdd: camera,
+      onTapMeal: (m) {
+        if (m.status == MealStatus.skipped) {
+          camera(); // 건너뜀은 지금처럼 촬영으로
+        } else {
+          context.push(R.meal(m.slot, meal: m.key, search: (m.status == MealStatus.captured && m.noAnalysis) || m.status == MealStatus.failed));
+        }
+      },
+    );
   }
 
   DateTime _dateOf(int day) => curChallenge.start.add(Duration(days: day - 1));
@@ -135,10 +158,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (row != null && row.hasRevision) caption = '저녁 무효 → 대체값 ${fmtM(inn.mP)} 적용 · ${fmtK1(row.sBefore!)} → ${fmtK1(row.s)}점';
     }
 
-    // 반영률: 아침·점심·저녁 확정 + 걸음
-    bool confirmed(MealRecord m) => m.status == MealStatus.confirmed || m.status == MealStatus.auto || m.status == MealStatus.corrected;
+    // 반영률: 아침·점심·저녁 확정(슬롯에 확정 끼니가 하나라도 있으면) + 걸음
+    bool confirmed(MealRecord m) => isCountedStatus(m.status);
     final cells = [
-      for (final s in mainSlots) confirmed(dayMeals.firstWhere((m) => m.slot == s)),
+      for (final s in mainSlots) mealsIn(dayMeals, s).any(confirmed),
       steps > 0,
     ];
     final pct = (cells.where((x) => x).length * 25);
@@ -202,19 +225,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } else {
       statusChip = ChChip('잠정 · ${act.syncTime} 동기화 · ${act.source}', icon: Icons.schedule_rounded);
     }
-
-    final slotTargets = <MealSlot, VoidCallback?>{
-      for (final m in dayMeals)
-        m.slot: !isToday
-            ? null
-            : () {
-                if (m.status == MealStatus.empty || m.status == MealStatus.skipped) {
-                  context.push('${R.camera}?slot=${m.slot.name}');
-                } else {
-                  context.push(R.meal(m.slot, search: (m.status == MealStatus.captured && (m.noAnalysis)) || m.status == MealStatus.failed));
-                }
-              },
-    };
 
     final dayStart = (day - 4).clamp(1, 4);
     final strip = Row(children: [
@@ -384,7 +394,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           InfoBanner(
             tone: Tone.brand,
             icon: Icons.notifications_off_rounded,
-            action: ChButton('${slotLabel[m.slot]} 확인하기', small: true, kind: BtnKind.quiet, onPressed: () => context.push(R.meal(m.slot))),
+            action: ChButton('${slotLabel[m.slot]} 확인하기', small: true, kind: BtnKind.quiet, onPressed: () => context.push(R.meal(m.slot, meal: m.key))),
             child: boldThen(context, '${slotLabel[m.slot]} 분석 완료 · 확인하기', '\n알림이 꺼져 있어도 홈에서 알려드려요', color: c.brand),
           ),
       if (!lifecycle) strip,
@@ -410,7 +420,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       if (!lifecycle)
         for (final s in [MealSlot.breakfast, MealSlot.lunch, MealSlot.dinner, MealSlot.snack])
-          _slotCard(dayMeals.firstWhere((m) => m.slot == s), isToday, slotTargets[s]),
+          _slotCard(s, dayMeals, isToday),
       if (showNudge)
         ChCard(
           outline: true,

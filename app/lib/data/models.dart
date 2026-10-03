@@ -104,9 +104,18 @@ class MealRecord {
     this.version = 1,
     this.lateUpload = false,
     this.pendingUpload = false,
+    this.localKey,
   });
 
   final MealSlot slot;
+
+  /// 이 폰에서 끼니를 가리키는 키. 아직 서버 id 가 없는 촬영(업로드 중·대기)도 이 키로 찾는다.
+  /// 서버에서 읽은 끼니는 서버 id 를 쓰고, 촬영으로 만든 끼니는 서버 id 가 생겨도 이 키를 유지한다.
+  final String? localKey;
+
+  /// 끼니 식별자(P7 경로 `meal=`). [matches] 는 로컬 키와 서버 id 를 모두 받는다.
+  String get key => localKey ?? serverId ?? slot.name;
+  bool matches(String k) => localKey == k || serverId == k;
 
   /// 서버 meals.id / meals.version(확정 If-Match). 모의 시드 끼니는 null.
   final String? serverId;
@@ -129,6 +138,7 @@ class MealRecord {
   MealInput toInput() => MealInput(slot: slot, status: status, kcal: kcal, aiKcal: aiKcal);
 
   MealRecord copyWith({
+    MealSlot? slot,
     MealStatus? status,
     double? kcal,
     double? aiKcal,
@@ -141,9 +151,10 @@ class MealRecord {
     int? version,
     bool? lateUpload,
     bool? pendingUpload,
+    String? localKey,
   }) =>
       MealRecord(
-        slot: slot,
+        slot: slot ?? this.slot,
         status: status ?? this.status,
         kcal: kcal ?? this.kcal,
         aiKcal: aiKcal ?? this.aiKcal,
@@ -156,8 +167,16 @@ class MealRecord {
         version: version ?? this.version,
         lateUpload: lateUpload ?? this.lateUpload,
         pendingUpload: pendingUpload ?? this.pendingUpload,
+        localKey: localKey ?? this.localKey,
       );
 }
+
+/// 확정값이 섭취에 들어가는 상태(확정·자동 확정·정정)
+bool isCountedStatus(MealStatus s) => s == MealStatus.confirmed || s == MealStatus.auto || s == MealStatus.corrected;
+
+/// [meals] 중 [slot] 의 끼니(빈 칸 표시용 행 제외). 목록 순서(촬영 시각 순) 그대로.
+List<MealRecord> mealsIn(List<MealRecord> meals, MealSlot slot) =>
+    [for (final m in meals) if (m.slot == slot && m.status != MealStatus.empty) m];
 
 class ChallengeInfo {
   const ChallengeInfo({

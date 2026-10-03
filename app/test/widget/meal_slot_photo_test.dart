@@ -76,9 +76,9 @@ void main() {
       ]);
       await tester.pumpAndSettle();
       expect(_memoryImages(tester), hasLength(1));
-      final card = find.ancestor(of: find.byType(Image), matching: find.byType(MealSlotCard));
-      expect(card, findsOneWidget);
-      expect(tester.widget<MealSlotCard>(card).meal.slot, MealSlot.lunch);
+      final row = find.ancestor(of: find.byType(Image), matching: find.byType(MealRow));
+      expect(row, findsOneWidget);
+      expect(tester.widget<MealRow>(row).meal.slot, MealSlot.lunch);
     });
 
     testWidgets('방금 찍어 올린 사진은 카드가 바로 이어 받는다', (tester) async {

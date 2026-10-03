@@ -58,7 +58,7 @@ void main() {
       final meals = buildTodayMeals();
       final lunch = meals.firstWhere((m) => m.slot == MealSlot.lunch);
       expect(canShareMeal(lunch), isTrue);
-      await pumpApp(tester, location: R.meal(MealSlot.lunch), overrides: [
+      await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'mock-lunch'), overrides: [
         mealsProvider.overrideWith(() => MealsNotifier(meals)),
         mealSharerProvider.overrideWithValue(sharer),
         sharePhotoStoreProvider.overrideWithValue(shares),
@@ -91,9 +91,9 @@ void main() {
       expect(err, isNull);
       final shot = container.read(mealsProvider).firstWhere((m) => m.serverId != null);
       expect(await container.read(sharePhotoStoreProvider).get(shot.serverId!), isNotNull);
-      await tester.runAsync(() => meals.confirm(shot.slot, const [MealItem(id: 'a', candidates: ['비빔밥'], candKcal: [560], portion: '1인분', kind: ItemKind.count)], 560));
+      await tester.runAsync(() => meals.confirm(shot.slot, const [MealItem(id: 'a', candidates: ['비빔밥'], candKcal: [560], portion: '1인분', kind: ItemKind.count)], 560, key: shot.key));
       await tester.pumpAndSettle();
-      showMealShareSheet(tester.element(find.byType(Scaffold).first), shot.slot);
+      showMealShareSheet(tester.element(find.byType(Scaffold).first), shot.key);
       await tester.pumpAndSettle();
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
       await tester.pumpAndSettle();
@@ -101,12 +101,12 @@ void main() {
     });
 
     testWidgets('AI 초안은 공유 아이콘이 없다', (tester) async {
-      await pumpApp(tester, location: R.meal(MealSlot.lunch), overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals()))]);
+      await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'mock-lunch'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals()))]);
       expect(find.byTooltip('공유'), findsNothing);
     });
 
     testWidgets('확정 직후 홈 스낵바에 공유 버튼', (tester) async {
-      await pumpApp(tester, location: R.meal(MealSlot.lunch), overrides: [
+      await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'mock-lunch'), overrides: [
         mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals())),
         mealSharerProvider.overrideWithValue(_FakeSharer()),
       ]);

@@ -57,8 +57,14 @@ class _ChalloryAppState extends ConsumerState<ChalloryApp> {
       DailyResult(:final localDate, :final message) => (_ledgerDay(localDate), message, '장부 보기', 6),
       Reminder(isSync: true, synced: true) => (R.activity, '오늘 걸음을 동기화했어요', '활동 보기', 4),
       Reminder(isSync: true, :final message) => (R.activity, message, '활동 보기', 6),
-      Reminder(:final slot, :final message) => (slot == null ? R.home : R.meal(slot), message, '확정하기', 6),
-      DraftReady(:final slot) => (R.meal(slot), '${slotLabel[slot]} 분석이 끝났어요', '확인하기', 4),
+      // 확정 대기 알림은 그 슬롯에서 가장 이른 대기 끼니를, 분석 완료 알림은 그 끼니를 연다
+      Reminder(:final slot, :final message) => (
+          slot == null ? R.home : R.meal(slot, meal: ref.read(mealsProvider.notifier).earliestUnconfirmedIn(slot)?.key),
+          message,
+          '확정하기',
+          6
+        ),
+      DraftReady(:final slot, :final mealId) => (R.meal(slot, meal: mealId), '${slotLabel[slot]} 분석이 끝났어요', '확인하기', 4),
       ReviewNotice(:final message) => (R.ledger, message, '설명 남기기', 8),
       VerdictReady(:final message) => (R.ledger, message, '장부 보기', 8),
     };

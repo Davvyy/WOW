@@ -32,7 +32,8 @@ void main() {
     await tester.runAsync(() => meals.capture(MealSlot.lunch, '12:20', photo: _jpeg(), capturedAt: DateTime.now()));
     final slot = meals.lastCapturedSlot;
     expect(slot, isNotNull);
-    final rec = meals.of(slot!);
+    final rec = meals.byKey(meals.lastCapturedKey!)!;
+    expect(rec.slot, slot);
     expect(rec.serverId, isNotNull);
     expect(rec.status, MealStatus.captured);
   });
@@ -46,7 +47,8 @@ void main() {
     final meals = container.read(mealsProvider.notifier);
     await tester.runAsync(() => meals.capture(MealSlot.lunch, '12:20', photo: _jpeg(), capturedAt: DateTime.now()));
     final slot = meals.lastCapturedSlot!;
-    GoRouter.of(tester.element(find.byType(Scaffold).first)).push(R.meal(slot));
+    final key = meals.lastCapturedKey!;
+    GoRouter.of(tester.element(find.byType(Scaffold).first)).push(R.meal(slot, meal: key));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500)); // 기다림 화면은 로딩 표시가 계속 돈다
     expect(find.textContaining('AI가 음식을 보고 있어요'), findsOneWidget);
@@ -58,12 +60,12 @@ void main() {
 
     // 모의 서버 분석 지연(0.5초) 뒤 1.5초 간격 확인 → 초안
     await tester.runAsync(() async {
-      for (var i = 0; i < 40 && meals.of(slot).status != MealStatus.draft; i++) {
+      for (var i = 0; i < 40 && meals.byKey(key)!.status != MealStatus.draft; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
     });
     await tester.pumpAndSettle();
-    expect(meals.of(slot).status, MealStatus.draft);
+    expect(meals.byKey(key)!.status, MealStatus.draft);
     expect(find.textContaining('AI가 음식을 보고 있어요'), findsNothing);
     expect(find.textContaining('확정 · 약 ${mockAiTotal(slot).round()}'), findsOneWidget);
   });
@@ -76,12 +78,13 @@ void main() {
     final meals = container.read(mealsProvider.notifier);
     await tester.runAsync(() => meals.capture(MealSlot.lunch, '12:20', photo: _jpeg(), capturedAt: DateTime.now()));
     final slot = meals.lastCapturedSlot!;
-    GoRouter.of(tester.element(find.byType(Scaffold).first)).push(R.meal(slot));
+    final key = meals.lastCapturedKey!;
+    GoRouter.of(tester.element(find.byType(Scaffold).first)).push(R.meal(slot, meal: key));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500)); // 기다림 화면은 로딩 표시가 계속 돈다
     expect(find.textContaining('AI가 음식을 보고 있어요'), findsOneWidget);
     await tester.runAsync(() async {
-      for (var i = 0; i < 40 && meals.of(slot).status != MealStatus.failed; i++) {
+      for (var i = 0; i < 40 && meals.byKey(key)!.status != MealStatus.failed; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
     });

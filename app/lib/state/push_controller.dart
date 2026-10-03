@@ -85,8 +85,11 @@ class Reminder extends PushEvent {
 
 /// N-04 분석 완료 → 그 끼니가 초안이 됨(P7)
 class DraftReady extends PushEvent {
-  const DraftReady(this.slot, {required super.opened});
+  const DraftReady(this.slot, {this.mealId, required super.opened});
   final MealSlot slot;
+
+  /// 분석이 끝난 서버 끼니 id(P7 이 이 끼니를 연다)
+  final String? mealId;
 }
 
 /// N-05 검토 안내 → 검토 카드(소명 72h)·장부('검토 중')·순위를 다시 읽음(P10 소명)
@@ -191,7 +194,7 @@ class PushController {
     }
     if (m.isAnalysisDone) {
       final slot = await _ref.read(mealsProvider.notifier).applyAnalysisPush(m.mealId!, hint: m.slot);
-      if (slot != null) _emit(DraftReady(slot, opened: opened));
+      if (slot != null) _emit(DraftReady(slot, mealId: m.mealId, opened: opened));
     } else if (m.isReminder) {
       final kind = m.reminderKind;
       if (kind == 'sync') {

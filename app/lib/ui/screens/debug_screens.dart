@@ -47,7 +47,7 @@ class DebugScreenList extends ConsumerWidget {
         link('P4', '… 거부 2회', '${R.p4}?state=denied'),
         link('P5', '홈(오늘)', R.home),
         link('P6', '식사 촬영', R.camera),
-        link('P7', '식사 확인·편집(점심)', R.meal(MealSlot.lunch)),
+        link('P7', '식사 확인·편집(점심)', R.meal(MealSlot.lunch, meal: 'mock-lunch')),
         link('P7', '… 검색 전용', R.meal(MealSlot.snack, search: true)),
         link('P8', '활동 상세', R.activity),
         link('P9', '리더보드', R.rank),

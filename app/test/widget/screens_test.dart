@@ -102,7 +102,7 @@ void main() {
 
   group('P7 식사 확인·편집', () {
     testWidgets('김 해제 시 합계 850 → 780, 확정하면 P5가 엔진으로 28.8 재계산', (tester) async {
-      final container = await pumpApp(tester, location: R.meal(MealSlot.lunch), overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals()))]);
+      final container = await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'mock-lunch'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals()))]);
       expect(find.textContaining('약 850'), findsWidgets);
       expect(find.textContaining('AI 초안 약 850'), findsOneWidget);
       // 김(6번째 항목) 체크 해제
@@ -124,7 +124,7 @@ void main() {
     });
 
     testWidgets('후보 칩은 이름과 kcal을 함께 바꾼다 · 국물 −40%', (tester) async {
-      await pumpApp(tester, location: R.meal(MealSlot.lunch), overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals()))]);
+      await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'mock-lunch'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals()))]);
       // 흰쌀밥 → 현미밥(300): 합계 850 − 10 = 840
       await tester.tap(find.textContaining('현미밥').first);
       await tester.pumpAndSettle();
@@ -136,7 +136,7 @@ void main() {
     });
 
     testWidgets('AI 대비 50% 넘게 낮추면 확인 모달', (tester) async {
-      await pumpApp(tester, location: R.meal(MealSlot.lunch), overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals()))]);
+      await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'mock-lunch'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildLunchDraftMeals()))]);
       await tester.tap(find.byType(ChCheck).at(1)); // 김치찌개 해제
       await tester.tap(find.byType(ChCheck).at(2)); // 계란말이 해제
       await tester.pumpAndSettle();
@@ -158,7 +158,7 @@ void main() {
         ];
 
     testWidgets('자동 확정 간식: 1.3×AI 로 안내하고 대체값(max)을 말하지 않는다(D55)', (tester) async {
-      await pumpApp(tester, location: R.meal(MealSlot.snack), overrides: [mealsProvider.overrideWith(() => MealsNotifier(autoMeals(MealSlot.snack, 260)))]);
+      await pumpApp(tester, location: R.meal(MealSlot.snack, meal: 'mock-snack'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(autoMeals(MealSlot.snack, 260)))]);
       expect(find.textContaining('자동 확정 260 kcal'), findsOneWidget);
       expect(find.textContaining('1.3×AI 200'), findsOneWidget);
       expect(find.textContaining('09:00까지 확정하지 않으면 1.3×AI kcal로 자동 확정돼요'), findsOneWidget);
@@ -167,7 +167,7 @@ void main() {
 
     testWidgets('자동 확정 끼니: max(M_p, 1.3×AI) 안내는 그대로', (tester) async {
       final v = math.max(meM, 260.0);
-      await pumpApp(tester, location: R.meal(MealSlot.lunch), overrides: [mealsProvider.overrideWith(() => MealsNotifier(autoMeals(MealSlot.lunch, v)))]);
+      await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'mock-lunch'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(autoMeals(MealSlot.lunch, v)))]);
       expect(find.textContaining('자동 확정 ${fmtInt(v)} kcal'), findsOneWidget);
       expect(find.textContaining('max(${fmtM(meM)}, 1.3×AI 200)'), findsOneWidget);
       expect(find.textContaining('09:00까지 확정하지 않으면 max(${fmtM(meM)}, 1.3×AI) kcal로 자동 확정돼요'), findsOneWidget);

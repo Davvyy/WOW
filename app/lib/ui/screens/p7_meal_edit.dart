@@ -11,6 +11,7 @@ import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
+import '../../services/health/health_source.dart' show newUuidV4;
 import '../../services/share/meal_share.dart';
 import '../widgets/common.dart';
 import '../widgets/meal_share_card.dart';
@@ -20,8 +21,11 @@ import '../../state/session.dart';
 /// P7 식사 확인·편집. 후보 칩(이름과 kcal이 함께 바뀜) · 분량(반 공기/1공기/곱빼기) · 국물 −40% ·
 /// 개수 스테퍼 · 먹은 것만 체크 · 실시간 합계. '확정'은 모의 상태를 갱신하고 P5가 엔진으로 다시 계산한다.
 class MealEditScreen extends ConsumerStatefulWidget {
-  const MealEditScreen({super.key, required this.slot, this.searchOnly = false});
+  const MealEditScreen({super.key, required this.slot, this.mealKey, this.searchOnly = false});
   final MealSlot slot;
+
+  /// 연 끼니의 키(로컬 키 또는 서버 id). 없거나 못 찾으면 [slot] 에 새로 기록한다.
+  final String? mealKey;
   final bool searchOnly;
 
   @override
@@ -32,6 +36,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   late List<MealItem> _items;
   late double _aiTotal;
   late MealRecord _origin;
+
+  /// 이 화면이 다루는 끼니의 키(새 기록이면 확정할 때 이 키로 더해진다)
+  late final String _key;
 
   /// AI 분석을 기다리는 중('지금 확정' 직후 · 분석 중 끼니를 연 경우). 초안이 오면 그 항목으로 바꾼다.
   late bool _waiting;
@@ -45,7 +52,10 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   @override
   void initState() {
     super.initState();
-    _origin = ref.read(mealsProvider.notifier).of(widget.slot);
+    final key = widget.mealKey;
+    final found = key == null ? null : ref.read(mealsProvider.notifier).byKey(key);
+    _origin = found ?? MealRecord(slot: widget.slot, localKey: 'local-${newUuidV4()}');
+    _key = _origin.key;
     _waiting = !widget.searchOnly && _origin.status == MealStatus.captured && !_origin.noAnalysis && !_origin.pendingUpload;
     if (widget.searchOnly || _waiting) {
       _items = const [];
@@ -167,9 +177,12 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     }
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    final snack = widget.slot != MealSlot.snack && total < engine.rules.snackKcal;
+    final meals = ref.read(mealsProvider.notifier);
+    final slot = meals.byKey(_key)?.slot ?? widget.slot; // 서버가 슬롯을 옮겼으면 그 슬롯
+    final key = _key;
+    final snack = slot != MealSlot.snack && total < engine.rules.snackKcal;
     // 화면은 바로 홈으로(낙관적 반영), 서버 확정(meal-confirm / meal-manual)이 안 되면 되돌리고 알린다
-    final pending = ref.read(mealsProvider.notifier).confirm(widget.slot, _items, total, aiKcal: _aiTotal > 0 ? _aiTotal : null);
+    final pending = meals.confirm(slot, _items, total, key: key, aiKcal: _aiTotal > 0 ? _aiTotal : null);
     context.go(R.home);
     if (snack) {
       messenger.showSnackBar(const SnackBar(content: Text('150 kcal 미만은 간식으로 기록돼요 · 끼니 슬롯은 채우지 않아요')));
@@ -179,14 +192,13 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       messenger.showSnackBar(SnackBar(content: Text(err)));
       return;
     }
-    final slot = widget.slot;
     messenger.showSnackBar(SnackBar(
       content: Text('${slotLabel[slot]}을 확정했어요'),
       duration: const Duration(seconds: 6),
       persist: false,
       action: SnackBarAction(label: '공유', onPressed: () {
         final ctx = rootNavigatorKey.currentContext;
-        if (ctx != null) showMealShareSheet(ctx, slot);
+        if (ctx != null) showMealShareSheet(ctx, key);
       }),
     ));
   }
@@ -205,11 +217,17 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final slot = widget.slot;
     final label = slotLabel[slot]!;
     final meals = ref.watch(mealsProvider);
-    ref.listen<MealRecord>(mealsProvider.select((l) => l.firstWhere((x) => x.slot == widget.slot)), (_, next) => _onMealChanged(next));
+    ref.listen<MealRecord?>(mealsProvider.select((l) => l.where((x) => x.matches(_key)).firstOrNull), (_, next) {
+      if (next != null) _onMealChanged(next);
+    });
+    // 지금 목록의 이 끼니(새 기록이면 아직 없음)
+    final live = meals.where((x) => x.matches(_key)).firstOrNull;
     final skipsUsed = ref.watch(skipsUsedProvider);
     final skipsToday = meals.where((m) => m.status == MealStatus.skipped && m.slot != slot).length;
     final remaining = engine.rules.skipPerWeek - skipsUsed - skipsToday;
     final skipLimit = remaining <= 0 || skipsToday >= engine.rules.skipPerDay;
+    // 건너뜀은 기록이 하나도 없는 끼니 슬롯에서만(이미 기록이 있는 슬롯이면 버튼을 끈다)
+    final canSkip = slot != MealSlot.snack && mealsIn(meals, slot).isEmpty;
     final total = _total;
     final isSnackLevel = total > 0 && total < engine.rules.snackKcal;
     final auto = _origin.status == MealStatus.auto;
@@ -329,15 +347,16 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       title: slot == MealSlot.snack ? '간식 확인' : '$label 확인',
       backFallback: R.home,
       actions: [
-        if (canShareMeal(_origin))
-          IconButton(onPressed: () => showMealShareSheet(context, widget.slot), tooltip: '공유', icon: Icon(Icons.ios_share_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48)),
-        IconButton(onPressed: () => showToast(context, '사진 삭제는 서버 연동 후 지원돼요'), tooltip: '사진 삭제', icon: Icon(Icons.delete_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48))],
+        if (live != null && canShareMeal(live))
+          IconButton(onPressed: () => showMealShareSheet(context, _key), tooltip: '공유', icon: Icon(Icons.ios_share_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48)),
+        IconButton(onPressed: () => showToast(context, '사진 삭제는 서버 연동 후 지원돼요'), tooltip: '사진 삭제', icon: Icon(Icons.delete_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48)),
+      ],
       gap: 10,
       cta: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (skipLimit && !searchMode)
           Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Icon(Icons.info_rounded, size: 14, color: c.warn), const SizedBox(width: 4), Expanded(child: Txt.cap('이번 주 건너뜀 ${engine.rules.skipPerWeek}회를 모두 썼어요. 안 먹은 끼니는 $m kcal로 계산돼요.', color: c.warn))])),
         Row(children: [
-          ChButton(skipLimit ? '건너뜀' : '건너뜀 (남은 $remaining회)', kind: BtnKind.quiet, expand: false, onPressed: skipLimit || slot == MealSlot.snack ? null : _skip),
+          ChButton(skipLimit ? '건너뜀' : '건너뜀 (남은 $remaining회)', kind: BtnKind.quiet, expand: false, onPressed: skipLimit || !canSkip ? null : _skip),
           const SizedBox(width: 8),
           Expanded(
             child: ChButton(

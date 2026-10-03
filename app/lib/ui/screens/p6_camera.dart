@@ -94,11 +94,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         final err = await meals.capture(_slot, _timeNow(), aiConsent: true, photo: photo, capturedAt: capturedAt);
         if (!mounted) return;
         if (err != null) messenger.showSnackBar(SnackBar(content: Text(err)));
+        // 방금 더한 그 끼니의 P7(같은 슬롯의 다른 끼니가 아니라)
         final made = meals.lastCapturedSlot;
+        final key = meals.lastCapturedKey;
         if (made != null) {
-          context.pushReplacement(R.meal(made));
+          context.pushReplacement(R.meal(made, meal: key));
         } else if (photo == null && err == null) {
-          context.pushReplacement(R.meal(_slot)); // 카메라 없는 모의 경로: 잠시 뒤 모의 초안
+          context.pushReplacement(R.meal(_slot, meal: key)); // 카메라 없는 모의 경로: 잠시 뒤 모의 초안
         } else {
           context.go(R.home); // 연결이 불안정해 대기열로 감 → 홈에 "업로드 대기"로 보임
         }

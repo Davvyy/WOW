@@ -415,54 +415,100 @@ class SkipsNotifier extends Notifier<int> {
 
 final skipsUsedProvider = NotifierProvider<SkipsNotifier, int>(SkipsNotifier.new);
 
+/// 오늘 끼니 목록. 한 슬롯에 끼니가 여러 개일 수 있고(촬영 시각 순), 기록이 없는 슬롯은 행이 없다.
+/// 끼니 하나는 [MealRecord.key](이 폰의 로컬 키 또는 서버 id)로 가리킨다. 확정·건너뜀·지우기·분석 갱신은 모두 그 끼니만 바꾼다.
 class MealsNotifier extends Notifier<List<MealRecord>> {
   MealsNotifier([List<MealRecord>? initial]) : _initial = initial;
   final List<MealRecord>? _initial;
 
   /// 마지막 [capture] 로 서버 끼니가 만들어진 슬롯(서버가 서버 시각으로 정함). 대기열로 갔거나 오류면 null.
-  /// '지금 확정'은 이 슬롯의 P7 을 열어 분석을 기다린다.
   MealSlot? lastCapturedSlot;
+
+  /// 마지막 [capture] 가 더한 끼니의 키(오류로 빠졌으면 null). '지금 확정'은 이 끼니의 P7 을 열어 분석을 기다린다.
+  String? lastCapturedKey;
 
   @override
   List<MealRecord> build() {
-    if (_initial != null) return _initial;
-    // 서버 연결 시 빈 슬롯으로 시작하고 loadToday() 로 채운다. 모의 모드는 프로토타입 시드.
-    if (ref.read(apiProvider).isRemote) return [for (final s in MealSlot.values) MealRecord(slot: s)];
-    return buildTodayMeals();
+    if (_initial != null) return _keyed(_initial);
+    // 서버 연결 시 빈 목록으로 시작하고 loadToday() 로 채운다. 모의 모드는 프로토타입 시드.
+    if (ref.read(apiProvider).isRemote) return const [];
+    return _keyed(buildTodayMeals());
   }
 
-  /// 오늘(KST) 본인 끼니를 서버에서 읽어 슬롯별로 반영. 한 슬롯에 여러 끼니면 마지막 것을 보여준다.
+  /// 빈 칸 표시용 행(status empty)은 버리고, 키가 없는 끼니에 키를 붙인다.
+  /// 서버 끼니는 서버 id, 모의 시드는 'mock-<슬롯>'(같은 슬롯 둘째부터 'mock-<슬롯>-2' …).
+  static List<MealRecord> _keyed(List<MealRecord> meals) {
+    final seen = <MealSlot, int>{};
+    String seedKey(MealSlot s) {
+      final n = seen[s] = (seen[s] ?? 0) + 1;
+      return n == 1 ? 'mock-${s.name}' : 'mock-${s.name}-$n';
+    }
+
+    return [
+      for (final m in meals)
+        if (m.status != MealStatus.empty) m.localKey != null ? m : m.copyWith(localKey: m.serverId ?? seedKey(m.slot)),
+    ];
+  }
+
+  static String _newKey() => 'local-${newUuidV4()}';
+
+  /// [key](로컬 키 또는 서버 id)의 끼니. 없으면 null.
+  MealRecord? byKey(String key) => state.where((m) => m.matches(key)).firstOrNull;
+
+  /// [slot] 의 끼니(촬영 시각 순)
+  List<MealRecord> inSlot(MealSlot slot) => mealsIn(state, slot);
+
+  /// [slot] 에서 확정을 기다리는 끼니 중 가장 이른 것(N-02 확정 대기 알림이 여는 끼니). 없으면 null.
+  MealRecord? earliestUnconfirmedIn(MealSlot slot) =>
+      inSlot(slot).where((m) => m.status == MealStatus.captured || m.status == MealStatus.draft || m.status == MealStatus.failed).firstOrNull;
+
+  void _put(MealRecord m) => state = [for (final x in state) x.localKey == m.localKey ? m : x];
+  void _add(MealRecord m) => state = [...state, m];
+  void _drop(String localKey) => state = [for (final x in state) if (x.localKey != localKey) x];
+
+  void reset(List<MealRecord> meals) => state = _keyed(meals);
+
+  /// 오늘(KST) 본인 끼니를 서버에서 읽어 모두 반영(촬영 시각 순). 아직 서버에 없는 이 폰의 촬영(업로드 중·대기)은 남긴다.
   Future<String?> loadToday() async {
     final api = ref.read(apiProvider);
     if (!api.isRemote) return null;
     try {
       final rows = await api.fetchMealsOn(todayKst());
       if (!ref.mounted) return null;
-      final next = [for (final s in MealSlot.values) MealRecord(slot: s)];
-      for (final m in rows) {
+      // 촬영 시각 순(같으면 서버 순서 그대로)
+      final order = [for (var i = 0; i < rows.length; i++) (i, rows[i])]..sort((a, b) {
+          final ta = a.$2.capturedAt, tb = b.$2.capturedAt;
+          final c = ta == null || tb == null ? 0 : ta.compareTo(tb);
+          return c != 0 ? c : a.$1.compareTo(b.$1);
+        });
+      final knownKeys = {for (final m in state) if (m.serverId != null) m.serverId!: m.localKey};
+      String two(int v) => v.toString().padLeft(2, '0');
+      final next = <MealRecord>[];
+      for (final (_, m) in order) {
         final slot = m.slot;
         if (slot == null) continue;
         final items = [for (var i = 0; i < m.items.length; i++) mealItemFromServer(m.items[i], i)];
-        final t = m.capturedAt == null ? '' : toKstWall(m.capturedAt!);
-        String two(int v) => v.toString().padLeft(2, '0');
-        next[slot.index] = MealRecord(
+        final t = m.capturedAt == null ? null : toKstWall(m.capturedAt!);
+        next.add(MealRecord(
           slot: slot,
           status: m.status,
           kcal: m.confirmedKcal ?? 0,
           aiKcal: m.aiKcal,
           items: items,
           title: items.map((i) => i.name).take(2).join(' · '),
-          time: t is DateTime ? '${two(t.hour)}:${two(t.minute)}' : '',
+          time: t == null ? '' : '${two(t.hour)}:${two(t.minute)}',
           serverId: m.id,
+          localKey: knownKeys[m.id] ?? m.id,
           version: m.version,
           noAnalysis: m.engine == 'none',
           lateUpload: m.lateUpload,
           corrected: m.status == MealStatus.corrected,
-        );
+        ));
       }
+      next.addAll(state.where((m) => m.serverId == null && m.status == MealStatus.captured));
       state = next;
       for (final r in next) {
-        if (r.status == MealStatus.captured && !r.noAnalysis && r.serverId != null) _pollDraft(r.slot, r.serverId!);
+        if (r.status == MealStatus.captured && !r.noAnalysis && r.serverId != null) _pollDraft(r.serverId!);
       }
       return null;
     } catch (e) {
@@ -470,20 +516,17 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     }
   }
 
-  MealRecord of(MealSlot slot) => state.firstWhere((m) => m.slot == slot);
-
-  void _put(MealRecord m) => state = [for (final x in state) x.slot == m.slot ? m : x];
-
-  void reset(List<MealRecord> meals) => state = meals;
-
-  /// 확정(P7). 이미 확정된 끼니를 고치면 corrected(정정).
+  /// 확정(P7). [key] 의 끼니를 확정하고, 그 끼니가 없으면(빈 슬롯·검색으로 기록) [slot] 에 새 끼니로 더한다.
+  /// 이미 확정된 끼니를 고치면 corrected(정정). 다른 끼니는 건드리지 않는다.
   /// 화면은 바로 바꾸고(낙관적), 서버 끼니면 meal-confirm(If-Match: version), 사진 없는 확정이면 meal-manual 을 부른다.
   /// 서버가 거절하면 이전 상태로 되돌리고 오류 문구를 돌려준다(성공 시 null).
-  Future<String?> confirm(MealSlot slot, List<MealItem> items, double total, {double? aiKcal}) async {
-    final prev = of(slot);
-    final wasConfirmed = prev.status == MealStatus.confirmed || prev.status == MealStatus.auto || prev.status == MealStatus.corrected;
+  Future<String?> confirm(MealSlot slot, List<MealItem> items, double total, {required String? key, double? aiKcal}) async {
+    final found = key == null ? null : byKey(key);
+    final prev = found ?? MealRecord(slot: slot, localKey: key ?? _newKey());
+    final local = prev.localKey!;
+    final wasConfirmed = isCountedStatus(prev.status);
     final names = items.where((i) => i.checked).map((i) => i.name).take(2).join(' · ');
-    _put(prev.copyWith(
+    final next = prev.copyWith(
       status: wasConfirmed ? MealStatus.corrected : MealStatus.confirmed,
       kcal: total,
       aiKcal: aiKcal ?? prev.aiKcal,
@@ -491,7 +534,8 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
       title: names.isEmpty ? prev.title : names,
       corrected: wasConfirmed,
       noAnalysis: false,
-    ));
+    );
+    found == null ? _add(next) : _put(next);
     final api = ref.read(apiProvider);
     final wire = [for (final it in items) mealItemToWire(it)];
     try {
@@ -499,26 +543,27 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
       if (prev.serverId != null) {
         r = await api.confirmMeal(prev.serverId!, prev.version, wire, idempotencyKey: newUuidV4());
       } else if (api.isRemote || prev.status == MealStatus.empty || prev.noAnalysis || prev.status == MealStatus.skipped) {
-        r = await api.createManualMeal(slot, wire, localDate: todayKst(), idempotencyKey: newUuidV4());
+        r = await api.createManualMeal(prev.slot, wire, localDate: todayKst(), idempotencyKey: newUuidV4());
       } else {
         return null; // 모의 시드 끼니(서버 행 없음)
       }
       if (!ref.mounted) return null;
-      _put(of(slot).copyWith(serverId: r.mealId, version: r.version, kcal: r.confirmedKcal));
+      final cur = byKey(local);
+      if (cur != null) _put(cur.copyWith(serverId: r.mealId, version: r.version, kcal: r.confirmedKcal));
       if (api.isRemote) ref.invalidate(ledgerProvider); // 서버가 잠정 점수를 다시 계산함
       return null;
     } catch (e) {
-      if (ref.mounted) _put(prev);
+      if (ref.mounted) found == null ? _drop(local) : _put(prev);
       return apiErrorText(e);
     }
   }
 
-  /// 직접 검색·입력으로 확정(초안 없음 경로)
-  Future<String?> confirmManual(MealSlot slot, List<MealItem> items, double total) => confirm(slot, items, total);
-
+  /// 건너뜀: 기록이 하나도 없는 끼니 슬롯에만 건너뜀 끼니를 더한다. 간식은 건너뛸 수 없다.
   Future<String?> skip(MealSlot slot) async {
-    final prev = of(slot);
-    _put(prev.copyWith(status: MealStatus.skipped, kcal: 0, items: const [], title: ''));
+    if (slot == MealSlot.snack) return '간식은 건너뛸 수 없어요';
+    if (inSlot(slot).isNotEmpty) return '이미 기록이 있는 끼니는 건너뛸 수 없어요';
+    final rec = MealRecord(slot: slot, status: MealStatus.skipped, localKey: _newKey());
+    _add(rec);
     try {
       final api = ref.read(apiProvider);
       final r = await api.skipMeal(todayKst(), slot, idempotencyKey: newUuidV4());
@@ -526,80 +571,117 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
       if (r.overLimit && ref.mounted) return '이번 주 건너뜀 한도를 넘어 대체값으로 계산돼요';
       return null;
     } catch (e) {
-      if (ref.mounted) _put(prev);
+      if (ref.mounted) _drop(rec.localKey!);
       return apiErrorText(e);
     }
   }
 
-  /// P6 촬영 직후: 분석 중(captured) → AI 초안(draft). 국외 AI 미동의면 분석 없이 저장.
-  /// [photo] 가 있으면 업로드 파이프라인(리사이즈·EXIF 제거·SHA-256 → 서버 끼니 생성)을 탄다.
+  /// 끼니 지우기(P7). 화면에서 먼저 빼고 서버 meal-delete 를 부른다. 서버가 거절하면 제자리에 되돌리고 안내 문구를 돌려준다.
+  /// 서버 끼니만 지울 수 있다(서버 id 가 없으면 아무것도 하지 않음).
+  Future<String?> delete(String key) async {
+    final i = state.indexWhere((m) => m.matches(key));
+    if (i < 0) return null;
+    final prev = state[i];
+    final id = prev.serverId;
+    if (id == null) return '아직 서버에 올라가지 않은 기록이에요';
+    state = [...state]..removeAt(i);
+    final api = ref.read(apiProvider);
+    try {
+      await api.deleteMeal(id, idempotencyKey: newUuidV4());
+      if (!ref.mounted) return null;
+      if (api.isRemote) ref.invalidate(ledgerProvider); // 서버가 그날 점수를 다시 계산함
+      unawaited(_forgetPhoto(id));
+      return null;
+    } catch (e) {
+      if (ref.mounted) state = [...state]..insert(i.clamp(0, state.length), prev);
+      return apiErrorText(e);
+    }
+  }
+
+  /// 지운 끼니의 공유용 사진(이 폰 7일 보관본)도 지운다
+  Future<void> _forgetPhoto(String mealId) async {
+    try {
+      await ref.read(sharePhotoStoreProvider).remove(mealId);
+    } catch (_) {}
+    if (ref.mounted) ref.invalidate(mealPhotoProvider(mealId));
+  }
+
+  /// P6 촬영 직후: 새 끼니를 더한다(같은 슬롯의 다른 끼니는 그대로). 분석 중(captured) → AI 초안(draft).
+  /// 국외 AI 미동의면 분석 없이 저장. [photo] 가 있으면 업로드 파이프라인(리사이즈·EXIF 제거·SHA-256 → 서버 끼니 생성)을 탄다.
   /// 슬롯은 서버가 서버 시각으로 정하므로 응답 슬롯으로 옮긴다. 간식을 고른 경우만 간식 슬롯으로 저장된다(D55).
   Future<String?> capture(MealSlot slot, String time, {bool aiConsent = true, Uint8List? photo, DateTime? capturedAt}) async {
     lastCapturedSlot = null;
-    final base = of(slot).copyWith(time: time, items: const [], kcal: 0, corrected: false);
-    _put(base.copyWith(status: MealStatus.captured, noAnalysis: !aiConsent, pendingUpload: photo != null));
+    final key = _newKey();
+    lastCapturedKey = key;
+    _add(MealRecord(slot: slot, localKey: key, time: time, status: MealStatus.captured, noAnalysis: !aiConsent, pendingUpload: photo != null));
     if (photo == null) {
       if (!aiConsent || ref.read(apiProvider).isRemote) return null;
       // 사진 없는 모의 경로(테스트·카메라 없는 환경): 2초 뒤 모의 초안
       Future.delayed(const Duration(seconds: 2), () {
         if (!ref.mounted) return;
-        final cur = of(slot);
-        if (cur.status != MealStatus.captured || cur.noAnalysis) return;
-        final items = mockDraftItems(slot);
-        _put(cur.copyWith(status: MealStatus.draft, items: items, aiKcal: mockAiTotal(slot), title: items.map((i) => i.name).take(2).join(' · ')));
+        final cur = byKey(key);
+        if (cur == null || cur.status != MealStatus.captured || cur.noAnalysis) return;
+        final items = mockDraftItems(cur.slot);
+        _put(cur.copyWith(status: MealStatus.draft, items: items, aiKcal: mockAiTotal(cur.slot), title: items.map((i) => i.name).take(2).join(' · ')));
       });
       return null;
     }
     try {
-      final meal = await ref.read(mealUploaderProvider).submitRaw(photo, capturedAt ?? DateTime.now(), localTag: slot.name);
+      final meal = await ref.read(mealUploaderProvider).submitRaw(photo, capturedAt ?? DateTime.now(), localTag: slot.name, id: key);
       if (!ref.mounted) return null;
-      if (meal == null) return '연결이 불안정해요. 연결되면 사진을 다시 보낼게요'; // 재시도 큐
-      return _applyCreated(slot, meal, aiConsent);
+      if (meal == null) return '연결이 불안정해요. 연결되면 사진을 다시 보낼게요'; // 재시도 큐(같은 키로 이어서 보냄)
+      return _applyCreated(key, meal);
     } catch (e) {
-      if (ref.mounted) _put(of(slot).copyWith(status: MealStatus.empty, pendingUpload: false));
+      if (ref.mounted) {
+        _drop(key);
+        if (lastCapturedKey == key) lastCapturedKey = null;
+      }
       return apiErrorText(e);
     }
   }
 
-  String? _applyCreated(MealSlot localSlot, CreatedMeal meal, bool aiConsent) {
+  /// 업로드로 서버 끼니가 생김: [localKey] 의 끼니에 서버 id 를 채우고 서버가 정한 슬롯으로 옮긴다.
+  /// 그 끼니가 목록에 없으면(앱 재시작 뒤 등) 새로 더한다.
+  String? _applyCreated(String localKey, CreatedMeal meal) {
     lastCapturedSlot = meal.slot;
     ref.invalidate(mealPhotoProvider(meal.mealId)); // 업로드 직후 보관된 사진을 카드가 다시 읽는다
-    final cur = of(localSlot);
-    if (meal.slot != localSlot) _put(of(localSlot).copyWith(status: MealStatus.empty, pendingUpload: false, time: ''));
-    _put(of(meal.slot).copyWith(status: MealStatus.captured, time: cur.time, serverId: meal.mealId, version: 1,
-        noAnalysis: !meal.analyze, lateUpload: meal.lateUpload, pendingUpload: false, items: const [], kcal: 0));
-    if (meal.analyze) _pollDraft(meal.slot, meal.mealId);
+    // loadToday 가 그새 같은 서버 끼니를 읽어 왔으면 그 행은 빼고 이 촬영 행 하나로 둔다
+    state = [for (final x in state) if (x.serverId != meal.mealId || x.localKey == localKey) x];
+    final cur = byKey(localKey);
+    final next = (cur ?? MealRecord(slot: meal.slot, localKey: localKey)).copyWith(slot: meal.slot, status: MealStatus.captured,
+        serverId: meal.mealId, version: 1, noAnalysis: !meal.analyze, lateUpload: meal.lateUpload, pendingUpload: false, items: const [], kcal: 0);
+    cur == null ? _add(next) : _put(next);
+    if (meal.analyze) _pollDraft(meal.mealId);
     if (!meal.counted) return '이미 확정된 날의 사진이라 기록으로만 남아요';
     if (meal.dupPhoto) return '같은 사진이 이미 있어 확인 중이에요';
     return null;
   }
 
   /// 분석 완료(N-04)를 기다리는 대신 짧게 확인(최대 약 15초). 푸시가 오면 [refreshMeal] 로도 갱신된다.
-  Future<void> _pollDraft(MealSlot slot, String mealId, {int tries = 10}) async {
+  Future<void> _pollDraft(String mealId, {int tries = 10}) async {
     for (var i = 0; i < tries; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 1500));
       if (!ref.mounted) return;
-      if (await refreshMeal(slot, mealId)) return;
+      if (await refreshMeal(mealId)) return;
     }
   }
 
   /// 분석 완료 푸시(N-04): 그 끼니가 지금 목록에 있으면 다시 읽고, 없으면(앱이 꺼져 있었음) 오늘 끼니를 통째로 읽는다.
-  /// 반영된 슬롯을 돌려준다(못 찾으면 [hint], 그것도 없으면 null).
+  /// 반영된 끼니의 슬롯을 돌려준다(못 찾으면 [hint], 그것도 없으면 null).
   Future<MealSlot?> applyAnalysisPush(String mealId, {MealSlot? hint}) async {
-    MealSlot? find() => state.where((m) => m.serverId == mealId).firstOrNull?.slot;
-    var slot = find();
+    var slot = byKey(mealId)?.slot;
     if (slot == null) {
       await loadToday();
       if (!ref.mounted) return null;
-      slot = find();
+      slot = byKey(mealId)?.slot;
       return slot ?? hint;
     }
-    await refreshMeal(slot, mealId);
+    await refreshMeal(mealId);
     return slot;
   }
 
-  /// 서버 끼니를 다시 읽어 초안·확정 상태를 반영. 분석이 끝났으면 true.
-  Future<bool> refreshMeal(MealSlot slot, String mealId) async {
+  /// 서버 끼니 [mealId] 를 다시 읽어 초안·분석 불가 상태를 그 끼니에만 반영. 분석이 끝났으면 true.
+  Future<bool> refreshMeal(String mealId) async {
     final ServerMeal? m;
     try {
       m = await ref.read(apiProvider).fetchMeal(mealId);
@@ -607,8 +689,8 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
       return false;
     }
     if (m == null || !ref.mounted) return false;
-    final cur = of(slot);
-    if (cur.serverId != mealId) return true; // 그새 다른 끼니로 바뀜
+    final cur = byKey(mealId);
+    if (cur == null) return true; // 그새 지워짐
     if (m.status == MealStatus.draft) {
       final items = [for (var i = 0; i < m.items.length; i++) mealItemFromServer(m.items[i], i)];
       _put(cur.copyWith(status: MealStatus.draft, items: items, aiKcal: m.aiKcal, version: m.version,
@@ -622,19 +704,17 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     return m.status != MealStatus.captured;
   }
 
-  /// 저장된 업로드 대기열을 불러와 해당 끼니 칸에 "업로드 대기"로 표시(앱 재시작 뒤)
+  /// 저장된 업로드 대기열을 불러와 대기 중인 사진마다 "업로드 대기" 끼니를 더한다(앱 재시작 뒤).
+  /// 대기열 작업 id 가 그 끼니의 로컬 키라 이미 목록에 있으면 다시 더하지 않는다.
   Future<int> restorePendingUploads() async {
     final jobs = await ref.read(mealUploaderProvider).restore();
     if (!ref.mounted) return 0;
     for (final job in jobs) {
       final slot = MealSlot.values.where((s) => s.name == job.localTag).firstOrNull;
-      if (slot == null) continue;
-      final cur = of(slot);
-      if (cur.serverId == null && (cur.status == MealStatus.empty || cur.status == MealStatus.captured)) {
-        final k = job.photo.capturedAt.toUtc().add(const Duration(hours: 9));
-        String two(int v) => v.toString().padLeft(2, '0');
-        _put(cur.copyWith(status: MealStatus.captured, pendingUpload: true, time: '${two(k.hour)}:${two(k.minute)}'));
-      }
+      if (slot == null || byKey(job.id) != null) continue;
+      final k = job.photo.capturedAt.toUtc().add(const Duration(hours: 9));
+      String two(int v) => v.toString().padLeft(2, '0');
+      _add(MealRecord(slot: slot, localKey: job.id, status: MealStatus.captured, pendingUpload: true, time: '${two(k.hour)}:${two(k.minute)}'));
     }
     return jobs.length;
   }
@@ -644,14 +724,12 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     final uploader = ref.read(mealUploaderProvider);
     final done = await uploader.retryPending(force: force);
     if (!ref.mounted) return 0;
-    for (final (tag, meal) in done) {
-      final slot = tag == null ? meal.slot : MealSlot.values.byName(tag);
-      _applyCreated(slot, meal, true);
+    for (final (_, meal, jobId) in done) {
+      _applyCreated(jobId, meal);
     }
     if (done.isNotEmpty && ref.read(apiProvider).isRemote) ref.invalidate(ledgerProvider);
     return uploader.pending.length;
   }
-
 }
 
 final mealsProvider = NotifierProvider<MealsNotifier, List<MealRecord>>(MealsNotifier.new);

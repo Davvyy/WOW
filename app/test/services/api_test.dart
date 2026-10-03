@@ -113,11 +113,13 @@ void main() {
       final err = await n.capture(MealSlot.lunch, '12:20', photo: Uint8List(3), capturedAt: DateTime.now());
       expect(err, isNull);
       final serverSlot = slotForKst(DateTime.now());
-      final rec = n.of(serverSlot);
+      final key = n.lastCapturedKey!;
+      final rec = n.byKey(key)!;
+      expect(rec.slot, serverSlot);
       expect(rec.serverId, isNotNull);
       await Future<void>.delayed(const Duration(milliseconds: 1700)); // 첫 확인(1.5초)
-      expect(n.of(serverSlot).status, MealStatus.draft);
-      expect(n.of(serverSlot).items, isNotEmpty);
+      expect(n.byKey(key)!.status, MealStatus.draft);
+      expect(n.byKey(key)!.items, isNotEmpty);
     });
 
     test('확정: If-Match 버전 사용 · 서버 버전 반영 · 412 면 되돌리고 안내', () async {
@@ -126,30 +128,30 @@ void main() {
       n.reset([for (final s in MealSlot.values) s == MealSlot.lunch
           ? MealRecord(slot: s, status: MealStatus.draft, serverId: meal.mealId, items: lunchDraftItems(), aiKcal: 850) : MealRecord(slot: s)]);
       final items = lunchDraftItems(gimChecked: false);
-      expect(await n.confirm(MealSlot.lunch, items, 780, aiKcal: 850), isNull);
-      expect(n.of(MealSlot.lunch).version, 2);
-      expect(n.of(MealSlot.lunch).kcal, 780);
+      expect(await n.confirm(MealSlot.lunch, items, 780, key: meal.mealId, aiKcal: 850), isNull);
+      expect(n.byKey(meal.mealId)!.version, 2);
+      expect(n.byKey(meal.mealId)!.kcal, 780);
       api.failNext = const ApiException(412, 'version mismatch');
-      final err = await n.confirm(MealSlot.lunch, items, 700);
+      final err = await n.confirm(MealSlot.lunch, items, 700, key: meal.mealId);
       expect(err, contains('다른 기기'));
-      expect(n.of(MealSlot.lunch).kcal, 780, reason: '되돌림');
+      expect(n.byKey(meal.mealId)!.kcal, 780, reason: '되돌림');
     });
 
     test('빈 슬롯 직접 입력 → meal-manual, 건너뜀 → meal-skip', () async {
       final n = c.read(mealsProvider.notifier);
       n.reset([for (final s in MealSlot.values) MealRecord(slot: s)]);
-      await n.confirm(MealSlot.snack, [lunchDraftItems().last], 70);
+      await n.confirm(MealSlot.snack, [lunchDraftItems().last], 70, key: null);
       expect(api.calls, contains('meal-manual'));
-      expect(n.of(MealSlot.snack).serverId, isNotNull);
+      expect(n.inSlot(MealSlot.snack).single.serverId, isNotNull);
       await n.skip(MealSlot.breakfast);
       expect(api.calls, contains('meal-skip'));
-      expect(n.of(MealSlot.breakfast).status, MealStatus.skipped);
+      expect(n.inSlot(MealSlot.breakfast).single.status, MealStatus.skipped);
     });
 
     test('모의 시드 끼니(서버 행 없음)는 확정해도 서버를 부르지 않음', () async {
       final n = c.read(mealsProvider.notifier);
       n.reset(buildTodayMeals());
-      await n.confirm(MealSlot.lunch, lunchDraftItems(gimChecked: false), 780);
+      await n.confirm(MealSlot.lunch, lunchDraftItems(gimChecked: false), 780, key: 'mock-lunch');
       expect(api.calls.where((x) => x.startsWith('meal-')), isEmpty);
     });
   });

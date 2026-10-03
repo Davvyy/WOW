@@ -152,14 +152,14 @@ void main() {
     await tester.runAsync(() => n.capture(MealSlot.snack, '07:00', photo: _jpeg(), capturedAt: DateTime.now()));
     expect(api.snackFlags, [true]);
     expect(n.lastCapturedSlot, MealSlot.snack);
-    expect(n.of(MealSlot.snack).serverId, isNotNull);
-    expect(n.of(MealSlot.snack).status, MealStatus.captured);
-    expect(n.of(MealSlot.breakfast).serverId, isNull, reason: '아침 칸은 그대로 빈 칸');
+    expect(n.inSlot(MealSlot.snack).single.serverId, isNotNull);
+    expect(n.inSlot(MealSlot.snack).single.status, MealStatus.captured);
+    expect(n.inSlot(MealSlot.breakfast), isEmpty, reason: '아침 칸은 그대로 빈 칸');
 
     await tester.runAsync(() => n.capture(MealSlot.breakfast, '07:00', photo: _jpeg(), capturedAt: DateTime.now()));
     expect(api.snackFlags, [true, false]);
     expect(n.lastCapturedSlot, MealSlot.breakfast);
-    expect(n.of(MealSlot.breakfast).serverId, isNotNull);
+    expect(n.inSlot(MealSlot.breakfast).single.serverId, isNotNull);
   });
 
   testWidgets('재실행 후 홈 끼니 칸에 "업로드 대기" 표시', (tester) async {
@@ -173,7 +173,7 @@ void main() {
     final n = c.read(mealsProvider.notifier);
     n.reset([for (final s in MealSlot.values) MealRecord(slot: s)]);
     expect(await tester.runAsync(() => n.restorePendingUploads()), 1);
-    final lunch = n.of(MealSlot.lunch);
+    final lunch = n.inSlot(MealSlot.lunch).single;
     expect(lunch.pendingUpload, isTrue);
     expect(lunch.time, '12:20');
     await tester.pumpWidget(UncontrolledProviderScope(

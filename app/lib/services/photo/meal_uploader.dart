@@ -47,16 +47,17 @@ class MealUploader {
   }
 
   /// [prepared] 를 서버에 올려 끼니를 만든다. 재시도할 수 있는 오류면 대기열에 넣고 null.
-  Future<CreatedMeal?> submit(PreparedPhoto prepared, {String? localTag}) async {
+  /// [id] 는 대기열 작업 id(앱이 그 촬영 끼니를 가리키는 로컬 키, 없으면 업로드 키).
+  Future<CreatedMeal?> submit(PreparedPhoto prepared, {String? localTag, String? id}) async {
     await restore();
-    final job = PendingCapture(prepared, uploadKey: newUuidV4(), mealKey: newUuidV4(), localTag: localTag, queuedAt: _clock().toUtc());
+    final job = PendingCapture(prepared, uploadKey: newUuidV4(), mealKey: newUuidV4(), localTag: localTag, queuedAt: _clock().toUtc(), id: id);
     return _run(job, queued: false);
   }
 
-  Future<CreatedMeal?> submitRaw(Uint8List original, DateTime capturedAt, {String? localTag}) async {
+  Future<CreatedMeal?> submitRaw(Uint8List original, DateTime capturedAt, {String? localTag, String? id}) async {
     final prep = prepare;
     if (prep == null) throw StateError('prepare 함수가 없어요');
-    return submit(await prep(original, capturedAt), localTag: localTag);
+    return submit(await prep(original, capturedAt), localTag: localTag, id: id);
   }
 
   Future<CreatedMeal?> _run(PendingCapture job, {required bool queued, bool renewed = false}) async {
@@ -106,11 +107,11 @@ class MealUploader {
     await store.remove(job);
   }
 
-  /// 앱 시작·복귀·당겨서 새로고침 때 호출. 성공한 끼니를 (localTag, meal) 로 돌려준다.
+  /// 앱 시작·복귀·당겨서 새로고침 때 호출. 성공한 끼니를 (localTag, meal, 작업 id) 로 돌려준다.
   /// [force] 면 재시도 상한을 넘은 것도 다시 보낸다(사용자가 직접 새로고침).
-  Future<List<(String?, CreatedMeal)>> retryPending({bool force = false}) async {
+  Future<List<(String?, CreatedMeal, String)>> retryPending({bool force = false}) async {
     await restore();
-    final done = <(String?, CreatedMeal)>[];
+    final done = <(String?, CreatedMeal, String)>[];
     for (final job in List.of(pending)) {
       if (!force && job.attempts >= maxAttempts) continue;
       if (!job.queuedKey) {
@@ -118,7 +119,7 @@ class MealUploader {
         job.queuedKey = true;
       }
       final m = await _run(job, queued: true);
-      if (m != null) done.add((job.localTag, m));
+      if (m != null) done.add((job.localTag, m, job.id));
     }
     return done;
   }
