@@ -203,6 +203,26 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     ));
   }
 
+  /// 이 끼니 지우기: 확인 창 → 서버 meal-delete → 홈으로 돌아가 안내. 서버가 거절하면 목록에 되돌리고 그 문구를 보여 준다.
+  Future<void> _delete() async {
+    final ok = await showChDialog<bool>(
+      context,
+      title: '이 기록을 지울까요?',
+      body: const Txt('사진과 음식 기록이 지워지고 점수가 다시 계산돼요. 되돌릴 수 없어요.'),
+      actions: [
+        Builder(builder: (ctx) => ChButton('취소', kind: BtnKind.quiet, onPressed: () => Navigator.of(ctx).pop(false))),
+        Builder(builder: (ctx) => ChButton('지우기', kind: BtnKind.critical, onPressed: () => Navigator.of(ctx).pop(true))),
+      ],
+    );
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final pending = ref.read(mealsProvider.notifier).delete(_key);
+    context.go(R.home);
+    final err = await pending;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(err ?? '기록을 지웠어요'), duration: const Duration(milliseconds: 2200)));
+  }
+
   Future<void> _skip() async {
     final messenger = ScaffoldMessenger.of(context);
     final pending = ref.read(mealsProvider.notifier).skip(widget.slot);
@@ -349,7 +369,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       actions: [
         if (live != null && canShareMeal(live))
           IconButton(onPressed: () => showMealShareSheet(context, _key), tooltip: '공유', icon: Icon(Icons.ios_share_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48)),
-        IconButton(onPressed: () => showToast(context, '사진 삭제는 서버 연동 후 지원돼요'), tooltip: '사진 삭제', icon: Icon(Icons.delete_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48)),
+        // 서버에 있는 끼니만 지울 수 있다(사진·항목을 서버가 지우고 점수를 다시 계산)
+        if (live?.serverId != null)
+          IconButton(onPressed: _delete, tooltip: '기록 지우기', icon: Icon(Icons.delete_rounded, color: c.fg), constraints: const BoxConstraints(minWidth: 48, minHeight: 48)),
       ],
       gap: 10,
       cta: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [

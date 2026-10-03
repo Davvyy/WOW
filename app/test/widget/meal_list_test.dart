@@ -1,8 +1,10 @@
-// 홈: 한 슬롯의 끼니를 모두 한 줄씩 보여 주고, 누른 그 끼니의 P7 을 연다.
+// 홈: 한 슬롯의 끼니를 모두 한 줄씩 보여 주고, 누른 그 끼니의 P7 을 연다. P7: 서버 끼니는 지울 수 있다.
 import 'package:challory/core/engine/engine.dart';
 import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/data/models.dart';
 import 'package:challory/router.dart';
+import 'package:challory/services/api/challory_api.dart';
+import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/ui/screens/p6_camera.dart';
 import 'package:challory/ui/widgets/common.dart';
@@ -53,6 +55,55 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.widget<CameraScreen>(find.byType(CameraScreen)).initialSlot, MealSlot.breakfast);
+  });
+
+  testWidgets('P7 지우기: 확인 창 → 서버 지우기 → 홈 안내, 그 끼니만 사라진다', (tester) async {
+    final api = MockChalloryApi();
+    final container = await pumpApp(tester, location: R.meal(MealSlot.breakfast, meal: 'm-b2'), overrides: [
+      apiProvider.overrideWithValue(api),
+      mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts())),
+    ]);
+    await tester.tap(find.byTooltip('기록 지우기'));
+    await tester.pumpAndSettle();
+    expect(find.text('이 기록을 지울까요?'), findsOneWidget);
+    expect(find.text('사진과 음식 기록이 지워지고 점수가 다시 계산돼요. 되돌릴 수 없어요.'), findsOneWidget);
+    // 취소하면 그대로
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+    expect(api.deletedMeals, isEmpty);
+    expect(find.text('아침 확인'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('기록 지우기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('지우기'));
+    await tester.pumpAndSettle();
+    expect(api.deletedMeals, ['m-b2']);
+    expect(find.text('기록을 지웠어요'), findsOneWidget);
+    expect(find.text('D+8/28'), findsOneWidget, reason: '홈으로 돌아옴');
+    final breakfasts = mealsIn(container.read(mealsProvider), MealSlot.breakfast);
+    expect([for (final m in breakfasts) m.title], ['계란토스트 · 바나나']);
+    expect(_rowsOf(MealSlot.breakfast), findsOneWidget);
+  });
+
+  testWidgets('P7 지우기를 서버가 거절하면 끼니를 되돌리고 그 문구를 보여 준다', (tester) async {
+    final api = MockChalloryApi()..failNext = const ApiException(422, '판정된 기록은 지울 수 없어요');
+    final container = await pumpApp(tester, location: R.meal(MealSlot.breakfast, meal: 'm-b2'), overrides: [
+      apiProvider.overrideWithValue(api),
+      mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts())),
+    ]);
+    await tester.tap(find.byTooltip('기록 지우기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('지우기'));
+    await tester.pumpAndSettle();
+    expect(find.text('판정된 기록은 지울 수 없어요'), findsOneWidget);
+    expect(mealsIn(container.read(mealsProvider), MealSlot.breakfast), hasLength(2));
+    expect(_rowsOf(MealSlot.breakfast), findsNWidgets(2));
+  });
+
+  testWidgets('서버 id 가 없는 끼니(모의 시드)·새 기록은 지우기 버튼이 없다', (tester) async {
+    await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'mock-lunch'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
+    expect(find.text('점심 확인'), findsOneWidget);
+    expect(find.byTooltip('기록 지우기'), findsNothing);
   });
 
   testWidgets('끼니가 있는 슬롯의 P7 은 건너뜀을 끈다(건너뜀은 빈 슬롯에서만)', (tester) async {
