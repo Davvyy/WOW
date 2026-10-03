@@ -18,6 +18,16 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+// JDK 22+ javac reads type annotations from camera-core classes and needs
+// CallbackToFutureAdapter on the compile classpath; camera-core only has it as
+// an implementation dependency, so camera_android_camerax fails to compile.
+subprojects {
+    if (name == "camera_android_camerax") {
+        plugins.withId("com.android.library") {
+            dependencies.add("compileOnly", "androidx.concurrent:concurrent-futures:1.1.0")
+        }
+    }
+}
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
