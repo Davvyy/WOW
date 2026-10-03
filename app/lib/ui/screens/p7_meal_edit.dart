@@ -40,6 +40,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   /// 이 화면이 다루는 끼니의 키(새 기록이면 확정할 때 이 키로 더해진다)
   late final String _key;
 
+  /// `meal=` 키로 열었는데 그 끼니가 목록에 없음 → 홈으로 돌아간다
+  late final bool _missing;
+
   /// AI 분석을 기다리는 중('지금 확정' 직후 · 분석 중 끼니를 연 경우). 초안이 오면 그 항목으로 바꾼다.
   late bool _waiting;
 
@@ -56,8 +59,17 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final found = key == null ? null : ref.read(mealsProvider.notifier).byKey(key);
     _origin = found ?? MealRecord(slot: widget.slot, localKey: 'local-${newUuidV4()}');
     _key = _origin.key;
-    _waiting = !widget.searchOnly && _origin.status == MealStatus.captured && !_origin.noAnalysis && !_origin.pendingUpload;
-    if (widget.searchOnly || _waiting) {
+    // 연 끼니가 없음(그새 지워짐 등): 예시 항목을 띄우지 않고 홈으로 돌아가 알린다. 키 없이 연 새 기록은 그대로.
+    _missing = key != null && found == null;
+    if (_missing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showToast(context, '기록을 찾지 못했어요');
+        context.go(R.home);
+      });
+    }
+    _waiting = !_missing && !widget.searchOnly && _origin.status == MealStatus.captured && !_origin.noAnalysis && !_origin.pendingUpload;
+    if (widget.searchOnly || _waiting || _missing) {
       _items = const [];
       _aiTotal = 0;
     } else {
@@ -282,6 +294,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
             ]),
           ),
         );
+
+    // 없는 끼니: 첫 프레임 뒤 홈으로 돌아가므로 빈 화면만(확정 버튼 없음)
+    if (_missing) return ChScaffold(title: '$label 확인', backFallback: R.home, children: const []);
 
     if (_waiting) {
       return ChScaffold(

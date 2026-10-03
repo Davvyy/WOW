@@ -31,6 +31,7 @@ List<MealRecord> _twoBreakfasts() => [
 Finder _rowsOf(MealSlot s) => find.byWidgetPredicate((w) => w is MealRow && w.meal.slot == s);
 
 void main() {
+  _unknownKey();
   testWidgets('홈 아침 카드: 끼니 2개면 2줄 · 머리글은 반영 kcal 합계 · 두 번째를 누르면 그 끼니의 P7', (tester) async {
     await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
     expect(_rowsOf(MealSlot.breakfast), findsNWidgets(2));
@@ -110,5 +111,15 @@ void main() {
     await pumpApp(tester, location: R.meal(MealSlot.breakfast, meal: 'm-b2'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
     final skip = tester.widget<ChButton>(find.byWidgetPredicate((w) => w is ChButton && w.label.startsWith('건너뜀')));
     expect(skip.onPressed, isNull);
+  });
+}
+
+void _unknownKey() {
+  testWidgets('P7 을 없는 끼니 키로 열면 예시 항목 없이 홈으로 돌아가 안내', (tester) async {
+    await pumpApp(tester, location: R.meal(MealSlot.lunch, meal: 'gone-1'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
+    expect(find.text('기록을 찾지 못했어요'), findsOneWidget);
+    expect(find.text('D+8/28'), findsOneWidget, reason: '홈');
+    expect(find.text('점심 확인'), findsNothing);
+    expect(find.textContaining('확정 · 약'), findsNothing);
   });
 }
