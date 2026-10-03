@@ -18,9 +18,13 @@ import 'health_source.dart';
 ///    stepsManual=null, 수동 출처가 감지되면 hasManualSource=true(서버가 '검토 중' 플래그).
 ///  - 플랫폼 활동 칼로리는 [HealthDay.platformActiveKcal] 참고값으로만 전달한다.
 class HealthPackageSource implements HealthSource {
-  HealthPackageSource({Health? health}) : _health = health ?? Health();
+  /// [isAndroid] 는 테스트에서 플랫폼 경로를 고르기 위한 것으로, 생략하면 실행 중인 플랫폼을 따른다.
+  HealthPackageSource({Health? health, bool? isAndroid})
+      : _health = health ?? Health(),
+        _isAndroid = isAndroid ?? (!kIsWeb && Platform.isAndroid);
 
   final Health _health;
+  final bool _isAndroid;
   bool _configured = false;
 
   static const _types = <HealthDataType>[
@@ -36,8 +40,6 @@ class HealthPackageSource implements HealthSource {
 
   /// 체중은 P12 "건강 앱에서 읽기" 최초 탭 시점에 별도 요청한다.
   static const weightType = HealthDataType.WEIGHT;
-
-  bool get _isAndroid => !kIsWeb && Platform.isAndroid;
 
   @override
   String get platformLabel => _isAndroid ? 'Health Connect' : 'Apple 건강';
@@ -110,13 +112,13 @@ class HealthPackageSource implements HealthSource {
   }
 
   Future<HealthDay> _fetchDay(String localDate, DateTime start, DateTime end) async {
-    // 1) 걸음: 집계 쿼리. 수동 포함/제외 두 번.
+    // 1) 걸음: 수동 포함 집계 + 출처·수동 여부 식별용 샘플
     final recorded = await _health.getTotalStepsInInterval(start, end, includeManualEntry: true) ?? 0;
-    final verified = await _health.getTotalStepsInInterval(start, end, includeManualEntry: false) ?? 0;
+    final stepPts = await _safeRead([HealthDataType.STEPS], start, end);
+    final verified = await _verifiedSteps(start, end, recorded, stepPts);
     final manualPart = (recorded - verified).clamp(0, recorded);
 
-    // 2) 출처·수동 여부 식별용 샘플 조회(합산 안 함)
-    final stepPts = await _safeRead([HealthDataType.STEPS], start, end);
+    // 2) 출처·수동 여부
     final origins = <String, RecordMethod>{};
     var manualSeen = manualPart > 0;
     for (final p in stepPts) {
@@ -141,7 +143,11 @@ class HealthPackageSource implements HealthSource {
       if (v is! WorkoutHealthValue) continue;
       final type = _sessionType(v.workoutActivityType);
       if (type == null) continue;
-      final inRange = await _health.getTotalStepsInInterval(p.dateFrom, p.dateTo, includeManualEntry: false) ?? 0;
+      final recordedInRange = await _health.getTotalStepsInInterval(p.dateFrom, p.dateTo, includeManualEntry: true) ?? 0;
+      final inRange = await _verifiedSteps(p.dateFrom, p.dateTo, recordedInRange, [
+        for (final s in stepPts)
+          if (s.dateFrom.isBefore(p.dateTo) && s.dateTo.isAfter(p.dateFrom)) s,
+      ]);
       sessions.add(HealthSession(
         platformUid: '${_isAndroid ? 'hc' : 'hk'}:${p.uuid}',
         type: type,
@@ -164,6 +170,18 @@ class HealthPackageSource implements HealthSource {
       sources: [for (final e in origins.entries) HealthOrigin(origin: e.key, method: e.value)],
       sessions: sessions,
     );
+  }
+
+  /// 수동 제외 걸음. Android(Health Connect)의 수동 제외 경로는 집계가 아니라 원본 기록 합이라
+  /// 여러 앱이 같은 걸음을 쓰면 중복으로 센다. 그래서 중복 제거된 집계([recorded])에서 수동 입력 기록만 뺀다.
+  /// iOS 는 HealthKit 통계 쿼리가 수동 제외 집계를 직접 돌려준다.
+  Future<int> _verifiedSteps(DateTime start, DateTime end, int recorded, List<HealthDataPoint> stepPts) async {
+    if (!_isAndroid) return await _health.getTotalStepsInInterval(start, end, includeManualEntry: false) ?? 0;
+    final manual = stepPts
+        .where((p) => p.recordingMethod == RecordingMethod.manual)
+        .fold<double>(0, (a, p) => a + _num(p.value))
+        .round();
+    return (recorded - manual).clamp(0, recorded);
   }
 
   Future<List<HealthDataPoint>> _safeRead(List<HealthDataType> types, DateTime start, DateTime end, {bool excludeManual = false}) async {

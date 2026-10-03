@@ -94,7 +94,7 @@ lib/
 ## 건강 데이터(`lib/services/health/`)
 
 - `HealthSource` : 일 집계만 돌려줍니다(`steps_total`, `steps_manual`, `floors`, 세션, 출처). KST 기준 D·D−1·D−2 3일 윈도.
-- `HealthPackageSource` : `health` 13.x. 걸음은 `getTotalStepsInInterval` 집계 쿼리로 읽고, 수동 입력은 제외합니다. iOS는 `steps_manual`을 분리해 보내고, Android(Health Connect)는 집계로 수동분을 분리할 수 없어 수동 제외 집계 + `has_manual_source` 플래그를 보냅니다. 플랫폼 활동 칼로리는 `platformActiveKcal` 참고값으로만 보관하며 점수·순위에 쓰지 않습니다.
+- `HealthPackageSource` : `health` 13.x. 걸음은 `getTotalStepsInInterval` 집계 쿼리로 읽고, 수동 입력은 제외합니다. iOS는 `steps_manual`을 분리해 보내고, Android(Health Connect)는 집계로 수동분을 분리할 수 없어 수동 제외 걸음 + `has_manual_source` 플래그를 보냅니다. Android 의 수동 제외 걸음은 중복 제거된 집계에서 수동 입력 기록을 뺀 값입니다(플러그인의 수동 제외 경로는 원본 기록 합이라 여러 앱이 같은 걸음을 쓰면 중복으로 셉니다). 운동 세션 구간 걸음도 같은 방식입니다. 플랫폼 활동 칼로리는 `platformActiveKcal` 참고값으로만 보관하며 점수·순위에 쓰지 않습니다.
 - `MockHealthSource` : 실기기가 아니면(데스크톱·테스트) 자동 사용.
 - `buildSyncBatch(...)` : docs/05 §5 배치 JSON(`client_batch_id`, `tz`, `days[...]`). P5·P8 새로고침 때 `sync-activity` 로 올립니다(`client_batch_id` = Idempotency-Key).
 - 갤러리/`image_picker` 사용 없음, 걸음 수동 입력 UI 없음.
