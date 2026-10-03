@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -8,7 +10,7 @@ plugins {
 fun dartDefine(key: String): String? =
     (project.findProperty("dart-defines") as String?)
         ?.split(",")
-        ?.map { String(java.util.Base64.getDecoder().decode(it)) }
+        ?.map { String(Base64.getDecoder().decode(it)) }
         ?.firstOrNull { it.startsWith("$key=") }
         ?.substringAfter("=")
         ?.takeIf { it.isNotEmpty() }

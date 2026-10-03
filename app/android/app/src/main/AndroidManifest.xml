@@ -50,11 +50,12 @@
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
             </intent-filter>
         </activity>
-        <!-- 카카오 로그인(카카오계정 웹 로그인 복귀). 스킴 kakao{네이티브 앱 키}는 build.gradle.kts 가 dart-define 에서 채운다 -->
+        <!-- 카카오 로그인(카카오계정 웹 로그인 복귀). 카카오 Flutter SDK v2 의 수신 액티비티에 스킴만 붙인다(v1 의 AuthCodeCustomTabsActivity 는 v2 에 없음).
+             스킴 kakao{네이티브 앱 키}는 build.gradle.kts 가 dart-define 에서 채운다 -->
         <activity
-            android:name="com.kakao.sdk.flutter.AuthCodeCustomTabsActivity"
+            android:name="com.kakao.sdk.flutter.auth.AuthCodeHandlerActivity"
             android:exported="true">
-            <intent-filter android:label="flutter_web_auth">
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
