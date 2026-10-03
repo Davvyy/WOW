@@ -23,6 +23,21 @@ abstract class ChalloryApi {
   /// API #33 내 챌린지 세션(요약·규칙 상수·잠긴 프로필·최근 공지). 참가 중이 아니면 null.
   Future<ChallengeSession?> fetchSession();
 
+  /// 참가 중인 챌린지 세션 전부(최근 참가 순). 강퇴·나감 제외. 참가한 곳이 없으면 빈 목록.
+  Future<List<ChallengeSession>> fetchSessions();
+
+  /// 코드 없이 참가할 수 있는 열린(월간) 챌린지. 내 참가 상태([OpenChallenge.myStatus])를 함께 준다.
+  Future<List<OpenChallenge>> fetchOpenChallenges();
+
+  /// 챌린지에서 나간다(leave_challenge). 나간 챌린지에는 다시 참가할 수 없다.
+  Future<void> leaveChallenge(String challengeId);
+
+  /// 다음 달 월간 챌린지에 자동으로 참가할지(profiles.auto_continue). 기본 켬.
+  Future<bool> fetchAutoContinue();
+
+  /// 다음 달 자동 참가 설정을 바꾼다(본인 프로필 행).
+  Future<void> setAutoContinue(bool on);
+
   /// 공지 목록(N-03, 최신순). 예약 발송 시각이 지난 것만.
   Future<List<Notice>> fetchNotices();
 

@@ -66,7 +66,27 @@ class ChallengeSession {
     me: mockMe,
     rules: EngineRules.defaults,
     status: 'running',
+    challengeId: 'mock-challenge',
+    participantId: 'mock-p',
+    checkStart: DateTime(2026, 10, 6),
     rulesMd: '## 운영자 추가 규칙\n- 회식 날(10.17)은 저녁 자동 확정 대신 대체값 적용을 요청할 수 있어요(운영자에게 메시지).\n- 상품은 상위 3명 + 반영률 100% 달성자 추첨 2명.',
+  );
+
+  /// 모의 월간 챌린지(코드 없이 참가, 정원 없음). 기록은 [mock] 과 공유된다.
+  static final mockMonthly = ChallengeSession(
+    challenge: ChallengeInfo(
+      name: '10월 챌린지', code: '', start: DateTime(2026, 10, 1), end: DateTime(2026, 10, 31), days: 31, capacity: 0, joined: 128,
+      today: mockChallenge.today, dayIndex: mockChallenge.today.difference(DateTime(2026, 10, 1)).inDays + 1,
+      syncTime: mockChallenge.syncTime, source: mockChallenge.source, platform: mockChallenge.platform,
+      noticeTitle: '', noticeBody: '', noticeDate: '', objectionUntil: '11.8'),
+    me: mockMe,
+    rules: EngineRules.defaults,
+    status: 'running',
+    kind: 'monthly',
+    challengeId: 'mock-monthly',
+    participantId: 'mock-p-monthly',
+    checkStart: DateTime(2026, 10, 1),
+    stats: const RankStats(days: 9, avail: 9, minDays: 4, avg: 41.3, rate: 1.0, pending: false, score: 82.6),
   );
 }
 

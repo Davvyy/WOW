@@ -39,7 +39,7 @@ class MockChalloryApi implements ChalloryApi {
     final ch = mockChallenge;
     InviteSummary s(String status, int joined) => InviteSummary(challengeId: 'mock-challenge', name: ch.name, status: status,
         startDate: ch.start, endDate: ch.end, capacity: ch.capacity, joined: joined, days: ch.days,
-        joinable: status == 'recruiting');
+        joinable: status == 'recruiting' && joined < ch.capacity);
     return switch (code.toUpperCase()) {
       'K7Q2MD' => s('recruiting', ch.joined),
       'FULL00' => s('recruiting', ch.capacity),
@@ -54,14 +54,66 @@ class MockChalloryApi implements ChalloryApi {
   Future<JoinResult> joinChallenge(JoinRequest req) async {
     _maybeFail('join_challenge');
     lastJoin = req;
+    // 미등록 코드도 예전처럼 운영자 모의 챌린지로 본다
+    final target = req.challengeId ?? (req.code?.toUpperCase() == 'K7Q2MD' ? 'mock-challenge' : null);
+    final id = target ?? 'mock-challenge';
     if (!req.terms || !req.sensitiveHealth) throw const ApiException(422, '필수 동의가 필요해요');
-    if (req.code == 'BLOCK0') throw const ApiException(403, '참가할 수 없는 챌린지예요');
+    if (req.code == 'BLOCK0' || _left.contains(id)) throw const ApiException(403, '참가할 수 없는 챌린지예요');
     final age = mockChallenge.start.year - req.birthYear;
     if (age - 1 < 14) throw const ApiException(422, '만 14세 이상부터 참가할 수 있어요');
     final bmi = req.weightKg / ((req.heightCm / 100) * (req.heightCm / 100));
     final bmr = ChalloryEngine.bmr(Profile(sex: req.sex, weightKg: req.weightKg, heightCm: req.heightCm, age: age)).bmr;
-    return JoinResult(participantId: 'mock-participant', challengeId: 'mock-challenge', bmr: bmr,
-        recordMode: age - 1 < 19 || bmi < 18.5 || req.pregnancy || req.eatingDisorder);
+    final recordMode = age - 1 < 19 || bmi < 18.5 || req.pregnancy || req.eatingDisorder;
+    for (final s in sessions) {
+      if (s.challengeId == id) {
+        // 이미 참가 중이면 그대로(멱등)
+        return JoinResult(participantId: s.participantId!, challengeId: id, bmr: bmr, recordMode: recordMode, kind: s.kind, checkStart: s.checkStart);
+      }
+    }
+    if (sessions.length >= 3) throw const ApiException(409, '동시에 3개까지 참가할 수 있어요');
+    final joined = id == 'mock-monthly' ? ChallengeSession.mockMonthly : ChallengeSession.mock;
+    sessions.insert(0, joined);
+    return JoinResult(participantId: joined.participantId!, challengeId: id, bmr: bmr, recordMode: recordMode,
+        kind: id == 'mock-monthly' ? 'monthly' : 'operator', checkStart: joined.checkStart);
+  }
+
+  /// 참가 중인 세션(최근 참가 순). 테스트가 직접 바꿀 수 있다.
+  final sessions = <ChallengeSession>[ChallengeSession.mock, ChallengeSession.mockMonthly]; // 가을 걷기 먼저: 기존 화면 테스트의 기본 챌린지
+  final _left = <String>{};
+  bool _autoContinue = true;
+
+  @override
+  Future<List<ChallengeSession>> fetchSessions() async {
+    calls.add('my_challenges');
+    return List.of(sessions);
+  }
+
+  @override
+  Future<List<OpenChallenge>> fetchOpenChallenges() async {
+    calls.add('open_challenges');
+    final m = ChallengeSession.mockMonthly.challenge;
+    final joined = sessions.any((s) => s.challengeId == 'mock-monthly');
+    return [
+      OpenChallenge(challengeId: 'mock-monthly', name: m.name, kind: 'monthly', startDate: m.start, endDate: m.end, days: m.days,
+          joined: m.joined, joinable: true, myStatus: _left.contains('mock-monthly') ? 'left' : (joined ? 'active' : null)),
+    ];
+  }
+
+  @override
+  Future<void> leaveChallenge(String challengeId) async {
+    _maybeFail('leave_challenge');
+    if (!sessions.any((s) => s.challengeId == challengeId)) throw const ApiException(404, '참가 중인 챌린지가 아니에요');
+    sessions.removeWhere((s) => s.challengeId == challengeId);
+    _left.add(challengeId);
+  }
+
+  @override
+  Future<bool> fetchAutoContinue() async => _autoContinue;
+
+  @override
+  Future<void> setAutoContinue(bool on) async {
+    _maybeFail('auto_continue');
+    _autoContinue = on;
   }
 
   bool participating = false;

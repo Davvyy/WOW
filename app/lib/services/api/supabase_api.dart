@@ -75,9 +75,13 @@ class SupabaseChalloryApi implements ChalloryApi {
   Future<Map<String, dynamic>> _me() async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw const ApiException(401, '로그인이 필요해요');
-    final row = await _client.from('participants')
+    // 선택한 챌린지(세션의 참가 행)가 있으면 그 행, 없으면 가장 최근 참가
+    final picked = currentSession.challengeId != null ? currentSession.participantId : null;
+    var q = _client.from('participants')
         .select('id, nickname, challenge_id, rank_eligible, leaderboard_visible, status, challenges(start_date, status)')
-        .eq('user_id', uid).not('status', 'in', '(kicked,left)').order('joined_at', ascending: false).limit(1).maybeSingle();
+        .eq('user_id', uid).not('status', 'in', '(kicked,left)');
+    if (picked != null) q = q.eq('id', picked);
+    final row = await q.order('joined_at', ascending: false).limit(1).maybeSingle();
     if (row == null) throw const ApiException(404, '참가 중인 챌린지가 없어요');
     return row;
   }
@@ -92,6 +96,53 @@ class SupabaseChalloryApi implements ChalloryApi {
     if (j == null) return null;
     return sessionFromSummary(Map<String, dynamic>.from(j as Map),
         platformLabel: defaultTargetPlatform == TargetPlatform.iOS ? 'Apple 건강' : 'Health Connect');
+  }
+
+  @override
+  Future<List<ChallengeSession>> fetchSessions() async {
+    final list = await _rpc('my_challenges', const {}) as List? ?? const [];
+    final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'Apple 건강' : 'Health Connect';
+    final out = <ChallengeSession>[];
+    for (final item in list) {
+      final id = (Map<String, dynamic>.from(item as Map)['challenge'] as Map)['id'] as String;
+      final j = await _rpc('challenge_session', {'p_challenge': id});
+      if (j != null) out.add(sessionFromSummary(Map<String, dynamic>.from(j as Map), platformLabel: platform));
+    }
+    return out;
+  }
+
+  @override
+  Future<List<OpenChallenge>> fetchOpenChallenges() async {
+    final list = await _rpc('open_challenges', const {}) as List? ?? const [];
+    return [for (final o in list) OpenChallenge.fromJson(Map<String, dynamic>.from(o as Map))];
+  }
+
+  @override
+  Future<void> leaveChallenge(String challengeId) async {
+    await _rpc('leave_challenge', {'p_challenge': challengeId});
+  }
+
+  @override
+  Future<bool> fetchAutoContinue() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return true;
+    try {
+      final row = await _client.from('profiles').select('auto_continue').eq('user_id', uid).maybeSingle();
+      return row?['auto_continue'] as bool? ?? true;
+    } catch (e) {
+      throw _pg(e);
+    }
+  }
+
+  @override
+  Future<void> setAutoContinue(bool on) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw const ApiException(401, '로그인이 필요해요');
+    try {
+      await _client.from('profiles').update({'auto_continue': on}).eq('user_id', uid);
+    } catch (e) {
+      throw _pg(e, denied: '설정을 바꿀 수 없어요');
+    }
   }
 
   @override
