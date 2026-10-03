@@ -222,4 +222,12 @@ void main() {
       expect(find.textContaining(fmtK1(expected)), findsOneWidget);
     });
   });
+
+  testWidgets('P1 로고는 앱 아이콘과 같은 C 링 + 불꽃 마크를 테마 색으로 그린다', (tester) async {
+    await pumpApp(tester, location: R.p1);
+    final logo = tester.widget<Image>(find.byWidgetPredicate(
+        (w) => w is Image && w.image is AssetImage && (w.image as AssetImage).assetName == 'assets/icon/app_icon_monochrome.png'));
+    expect(logo.color, Colors.white); // 라이트 테마 onBrand
+    expect(find.byIcon(Icons.local_fire_department_rounded), findsNothing);
+  });
 }

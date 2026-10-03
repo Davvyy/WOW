@@ -155,11 +155,17 @@ class _StartScreenState extends ConsumerState<StartScreen> {
           padding: const EdgeInsets.fromLTRB(16, 40, 16, 24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Center(
+              // 앱 아이콘과 같은 마크(C 링 + 불꽃). 원본은 108dp 캔버스 중 72dp 가 보이는 영역이라 1.5배로 그리고 잘라 쓴다.
               child: Container(
                 width: 64,
                 height: 64,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(color: c.brand, borderRadius: BorderRadius.circular(20)),
-                child: Icon(Icons.local_fire_department_rounded, color: c.onBrand, size: 32),
+                child: OverflowBox(
+                  maxWidth: 96,
+                  maxHeight: 96,
+                  child: Image.asset('assets/icon/app_icon_monochrome.png', width: 96, height: 96, color: c.onBrand),
+                ),
               ),
             ),
             const SizedBox(height: 8),
