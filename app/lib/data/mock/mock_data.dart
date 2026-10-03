@@ -341,13 +341,6 @@ final mockFinal = <LeaderRow>[
 ];
 
 // ---------- 판정 템플릿 (docs/06 §6) ----------
-const reasonText = {
-  'steps_spike': '걸음 기록이 평소보다 크게 높아 확인했어요',
-  'source_unknown': '확인되지 않은 출처의 운동 기록이 있었어요',
-  'dup_photo': '같은 사진이 두 번 이상 사용됐어요',
-  'downward_edit': '확정값이 AI 추정보다 절반 넘게 낮았어요',
-  'skip_abuse': "'건너뜀'이 한도를 넘었어요",
-};
 
 class Verdict {
   const Verdict(this.label, this.text, this.effect);

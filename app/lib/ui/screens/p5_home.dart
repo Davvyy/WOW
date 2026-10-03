@@ -112,6 +112,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final todayMe = lb?.meIn(lb.today);
     final reviewing = isToday && (remote ? (todayMe?.underReview ?? false) : steps > AppConfig.stepsSpikeAbs);
     final provisional = isToday;
+    // 검토 배너 문구: 서버 모드는 오늘 열린 검토의 종류를 따른다(목록을 못 받았으면 일반 문구)
+    final reviewBanner = reviewBannerText(
+      remote: remote,
+      review: remote && reviewing ? openReviewOn(ref.watch(myReviewsProvider).value, ch.today) : null,
+    );
 
     String? caption;
     final inn = sim.intake;
@@ -363,7 +368,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           tone: Tone.review,
           icon: Icons.policy_rounded,
           action: ChButton('소명하기', small: true, kind: BtnKind.quiet, onPressed: () => context.push('${R.ledger}?v=review')),
-          child: boldThen(context, '걸음 ${fmtInt(steps)}이 평소의 2.5배를 넘어 검토 중이에요.', ' 순위는 잠정으로 유지되고, 72시간 안에 설명을 남길 수 있어요.', color: c.review),
+          child: reviewBanner.spike
+              ? boldThen(context, '걸음 ${fmtInt(steps)}이 평소의 2.5배를 넘어 검토 중이에요.', ' 순위는 잠정으로 유지되고, 72시간 안에 설명을 남길 수 있어요.', color: c.review)
+              : boldThen(context, reviewBanner.lead, reviewBanner.rest, color: c.review),
         ),
       if (isToday)
         for (final m in meals.where((m) => m.status == MealStatus.draft).take(1))

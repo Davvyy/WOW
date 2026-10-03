@@ -40,6 +40,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     final manualSource = !_watch && act.hasManualSource && !ios;
     final reviewing = !_watch && steps > AppConfig.stepsSpikeAbs;
     final zero = !_watch && steps == 0;
+    final remote = ref.read(apiProvider).isRemote;
+    final reviewBanner = reviewBannerText(
+      remote: remote,
+      review: remote && reviewing ? openReviewOn(ref.watch(myReviewsProvider).value, ch.today) : null,
+    );
     final perStep = engine.kcalPerStep(who.weightKg);
 
     Widget syncChip() {
@@ -89,7 +94,12 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           Kv(Txt.cap(_watch ? '세션 밖 걸음' : '걸음'), NumText(fmtInt(_watch ? a.stepsOut : steps), size: 20, weight: FontWeight.w700)),
           if (_watch) Txt.cap('기록 ${fmtInt(steps)}보 중 ${fmtInt(mockWatchSession.stepsInRange)}보는 세션으로 계산됐어요(이중 계산 방지).'),
           if (reviewing)
-            Txt.cap('걸음 ${fmtInt(steps)}이 평소 중앙값의 2.5배를 넘어 검토 중이에요 · 잠정 점수에는 반영돼요', color: c.review)
+            Txt.cap(
+              reviewBanner.spike
+                  ? '걸음 ${fmtInt(steps)}이 평소 중앙값의 2.5배를 넘어 검토 중이에요 · 잠정 점수에는 반영돼요'
+                  : '${reviewBanner.lead}${reviewBanner.rest}',
+              color: c.review,
+            )
           else
             const Txt.cap('자동 기록만 인정 · 세션 창 걸음은 세션 쪽에서만 계산돼요'),
         ], gap: 6)),

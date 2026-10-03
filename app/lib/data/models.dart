@@ -350,6 +350,39 @@ class MyReview {
   bool get decided => status == 'decided';
 }
 
+/// 검토 사유 문장(docs/06 §6 판정 템플릿). 키는 reviews.type·reason_template
+const reasonText = {
+  'steps_spike': '걸음 기록이 평소보다 크게 높아 확인했어요',
+  'source_unknown': '확인되지 않은 출처의 운동 기록이 있었어요',
+  'dup_photo': '같은 사진이 두 번 이상 사용됐어요',
+  'downward_edit': '확정값이 AI 추정보다 절반 넘게 낮았어요',
+  'skip_abuse': "'건너뜀'이 한도를 넘었어요",
+};
+
+/// 사유를 모르거나 검토 목록을 아직 못 받았을 때 홈·활동 배너 문장
+const reviewReasonFallback = '기록을 확인하고 있어요';
+
+/// [day] 날짜에 걸린 열린(소명 전·후, 판정 전) 검토 중 첫 건. 없으면 null
+MyReview? openReviewOn(List<MyReview>? reviews, DateTime day) {
+  for (final r in reviews ?? const <MyReview>[]) {
+    final d = r.localDate;
+    if (!r.decided && d != null && d.year == day.year && d.month == day.month && d.day == day.day) return r;
+  }
+  return null;
+}
+
+/// 홈·활동 화면 검토 배너가 보여줄 사유. 걸음 급증이면 [spike] 가 true(화면이 걸음 수를 넣어 기존 문구를 쓴다).
+/// 모의 모드는 걸음 급증 시나리오만 있어 항상 급증. 서버 모드는 그날 열린 검토 [review] 의 종류를 따른다.
+/// 종류를 모르거나 검토 목록을 아직 못 받았으면 일반 문구.
+({bool spike, String lead, String rest}) reviewBannerText({required bool remote, MyReview? review}) {
+  if (!remote) return (spike: true, lead: '', rest: '');
+  final key = review?.reasonTemplate ?? review?.type;
+  if (key == 'steps_spike') return (spike: true, lead: '', rest: '');
+  final reason = reasonText[key];
+  if (reason == null) return (spike: false, lead: reviewReasonFallback, rest: '');
+  return (spike: false, lead: reason, rest: ' · 72시간 안에 설명을 남길 수 있어요');
+}
+
 /// 음식 검색·최근 음식 한 건(1인분 kcal). 서버: food_search(식약처 DB, pg_trgm) / recent_foods(30일 확정)
 class FoodHit {
   const FoodHit({required this.name, required this.kcal, this.foodCode, this.recent = false});

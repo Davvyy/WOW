@@ -19,9 +19,10 @@ import 'package:flutter_test/flutter_test.dart';
 final _f = jsonDecode(File('test/fixtures/server_ledger.json').readAsStringSync()) as Map<String, dynamic>;
 
 class _RemoteFake extends MockChalloryApi {
-  _RemoteFake({this.noSession = false, this.status});
+  _RemoteFake({this.noSession = false, this.status, this.underReview = false});
   final bool noSession;
   final String? status;
+  final bool underReview;
   final reported = <String?>[];
 
   /// 채워 두면 다음 세션 목록 응답을 붙잡아 둔다(다시 읽는 중 화면 확인용)
@@ -44,12 +45,17 @@ class _RemoteFake extends MockChalloryApi {
 
   @override
   Future<Leaderboard> fetchLeaderboard() async => leaderboardFromServer(
-        todayRows: _f['snapshot_today'] as List,
+        // 검토 중이면 서버 스냅샷에서 내 행이 '집계 중'으로 가려진다
+        todayRows: [
+          for (final r in _f['snapshot_today'] as List)
+            if (!(underReview && (r as Map)['participant_id'] == _f['participant_id'])) r,
+        ],
         cumulativeRows: _f['snapshot_cumulative'] as List,
         myParticipantId: _f['participant_id'] as String,
         myNickname: '지수',
         myToday: 28.8,
         myCumulative: 312.6,
+        myUnderReview: underReview,
       );
   @override
   Future<List<LedgerRow>> fetchLedger() async {
@@ -124,6 +130,29 @@ void main() {
     await _pump(tester, R.home, _RemoteFake());
     expect(find.text('가을 걷기 챌린지'), findsWidgets);
     expect(find.textContaining('D+8/28'), findsWidgets);
+  });
+
+  testWidgets('P5 검토 배너: source_unknown 이면 그 사유를 보여주고 걸음 급증 문구는 쓰지 않는다', (tester) async {
+    final api = _RemoteFake(underReview: true)
+      ..reviews.add(MyReview(id: 'rv3', type: 'source_unknown', status: 'open', localDate: DateTime(2026, 10, 13)));
+    await _pump(tester, R.home, api);
+    expect(find.textContaining('확인되지 않은 출처의 운동 기록이 있었어요'), findsOneWidget);
+    expect(find.textContaining('72시간 안에 설명을 남길 수 있어요'), findsOneWidget);
+    expect(find.textContaining('평소의 2.5배'), findsNothing);
+  });
+
+  testWidgets('P5 검토 배너: steps_spike 이면 걸음 급증 문구', (tester) async {
+    final api = _RemoteFake(underReview: true)
+      ..reviews.add(MyReview(id: 'rv4', type: 'steps_spike', status: 'open', localDate: DateTime(2026, 10, 13)));
+    await _pump(tester, R.home, api);
+    expect(find.textContaining('평소의 2.5배를 넘어 검토 중이에요'), findsOneWidget);
+    expect(find.textContaining('확인되지 않은 출처'), findsNothing);
+  });
+
+  testWidgets('P5 검토 배너: 검토 목록이 비어 있으면 일반 문구', (tester) async {
+    await _pump(tester, R.home, _RemoteFake(underReview: true));
+    expect(find.textContaining('기록을 확인하고 있어요'), findsOneWidget);
+    expect(find.textContaining('평소의 2.5배'), findsNothing);
   });
 
   testWidgets('세션 목록을 다시 읽는 동안 홈을 로딩 화면으로 바꾸지 않는다', (tester) async {
