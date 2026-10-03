@@ -1,11 +1,11 @@
 -- 끼니 기록 삭제(docs/02 D57): 참가자가 확정 전 날짜의 자기 대표 끼니를 지운다. 복사본까지 같이 지우고 점수 재계산,
--- 열린 검토는 닫고, 다른 끼니가 쓰지 않는 사진 원본은 바로 파기(경로를 돌려주면 Edge 가 Storage 에서 지운다).
+-- 다른 끼니가 쓰지 않는 사진 원본은 바로 파기(경로를 돌려주면 Edge 가 Storage 에서 지운다). 확인 중(열린 검토)인 기록은 지우지 않는다.
 begin;
 do $$
 declare op uuid := (select operator_id from challenges where invite_code = 'K7Q2MD');
   seed uuid := (select id from challenges where invite_code = 'K7Q2MD');
   uid uuid := tests.uid('지수'); ji uuid := tests.pid('지수'); x uuid; xp uuid; r jsonb; ph uuid; m uuid; cp uuid;
-  rv_own uuid; rv_copy uuid; v_slot text; i_ji numeric; i_xp numeric; n_items int;
+  m2 uuid; cp2 uuid; m3 uuid; rv_own uuid; rv_copy uuid; v_slot text; i_ji numeric; i_xp numeric; n_items int;
   items jsonb := '[{"chosen_name":"비빔밥","serving_kcal":560,"eaten":true}]';
   t_del timestamptz := '2026-10-13 13:00+09';
 begin
@@ -23,15 +23,28 @@ begin
   perform confirm_meal(uid, m, items, (select version from meals where id = m), '2026-10-13 12:40+09');
   cp := (select id from meals where record_group_id = m and id <> m);
   perform tests.ok(cp is not null and (select participant_id from meals where id = cp) = xp, '복사본이 X 에 있음');
+
+  -- 확인 중인 기록은 지울 수 없다: 복사본에 열린 플래그(다른 사진 끼니), 대표에 소명 중(appealed) 신고(직접 넣은 끼니)
+  r := create_photo(uid, repeat('5c', 32), 400000, 1568, 1176, '2026-10-13 12:50+09', '2026-10-13 12:50+09');
+  perform verify_photo(uid, (r ->> 'photo_id')::uuid, repeat('5c', 32), 400000, 1568, 1176, '2026-10-13 12:50+09');
+  m2 := (create_meal(uid, (r ->> 'photo_id')::uuid, false, '2026-10-13 12:51+09') ->> 'meal_id')::uuid;
+  cp2 := (select id from meals where record_group_id = m2 and id <> m2);
+  rv_copy := raise_flag(xp, '2026-10-13', 'dup_photo', jsonb_build_object('key', cp2::text, 'meal_id', cp2), '2026-10-13 12:52+09');
+  perform tests.throws(format('select delete_meal(%L, %L)', uid, m2), 'PT422', '복사본이 확인 중', '확인 중인 기록은 지울 수 없어요');
+  insert into meals (participant_id, challenge_id, local_date, slot, status, confirmed_kcal) values (ji, seed, '2026-10-13', 'snack', 'confirmed', 200)
+  returning id into m3;
+  insert into reviews (challenge_id, participant_id, type, local_date, target, status)
+  values (seed, ji, 'report', '2026-10-13', jsonb_build_object('meal_id', m3, 'slot', 'snack'), 'appealed') returning id into rv_own;
+  perform tests.throws(format('select delete_meal(%L, %L)', uid, m3), 'PT422', '대표가 확인 중(소명)', '확인 중인 기록은 지울 수 없어요');
+  perform tests.ok((select count(*) = 2 from meals where record_group_id = m2) and exists (select 1 from meals where id = m3), '확인 중인 끼니는 남음');
+  perform tests.ok((select status = 'open' and verdict is null and decided_at is null from reviews where id = rv_copy)
+    and (select status = 'appealed' and verdict is null and decided_at is null from reviews where id = rv_own), '검토는 그대로(판정되지 않음)');
+
+  -- 삭제 전 섭취(위에서 직접 넣은 끼니까지 반영해 두고 비교)
+  perform recompute_day(ji, '2026-10-13'); perform recompute_day(xp, '2026-10-13');
   select i_d into i_ji from daily_scores where participant_id = ji and local_date = '2026-10-13';
   select i_d into i_xp from daily_scores where participant_id = xp and local_date = '2026-10-13';
   perform tests.ok(i_ji is not null and i_xp is not null, '두 참가자 모두 점수 행');
-
-  -- 끼니에 대한 열린 검토(대표: 신고, 복사본: 중복 사진 플래그)
-  insert into reviews (challenge_id, participant_id, type, local_date, target)
-  values (seed, ji, 'report', '2026-10-13', jsonb_build_object('meal_id', m, 'slot', 'lunch')) returning id into rv_own;
-  rv_copy := raise_flag(xp, '2026-10-13', 'dup_photo', jsonb_build_object('key', cp::text, 'meal_id', cp, 'photo_id', ph), '2026-10-13 12:45+09');
-  perform tests.ok((select under_review from daily_scores where participant_id = xp and local_date = '2026-10-13'), '삭제 전: X 검토 중');
 
   -- 복사본 id·없는 id → PT404, 남의 끼니 → PT403
   perform tests.throws(format('select delete_meal(%L, %L)', uid, cp), 'PT404', '복사본 id 는 찾지 못함', '기록을 찾지 못했어요');
@@ -50,13 +63,6 @@ begin
   perform tests.eq(n_items, 0, '항목 cascade');
   perform tests.ok((select i_d from daily_scores where participant_id = ji and local_date = '2026-10-13') is distinct from i_ji, '대표 참가자 섭취 재계산');
   perform tests.ok((select i_d from daily_scores where participant_id = xp and local_date = '2026-10-13') is distinct from i_xp, '복사본 참가자 섭취 재계산');
-
-  -- 열린 검토는 승인으로 닫힘, X 검토 중 해제
-  perform tests.ok((select status = 'decided' and verdict = 'approve' and decided_at = t_del and reason_template is null from reviews where id = rv_own),
-    '대표 끼니 검토 닫힘');
-  perform tests.ok((select status = 'decided' and verdict = 'approve' and decided_at = t_del and reason_template is null from reviews where id = rv_copy),
-    '복사본 검토 닫힘');
-  perform tests.ok(not (select under_review from daily_scores where participant_id = xp and local_date = '2026-10-13'), '삭제 후: X 검토 중 해제');
 
   -- 사진: 다른 끼니가 쓰지 않으면 파기 경로 반환
   perform tests.eq(r ->> 'purge_path', (select storage_path from photos where id = ph), '안 쓰는 사진은 purge_path 반환');
