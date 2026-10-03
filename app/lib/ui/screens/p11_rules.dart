@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,6 +91,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
     final m = fmtM(meM);
     final ss = currentSession; // 서버 challenge_rules·rules_md (모의: 프로토타입 값)
     final (bs, be, le, de) = ss.slotStarts;
+    final minRankDays = min(7, (curChallenge.days - 3) ~/ 2); // 순위 진입 최소 참여일
     final cards = [
       ('①', '먹은 걸 찍어요', '세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 $m kcal로, 간식은 찍은 만큼 더해져요.', '대체값 $m · 간식 ${fmtInt(r.snackKcal)} 미만', const Color(0xFF0B6E70)),
       ('②', '움직여요', '걸음·달리기·계단 자동 기록만 인정. 하루 활동 최대 ${fmtInt(r.c)} kcal.', '활동 상한 ${fmtInt(r.c)} · 걸음 ${fmtInt(r.stepsCap)}', const Color(0xFF1F5E8F)),
@@ -168,6 +171,18 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                     ),
                   ]),
                 ]),
+                ChCard(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
+                    const Txt.title('순위는 이렇게'),
+                    const Txt('순위 점수 = 일평균 × (1 + 참여율)'),
+                    const Txt('참여율 = 참여일 ÷ 반영 가능 일수'),
+                    Txt('참여일을 $minRankDays일 채우면 순위에 들어가요(그 전에는 순위 대기)'),
+                    const Txt('참가한 날부터 3일은 점검 기간(점수는 계산되지만 순위에 안 들어가요)'),
+                    const Txt('챌린지를 나가면 순위에서 빠지고 기록은 보관돼요'),
+                    if (ss.monthly) const Txt('매달 1일에 새 챌린지가 열려요'),
+                    const Txt.cap('예) 28일 참여·평균 40점 → 80점, 14일 참여·평균 60점 → 90점'),
+                  ], gap: 6)),
+                ),
                 ChCard(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
                     Row(children: [const Txt.title('상수 '), const Txt.cap('챌린지 시작 후 잠금')]),

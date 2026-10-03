@@ -166,6 +166,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final act = ref.watch(activityProvider);
     final visible = ref.watch(rankVisibleProvider);
     final aiConsent = ref.watch(aiConsentProvider);
+    final autoContinue = ref.watch(autoContinueProvider).value ?? true;
 
     Widget li(IconData icon, String title, {String? sub, Widget? trailing, VoidCallback? onTap, Color? titleColor}) => InkWell(
           onTap: onTap,
@@ -259,6 +260,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SectionTitle('공개'),
             toggle('순위에 내 행 보이기', '끄면 내 행만 보여요', visible, (v) => ref.read(rankVisibleProvider.notifier).set(v)),
             toggle('측정 등급 배지 보이기', '기본 꺼짐 · 폰/워치 표시', _grade, (v) => setState(() => _grade = v)),
+          ]),
+        ),
+        ChCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const SectionTitle('챌린지'),
+            toggle('다음 달 챌린지 자동 참가', '켜 두면 매달 1일에 새 월간 챌린지에 이어서 참가해요', autoContinue, (v) async {
+              final err = await ref.read(autoContinueProvider.notifier).set(v);
+              if (err != null && context.mounted) showToast(context, err);
+            }),
           ]),
         ),
         ChCard(

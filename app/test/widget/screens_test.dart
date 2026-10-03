@@ -3,6 +3,7 @@ import 'package:challory/core/format.dart';
 import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/state/session.dart';
 import 'package:challory/router.dart';
+import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/ui/screens/p11_rules.dart';
 import 'package:challory/ui/screens/p9_leaderboard.dart';
@@ -220,6 +221,24 @@ void main() {
           .sD;
       expect(expected, greaterThan(28.8));
       expect(find.textContaining(fmtK1(expected)), findsOneWidget);
+    });
+  });
+
+  group('월간·동시 참가 설명·설정', () {
+    testWidgets('P11: 새 순위 규칙과 점검 기간·나가기 설명', (tester) async {
+      await pumpApp(tester, location: R.rules);
+      expect(find.textContaining('일평균 × (1 + 참여율)'), findsOneWidget);
+      expect(find.textContaining('참가한 날부터 3일은 점검 기간'), findsOneWidget);
+      expect(find.textContaining('나가면 순위에서 빠지고 기록은 보관돼요'), findsOneWidget);
+    });
+
+    testWidgets('P12: 다음 달 자동 참가 토글', (tester) async {
+      final api = MockChalloryApi();
+      await pumpApp(tester, location: R.settings, overrides: [apiProvider.overrideWithValue(api)]);
+      expect(find.text('다음 달 챌린지 자동 참가'), findsOneWidget);
+      await tester.tap(find.byWidgetPredicate((w) => w is ChSwitch && w.label == '다음 달 챌린지 자동 참가'));
+      await tester.pumpAndSettle();
+      expect(await api.fetchAutoContinue(), isFalse);
     });
   });
 

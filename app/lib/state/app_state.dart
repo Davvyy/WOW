@@ -730,6 +730,29 @@ class AiConsentNotifier extends Notifier<bool> {
 
 final aiConsentProvider = NotifierProvider<AiConsentNotifier, bool>(AiConsentNotifier.new);
 
+/// 다음 달 월간 챌린지 자동 참가(profiles.auto_continue, D51)
+class AutoContinueNotifier extends AsyncNotifier<bool> {
+  @override
+  Future<bool> build() {
+    ref.watch(authChangesProvider);
+    return ref.watch(apiProvider).fetchAutoContinue();
+  }
+
+  Future<String?> set(bool on) async {
+    final prev = state.value ?? true;
+    state = AsyncData(on);
+    try {
+      await ref.read(apiProvider).setAutoContinue(on);
+      return null;
+    } catch (e) {
+      state = AsyncData(prev);
+      return apiErrorText(e);
+    }
+  }
+}
+
+final autoContinueProvider = AsyncNotifierProvider<AutoContinueNotifier, bool>(AutoContinueNotifier.new);
+
 /// P12 "순위에 내 행 보이기" (끄면 내 행만 보인다)
 class RankVisibleNotifier extends Notifier<bool> {
   @override
