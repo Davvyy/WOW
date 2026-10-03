@@ -19,7 +19,9 @@ export function userClient(req: Request): SupabaseClient {
   if (!url || !anon) throw new HttpError(500, 'SUPABASE_URL / SUPABASE_ANON_KEY 미설정');
   return createClient(url, anon, {
     auth: { persistSession: false },
-    global: { headers: { authorization: req.headers.get('authorization') ?? '' } },
+    // 키는 'Authorization' 이어야 한다: supabase-js 가 인증 요청 헤더를 { Authorization: Bearer <anon>, ...global } 로 합치므로
+    // 소문자 키면 기본값을 덮지 못하고 'Bearer <anon>, Bearer <user>' 로 합쳐져 getUser() 가 401 이 된다.
+    global: { headers: { Authorization: req.headers.get('authorization') ?? '' } },
   });
 }
 
