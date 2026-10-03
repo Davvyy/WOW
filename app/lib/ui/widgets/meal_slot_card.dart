@@ -40,6 +40,7 @@ class MealSlotCard extends StatelessWidget {
           child: Icon(icon, color: c.fg2, size: 26),
         );
     // [status] 가 true 면 아이콘이 상태(분석 중·업로드 대기)를 뜻하므로 사진 위에도 작게 남긴다.
+    final decodePx = (56 * MediaQuery.devicePixelRatioOf(context) * 1.5).ceil();
     Widget thumbFood(IconData icon, {bool status = false}) {
       final p = photo;
       if (p == null) {
@@ -56,7 +57,13 @@ class MealSlotCard extends StatelessWidget {
           width: 56,
           height: 56,
           child: Stack(fit: StackFit.expand, children: [
-            Image.memory(p, fit: BoxFit.cover, gaplessPlayback: true, excludeFromSemantics: true),
+            // 56px 타일에 원본(긴 변 1568px)을 통째로 디코딩하지 않는다: 타일의 1.5배 안에서만 디코딩
+            Image(
+              image: ResizeImage(MemoryImage(p), width: decodePx, height: decodePx, policy: ResizeImagePolicy.fit),
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              excludeFromSemantics: true,
+            ),
             if (status)
               Positioned(
                 right: 3,

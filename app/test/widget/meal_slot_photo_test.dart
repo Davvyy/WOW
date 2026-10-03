@@ -15,8 +15,13 @@ import 'screens_test.dart' show pumpApp, pumpWidgetScreen;
 
 Uint8List _png() => Uint8List.fromList(img.encodePng(img.Image(width: 4, height: 4)));
 
-Iterable<Image> _memoryImages(WidgetTester tester) =>
-    tester.widgetList<Image>(find.byType(Image)).where((i) => i.image is MemoryImage);
+/// 썸네일은 타일 크기로만 디코딩한다: ResizeImage 로 감싼 MemoryImage
+MemoryImage? _photoOf(Image i) {
+  final p = i.image;
+  return p is ResizeImage && p.imageProvider is MemoryImage ? p.imageProvider as MemoryImage : null;
+}
+
+Iterable<Image> _memoryImages(WidgetTester tester) => tester.widgetList<Image>(find.byType(Image)).where((i) => _photoOf(i) != null);
 
 void main() {
   group('MealSlotCard 사진 썸네일', () {
@@ -27,6 +32,13 @@ void main() {
       expect(images, hasLength(1));
       expect(images.single.fit, BoxFit.cover);
       expect(images.single.gaplessPlayback, isTrue);
+      final resize = images.single.image as ResizeImage;
+      final dpr = tester.view.devicePixelRatio;
+      expect(resize.width, isNotNull);
+      expect(resize.height, isNotNull);
+      expect(resize.width!, lessThanOrEqualTo(168 * dpr));
+      expect(resize.height!, lessThanOrEqualTo(168 * dpr));
+      expect(resize.policy, ResizeImagePolicy.fit);
     });
 
     testWidgets('photo 가 없으면 사진 이미지가 없다', (tester) async {
