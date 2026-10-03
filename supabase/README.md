@@ -98,6 +98,7 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 
 - 월간 챌린지는 `run_lifecycle`(00:00 KST)이 `ensure_monthly_challenge()` 로 매달 1일에 만든다. 운영자는 `app_settings.monthly_operator_id`(마이그레이션이 가장 먼저 만든 운영자 계정으로 채움). 바꾸려면 `update app_settings set value = to_jsonb('<uuid>'::uuid) where key = 'monthly_operator_id';`
 - 참가: 운영자 챌린지는 초대코드, 월간은 `join_challenge({challenge_id})`. 모집·점검·진행 중 언제든, 동시 3개까지. 나가기 `leave_challenge(id)`.
+- 월간 결과는 콘솔에서 챌린지를 공개(OP4)해야 확정된다. 그 전까지는 `closing` 으로 남고, 동시 3개 제한에는 세지 않는다.
 - 기록 공유: 끼니는 `record_group_id`(대표 끼니)로 묶이고, 걸음은 참가별 파생 배치 id 로 들어간다. Edge 함수는 바뀌지 않는다.
 - 테스트(로컬 Postgres 없음): Docker `postgres:16` 컨테이너에서 `tests/run.sh` 를 돌린다(저장소를 읽기 전용으로 붙이고 컨테이너 안 복사본에서 실행).
 
