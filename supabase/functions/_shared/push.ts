@@ -18,12 +18,78 @@ export class LogPushSender implements PushSender {
   }
 }
 
+/** Firebase 서비스 계정 키(JSON)에서 쓰는 필드 */
+export interface ServiceAccount {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+  token_uri?: string;
+}
+
+export interface TokenSource {
+  token(): Promise<string>;
+}
+
+const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+const DEFAULT_TOKEN_URI = 'https://oauth2.googleapis.com/token';
+
+function b64url(bytes: Uint8Array): string {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** 서비스 계정 키로 서명한 OAuth JWT(RS256, 1시간). Google 토큰 엔드포인트에 보내 액세스 토큰과 바꾼다. */
+export async function signServiceAccountJwt(sa: ServiceAccount, nowSec: number): Promise<string> {
+  const enc = (v: unknown) => b64url(new TextEncoder().encode(JSON.stringify(v)));
+  const unsigned = `${enc({ alg: 'RS256', typ: 'JWT' })}.${enc({
+    iss: sa.client_email,
+    scope: FCM_SCOPE,
+    aud: sa.token_uri ?? DEFAULT_TOKEN_URI,
+    iat: nowSec,
+    exp: nowSec + 3600,
+  })}`;
+  const pem = sa.private_key.replace(/-----(BEGIN|END) PRIVATE KEY-----/g, '').replace(/\s+/g, '');
+  const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned)));
+  return `${unsigned}.${b64url(sig)}`;
+}
+
+/** 서비스 계정 액세스 토큰. 만료 1분 전까지 재사용하고 그 뒤 새로 받는다(정적 토큰은 1시간 뒤 만료돼 푸시가 끊긴다). */
+export class GoogleTokenSource implements TokenSource {
+  private cached: { token: string; expiresAt: number } | null = null;
+  constructor(private sa: ServiceAccount, private fetchImpl: typeof fetch = fetch, private now: () => number = Date.now) {}
+
+  async token(): Promise<string> {
+    const t = this.now();
+    if (this.cached && t < this.cached.expiresAt - 60_000) return this.cached.token;
+    const assertion = await signServiceAccountJwt(this.sa, Math.floor(t / 1000));
+    const res = await this.fetchImpl(this.sa.token_uri ?? DEFAULT_TOKEN_URI, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }).toString(),
+    });
+    if (!res.ok) throw new Error(`google token ${res.status}`);
+    const j = await res.json();
+    this.cached = { token: j.access_token, expiresAt: t + (j.expires_in ?? 3600) * 1000 };
+    return this.cached.token;
+  }
+}
+
 export class FcmPushSender implements PushSender {
-  constructor(private projectId: string, private accessToken: string, private fetchImpl: typeof fetch = fetch) {}
+  constructor(private projectId: string, private tokens: TokenSource, private fetchImpl: typeof fetch = fetch) {}
   async send(m: PushMessage) {
+    let accessToken: string;
+    try {
+      accessToken = await this.tokens.token();
+    } catch (e) {
+      console.error('[push] FCM 액세스 토큰을 받지 못함', e);
+      return false;
+    }
     const res = await this.fetchImpl(`https://fcm.googleapis.com/v1/projects/${this.projectId}/messages:send`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${this.accessToken}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
       body: JSON.stringify({
         message: {
           token: m.token,
@@ -38,9 +104,27 @@ export class FcmPushSender implements PushSender {
   }
 }
 
+// 함수 인스턴스가 살아 있는 동안 서비스 계정별 토큰을 재사용한다(selectPushSender 는 요청마다 불린다)
+const tokenSources = new Map<string, GoogleTokenSource>();
+
+/** FCM_SERVICE_ACCOUNT(서비스 계정 키 JSON 전체)가 있으면 FCM, 없거나 깨졌으면 콘솔 로그(모의) */
 export function selectPushSender(env: (k: string) => string | undefined): PushSender {
-  const p = env('FCM_PROJECT_ID'), t = env('FCM_ACCESS_TOKEN');
-  return p && t ? new FcmPushSender(p, t) : new LogPushSender();
+  const raw = env('FCM_SERVICE_ACCOUNT');
+  if (!raw) return new LogPushSender();
+  let sa: ServiceAccount;
+  try {
+    sa = JSON.parse(raw);
+  } catch {
+    console.error('[push] FCM_SERVICE_ACCOUNT 가 JSON 이 아니라 모의 발송으로 대신함');
+    return new LogPushSender();
+  }
+  if (!sa.project_id || !sa.client_email || !sa.private_key) {
+    console.error('[push] FCM_SERVICE_ACCOUNT 에 project_id·client_email·private_key 가 없어 모의 발송으로 대신함');
+    return new LogPushSender();
+  }
+  let src = tokenSources.get(sa.client_email);
+  if (!src) tokenSources.set(sa.client_email, src = new GoogleTokenSource(sa));
+  return new FcmPushSender(sa.project_id, src);
 }
 
 /** claim_due_notifications · claim_notification 이 돌려주는 행 */

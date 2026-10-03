@@ -78,7 +78,7 @@ supabase functions deploy --use-api photo-upload-url meals meal-manual meal-conf
 supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
   AI_ENGINE=gemini VERTEX_PROJECT=... VERTEX_LOCATION=asia-northeast3 VERTEX_ACCESS_TOKEN=...   # 또는 GEMINI_API_KEY
   # 스왑: AI_ENGINE=claude ANTHROPIC_API_KEY=...
-  # 푸시: FCM_PROJECT_ID=... FCM_ACCESS_TOKEN=...
+  # 푸시: supabase secrets set FCM_SERVICE_ACCOUNT="$(cat <Firebase 서비스 계정 키>.json)"   (또는 Dashboard › Edge Functions › Secrets 에 JSON 전체를 붙여 넣기)
 ```
 
 - `config.toml`: 함수별 `verify_jwt`·import map(`functions/deno.json`)·진입점, 로컬 Storage 버킷(`meal-photos`, JPEG 5 MiB), Auth 복귀 딥링크를 담는다. `notify` 만 `verify_jwt = false`(pg_cron·외부 스케줄러가 JWT 없이 `x-cron-secret` 으로 부름, 함수가 CRON_SECRET 으로 막음)이고 나머지는 Bearer JWT 필수. `project_id` 는 로컬 구분용 이름이라 원격 프로젝트는 `supabase link --project-ref` 로 고른다. Auth 제공자(카카오·Apple) 설정은 이 파일이 아니라 Dashboard 에서 한다(아래 "로그인(Auth) 설정").
@@ -88,6 +88,7 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
 - 알림 발송 워커 `notify` 는 pg_net 또는 외부 스케줄러가 1~5분마다 `x-cron-secret` 헤더로 호출한다. transactional 알림은 워커를 기다리지 않는다: 분석 완료(N-04)는 `analyze-meal` 이, 판정 결과(N-06)는 `verdict`(확정 호출, 재전송 제외)가 큐에 넣은 직후 `claim_notification` 으로 그 건을 집어 바로 보낸다(`_shared/supabase.ts` `sendPendingNow`, 같은 no_push·하루 4건 규칙, 실패하면 워커가 이어서 보냄). 검토 안내(N-05, scheduled)도 `reports`·`sync-activity` 가 같은 방식으로 바로 보내되, 22~08시 생성분은 예약 시각(08:00)이 아니므로 집히지 않고 워커가 08:00 에 보낸다.
 - 푸시 data 는 `type`·`id`(알림) + payload(N-01: `local_date`, N-02: `local_date`·`kind`(confirm·sync)·`slot`·`pending`, N-04: `meal_id`·`slot`, N-05: `review_id`, N-06: `review_id`·`verdict`)를 문자열로 싣는다. 앱은 N-04 를 받으면 그 끼니를 다시 읽고(눌렀으면 P7), N-05·N-06 을 받으면 장부·검토·순위를 다시 읽고(눌렀으면 P10), N-01 을 받으면 확정된 장부·순위를 다시 읽는다(눌렀으면 P5).
 - 키가 없으면 `analyze-meal` 은 모의 어댑터(프로토타입 점심 초안 6항목)를, `notify` 는 로그 발송을 쓴다.
+- 푸시는 `FCM_SERVICE_ACCOUNT`(Firebase 콘솔 › 프로젝트 설정 › 서비스 계정 › 새 비공개 키 생성으로 받은 JSON 전체)로 보낸다. 함수가 이 키로 서명한 JWT 를 Google 토큰 엔드포인트에 보내 FCM 액세스 토큰을 받고, 만료 1분 전까지 인스턴스 안에서 재사용한다(`_shared/push.ts`). 정적 액세스 토큰은 1시간 뒤 만료되므로 쓰지 않는다. JSON 이 깨졌거나 필드가 빠지면 오류 로그를 남기고 로그 발송으로 대신한다.
 - Gemini 기본 모델은 `gemini-3.5-flash-lite` 이고 `GEMINI_MODEL` 시크릿으로 바꾼다. 2.5 모델은 예전에 쓰던 사용자에게만 열려 새 키로는 404 가 난다. `analyze-meal` 은 호출 1회 8초·최대 2회라 응답이 빠른 모델이어야 한다. 무료 등급은 보낸 사진이 Google 제품 개선에 쓰이므로 실제 참가자를 받기 전 유료 등급으로 바꾼다.
 - 음식 DB: 시드의 `food_db_cache` 30건은 **예시 값**이다. 실제 식약처 음식 표준데이터(15100070)는 CSV를 내려받아 `food_db_cache(food_code, name_kr, category, serving_g, kcal, ...)` 로 적재하고 동의어 100개를 `food_synonyms` 에 넣는다.
 
