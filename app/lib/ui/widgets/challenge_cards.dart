@@ -17,6 +17,7 @@ class ChallengeCards extends ConsumerWidget {
 
   static String statusLine(ChallengeSession s, DateTime today) {
     final cs = s.checkStart;
+    if (cs != null && today.isBefore(cs)) return '';
     if (cs != null && today.isBefore(cs.add(const Duration(days: 3)))) {
       return '점검 기간 ${today.difference(cs).inDays + 1}/3일';
     }
@@ -44,7 +45,7 @@ class ChallengeCards extends ConsumerWidget {
         key: ValueKey('challenge-card-$i'),
         width: 220,
         child: ChCard(
-          outline: true,
+          outline: !sel,
           color: sel ? c.brandSoft : null,
           onTap: () => ref.read(selectedChallengeProvider.notifier).select(s.challengeId),
           semanticsLabel: '${ch.name} 보기',
@@ -169,6 +170,7 @@ class _CodeSheet extends ConsumerStatefulWidget {
 class _CodeSheetState extends ConsumerState<_CodeSheet> {
   final _code = TextEditingController();
   String? _err;
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -180,11 +182,19 @@ class _CodeSheetState extends ConsumerState<_CodeSheet> {
     final nav = Navigator.of(context);
     final host = nav.context;
     final code = _code.text.trim().toUpperCase();
+    if (_busy) return;
     if (code.length != 6) return setState(() => _err = '코드를 다시 확인해 주세요');
-    final inv = await ref.read(apiProvider).getInvite(code);
+    setState(() => _busy = true);
+    final InviteSummary? inv;
+    try {
+      inv = await ref.read(apiProvider).getInvite(code);
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+      rethrow;
+    }
     if (!mounted) return;
-    if (inv == null) return setState(() => _err = '코드를 다시 확인해 주세요');
-    if (!inv.joinable || inv.full) return setState(() => _err = '참가가 마감된 챌린지예요');
+    if (inv == null) return setState(() { _busy = false; _err = '코드를 다시 확인해 주세요'; });
+    if (!inv.joinable || inv.full) return setState(() { _busy = false; _err = '참가가 마감된 챌린지예요'; });
     nav.pop();
     if (!host.mounted) return;
     await showJoinSheet(host, invite: inv, code: code);
