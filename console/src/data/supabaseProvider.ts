@@ -123,6 +123,14 @@ export function createSupabaseApi(): ConsoleApi {
       if (error) fail('규칙 상수를 불러오지 못했어요', error);
       return mapRules(data);
     },
+    async createChallenge(input) {
+      const { data, error } = await sb.rpc('create_challenge', {
+        p: { name: input.name, start_date: input.startDate, end_date: input.endDate, capacity: input.capacity },
+      });
+      if (error) fail('챌린지를 만들지 못했어요', error);
+      notify();
+      return api.getChallenge((data as { id: string }).id);
+    },
     async updateChallenge(id, patch) {
       const body: Row = {};
       if (patch.name !== undefined) body.name = patch.name;

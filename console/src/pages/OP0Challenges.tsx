@@ -11,7 +11,7 @@ export function OP0Challenges() {
   return (
     <main className="content">
       <PageHead id="OP0" title="챌린지 목록" lead={`운영자 ${ops.operatorName} · ${data ? `${data.length}개 챌린지` : ''}`}
-        acts={<button className="btn secondary" disabled title="1회차는 챌린지 1개로 운영해요"><Ms name="add" />새 챌린지</button>} />
+        acts={<button className="btn secondary" onClick={() => nav('/new')}><Ms name="add" />새 챌린지</button>} />
       {error && !data ? <ErrorBox error={error} retry={reload} /> : null}
       {!data && !error ? <Loading /> : null}
       {data ? (

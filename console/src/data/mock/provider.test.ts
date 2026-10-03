@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { newChallengeDefaults } from '../../lib/challengeForm';
 import { composeNotification } from '../../lib/verdictCopy';
 import { createMockApi } from './provider';
 
@@ -28,5 +29,15 @@ describe('mock provider', () => {
     expect(await api.openReviewCount('ch-autumn')).toBe(0);
     await api.transition('ch-autumn', 'published');
     expect((await api.getChallenge('ch-autumn')).status).toBe('published');
+  });
+  it('새 챌린지: 초안으로 목록에 들어가고 규칙은 잠금 전, 잘못된 입력은 거절', async () => {
+    const api = createMockApi('running');
+    const { today } = await api.ops();
+    const c = await api.createChallenge({ ...newChallengeDefaults(today), name: '  봄 걷기 챌린지  ' });
+    expect(c).toMatchObject({ name: '봄 걷기 챌린지', status: 'draft', inviteCode: '', joined: 0 });
+    expect((await api.listChallenges()).map((x) => x.challenge.id)).toContain(c.id);
+    expect((await api.getChallenge(c.id)).name).toBe('봄 걷기 챌린지');
+    expect((await api.getRules(c.id)).lockedAt).toBeNull();
+    await expect(api.createChallenge({ ...newChallengeDefaults(today), name: 'x', capacity: 10 })).rejects.toThrow('정원은 30~100명');
   });
 });

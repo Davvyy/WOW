@@ -3,6 +3,7 @@ import type {
   DayRow, FinalRanking, HealthAlert, OpsInfo, Participant, ParticipantAction, PurgeResult, ReasonTemplate,
   ReviewItem, SimInput, SimResult, Verdict, VerdictImpact,
 } from './types';
+import type { ChallengeBasics } from '../lib/challengeForm';
 
 /**
  * 콘솔의 모든 데이터 접근은 이 인터페이스를 거친다.
@@ -17,6 +18,8 @@ export interface ConsoleApi {
   summary(id: string): Promise<ChallengeSummary>;
   getChallenge(id: string): Promise<Challenge>;
   getRules(challengeId: string): Promise<ChallengeRules>;
+  /** RPC create_challenge: 초안 + 기본 규칙 행. 초대코드는 모집 시작 때 발급(그 전엔 ''). 검사는 lib/challengeForm 과 같다. */
+  createChallenge(input: ChallengeBasics): Promise<Challenge>;
   /** 시작 전(draft/recruiting)에만 허용. 이름·기간·정원. */
   updateChallenge(id: string, patch: Partial<Pick<Challenge, 'name' | 'startDate' | 'endDate' | 'capacity'>>): Promise<Challenge>;
   /** 시작 후에도 허용. */

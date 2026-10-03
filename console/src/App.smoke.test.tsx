@@ -26,6 +26,13 @@ async function click(el: Element | null | undefined) {
   for (let i = 0; i < 5; i++) await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
 }
 
+/** 제어 입력(React)에 값 넣기 */
+async function type(el: Element | null | undefined, value: string) {
+  if (!el) throw new Error('입력을 찾지 못했어요');
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  await act(async () => { set.call(el, value); el.dispatchEvent(new Event('input', { bubbles: true })); });
+}
+
 beforeAll(() => { getApi().mock?.setScenario('running'); });
 afterEach(async () => { await act(async () => { root?.unmount(); }); host?.remove(); root = null; });
 
@@ -79,5 +86,23 @@ describe('OP4', () => {
     expect(t2).toContain('미결 0건');
     const ok = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('최종 확정'));
     expect(ok?.hasAttribute('disabled')).toBe(false);
+  });
+  it('OP0 새 챌린지: 입력 검사 → 만들면 초안으로 OP1 설정에 들어가고 목록에도 보인다', async () => {
+    await visit('/');
+    const btn = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('새 챌린지'));
+    expect(btn?.hasAttribute('disabled')).toBe(false);
+    await click(btn);
+    expect(host.textContent).toContain('새 챌린지 만들기');
+    await type(host.querySelector('#n-name'), '봄 걷기 챌린지');
+    await type(host.querySelector('#n-cap'), '10');
+    await click(Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('만들기')));
+    expect(host.textContent).toContain('정원은 30~100명으로 정해 주세요');
+    await type(host.querySelector('#n-cap'), '40');
+    await click(Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('만들기')));
+    expect(window.location.pathname).toMatch(/^\/c\/ch-new-\d+\/settings$/);
+    expect(host.textContent).toContain('봄 걷기 챌린지');
+    const list = await visit('/');
+    expect(list).toContain('봄 걷기 챌린지');
+    expect(list).toContain('참가 0/40');
   });
 });

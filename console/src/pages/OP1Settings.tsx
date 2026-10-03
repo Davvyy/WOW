@@ -3,6 +3,7 @@ import { Banner, Chip, ErrorBox, Loading, Modal, Ms, PageHead } from '../compone
 import { useChallenge } from '../components/Shell';
 import { useConsole, useLoad } from '../context';
 import type { ChallengeRules, ChallengeStatus, SimResult } from '../data/types';
+import { challengeBasicsError } from '../lib/challengeForm';
 import { daysBetween, fmt, mdDate } from '../lib/format';
 import { FLOW, isLocked, manualTransitions, STATUS } from '../lib/lifecycle';
 import { parseMd, splitBold } from '../lib/markdown';
@@ -141,9 +142,8 @@ export function OP1Settings() {
 
   async function saveBasic() {
     const cap = Number(form.capacity);
-    if (!(days >= 7 && days <= 30)) { setFormErr('기간은 7~30일로 정해 주세요'); return; }
-    if (!(cap >= 30 && cap <= 100)) { setFormErr('정원은 30~100명으로 정해 주세요'); return; }
-    if (cap < ch.joined) { setFormErr(`현재 참가자 ${ch.joined}명보다 적게 줄일 수 없어요`); return; }
+    const err = challengeBasicsError({ name: form.name, startDate: form.startDate, endDate: form.endDate, capacity: cap }, { joined: ch.joined });
+    if (err) { setFormErr(err); return; }
     setFormErr(null);
     try {
       await api.updateChallenge(ch.id, { name: form.name.trim(), startDate: form.startDate, endDate: form.endDate, capacity: cap });

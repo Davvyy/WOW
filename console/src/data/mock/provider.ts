@@ -8,6 +8,7 @@ import type {
   FinalRanking, HealthAlert, OpsInfo, Participant, ParticipantAction, ParticipantState, PurgeResult, ReasonTemplate,
   ReviewEvidence, ReviewItem, SimInput, SimResult, Slot, Verdict, VerdictImpact,
 } from '../types';
+import { challengeBasicsError } from '../../lib/challengeForm';
 import { buildCsv } from '../../lib/csv';
 import { fmt, mdDate, median, round1 as r1 } from '../../lib/format';
 import { REASON_LABEL_BY_TYPE } from '../../lib/verdictCopy';
@@ -76,6 +77,7 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
   let announcements: Announcement[] = [];
   let md = DEFAULT_MD;
   let completedBase = 12;
+  let created: Challenge[] = []; // 콘솔에서 새로 만든 챌린지(시나리오를 바꾸면 비운다)
 
   const nowIso = () => kstIso(scenario.today, scenario.time);
   const nowLabel = () => `${mdDate(scenario.today)} ${scenario.time}`;
@@ -107,6 +109,7 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
     completedBase = s.decideAll ? 15 : 12;
     md = DEFAULT_MD;
     primary.rulesMd = md;
+    created = [];
   }
   seed();
 
@@ -266,7 +269,7 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
       const running = ['checking', 'running', 'closing'].includes(primary.status);
       return [
         { challenge: { ...primary }, openReviews: openCount(), todaySyncRate: primary.joined ? Math.round((primary.joined - (running ? unsynced : 0)) / primary.joined * 100) : null, unconfirmedMeals: running ? 17 : 0 },
-        ...OTHER_CHALLENGES.map((c) => ({ challenge: { ...c }, openReviews: 0, todaySyncRate: null, unconfirmedMeals: 0 })),
+        ...[...created, ...OTHER_CHALLENGES].map((c) => ({ challenge: { ...c }, openReviews: 0, todaySyncRate: null, unconfirmedMeals: 0 })),
       ];
     },
     async summary(id) {
@@ -277,11 +280,26 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
     },
     async getChallenge(id) {
       if (id === PRIMARY) return { ...primary, rulesMd: md };
-      const c = OTHER_CHALLENGES.find((x) => x.id === id);
+      const c = [...created, ...OTHER_CHALLENGES].find((x) => x.id === id);
       if (!c) throw new Error('챌린지를 찾지 못했어요');
       return { ...c };
     },
-    getRules: () => sleep({ ...DEFAULT_RULES, lockedAt: ['draft', 'recruiting'].includes(primary.status) ? null : `${START}T00:00:00+09:00` }),
+    getRules: (id) => {
+      const c = id === PRIMARY ? primary : [...created, ...OTHER_CHALLENGES].find((x) => x.id === id) ?? primary;
+      return sleep({ ...DEFAULT_RULES, lockedAt: ['draft', 'recruiting'].includes(c.status) ? null : `${c.startDate}T00:00:00+09:00` });
+    },
+    async createChallenge(input) {
+      const err = challengeBasicsError(input, { today: scenario.today });
+      if (err) throw new Error(err);
+      const c: Challenge = {
+        id: `ch-new-${created.length + 1}`, name: input.name.trim(), status: 'draft', startDate: input.startDate, endDate: input.endDate,
+        capacity: input.capacity, inviteCode: '', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 0,
+      };
+      created = [c, ...created];
+      log(`새 챌린지 생성: ${c.name}`);
+      notify();
+      return { ...c };
+    },
     async updateChallenge(id, patch) {
       if (id !== PRIMARY) throw new Error('모의 데이터에서는 가을 걷기 챌린지만 수정할 수 있어요');
       if (!['draft', 'recruiting'].includes(primary.status)) throw new Error('시작 후에는 기간·정원이 바뀌지 않아요');

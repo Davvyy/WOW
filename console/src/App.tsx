@@ -5,6 +5,7 @@ import { ChallengeLayout, Shell } from './components/Shell';
 import { ConsoleProvider } from './context';
 import { getApi } from './data';
 import { createRefineDataProvider } from './data/refineProvider';
+import { NewChallenge } from './pages/NewChallenge';
 import { OP0Challenges } from './pages/OP0Challenges';
 import { OP1Settings } from './pages/OP1Settings';
 import { OP2Participants } from './pages/OP2Participants';
@@ -27,6 +28,7 @@ export default function App() {
             <Routes>
               <Route element={<Shell />}>
                 <Route index element={<OP0Challenges />} />
+                <Route path="new" element={<NewChallenge />} />
                 <Route path="c/:cid" element={<ChallengeLayout />}>
                   <Route index element={<Navigate to="settings" replace />} />
                   <Route path="settings" element={<OP1Settings />} />
