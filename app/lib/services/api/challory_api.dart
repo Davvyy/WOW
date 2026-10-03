@@ -93,6 +93,10 @@ abstract class ChalloryApi {
   /// API #13 건너뜀
   Future<SkipResult> skipMeal(String localDate, MealSlot slot, {required String idempotencyKey});
 
+  /// 끼니 지우기(Edge meal-delete). 서버가 사진·항목을 지우고 그날 점수를 다시 계산한다.
+  /// 404 기록 없음 · 403 남의 기록 · 422 확정된 날짜·판정된 기록은 [ApiException] 으로 서버 문구 그대로.
+  Future<void> deleteMeal(String mealId, {required String idempotencyKey});
+
   /// API #10 사진 없는 직접 입력·검색 확정
   Future<ConfirmResult> createManualMeal(MealSlot slot, List<Map<String, dynamic>> items, {String? localDate, required String idempotencyKey});
 

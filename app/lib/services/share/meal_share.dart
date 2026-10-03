@@ -56,6 +56,9 @@ abstract class SharePhotoStore {
   Future<void> put(String mealId, Uint8List bytes);
   Future<Uint8List?> get(String mealId);
 
+  /// 끼니 하나의 사진을 지운다(기록을 지웠을 때)
+  Future<void> remove(String mealId);
+
   /// 기간이 지난 사진을 지우고 지운 수를 돌려준다(앱 시작 시)
   Future<int> prune();
 
@@ -69,6 +72,8 @@ class MemorySharePhotoStore implements SharePhotoStore {
   Future<void> put(String mealId, Uint8List bytes) async => photos[mealId] = bytes;
   @override
   Future<Uint8List?> get(String mealId) async => photos[mealId];
+  @override
+  Future<void> remove(String mealId) async => photos.remove(mealId);
   @override
   Future<int> prune() async => 0;
   @override
@@ -111,6 +116,14 @@ class FileSharePhotoStore implements SharePhotoStore {
     } catch (_) {
       return null;
     }
+  }
+
+  @override
+  Future<void> remove(String mealId) async {
+    final f = _file(await _ready(), mealId);
+    try {
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
   }
 
   @override

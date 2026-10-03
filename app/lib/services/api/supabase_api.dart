@@ -396,6 +396,10 @@ class SupabaseChalloryApi implements ChalloryApi {
   }
 
   @override
+  Future<void> deleteMeal(String mealId, {required String idempotencyKey}) async =>
+      await _fn('meal-delete', {'meal_id': mealId}, headers: {'Idempotency-Key': idempotencyKey});
+
+  @override
   Future<ConfirmResult> createManualMeal(MealSlot slot, List<Map<String, dynamic>> items, {String? localDate, required String idempotencyKey}) async =>
       ConfirmResult.fromJson(await _fn('meal-manual', {'slot': slot.name, 'items': items, 'local_date': ?localDate},
           headers: {'Idempotency-Key': idempotencyKey}));

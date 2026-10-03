@@ -270,6 +270,16 @@ class MockChalloryApi implements ChalloryApi {
     return const SkipResult(remainingWeek: 1, overLimit: false);
   }
 
+  /// 지운 끼니 id(테스트가 확인한다)
+  final deletedMeals = <String>[];
+
+  @override
+  Future<void> deleteMeal(String mealId, {required String idempotencyKey}) async {
+    _maybeFail('meal-delete');
+    _meals.remove(mealId);
+    deletedMeals.add(mealId);
+  }
+
   @override
   Future<ConfirmResult> createManualMeal(MealSlot slot, List<Map<String, dynamic>> items, {String? localDate, required String idempotencyKey}) async {
     _maybeFail('meal-manual');
