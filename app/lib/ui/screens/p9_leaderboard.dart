@@ -213,7 +213,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       );
     }
 
-    Widget podium(List<LeaderRow> top, {bool showAvg = false}) {
+    // 고정 행 높이: 기본 68(격차 줄이 있으면 76), 누적 탭의 일평균 줄이 붙으면 24 더
+    double pinnedHeight(LeaderRow r, {bool pinned = false}) => (pinned ? 76 : 68) + (!today && r.avg != null ? 24 : 0);
+
+    Widget podium(List<LeaderRow> top,{bool showAvg = false}) {
       Widget p(LeaderRow? r, {required bool first}) {
         if (r == null) return const SizedBox.shrink();
         return Container(
@@ -231,7 +234,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 ]),
                 Txt(r.name, size: 13, weight: FontWeight.w600, maxLines: 1),
                 NumText(fmtK1(r.score!), size: 19, weight: FontWeight.w700),
-                if (showAvg && r.avg != null) Txt(_avgText(r), size: 11, color: c.fg2, align: TextAlign.center),
+                if (showAvg && r.avg != null) Txt(_avgText(r), size: 11, color: c.fg2, align: TextAlign.center, maxLines: 2),
               ]),
             ),
           ),
@@ -283,13 +286,13 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         final fin = watchFinalRows(ref);
         final finMe = myFinalRow(fin);
         addBox(podium(fin.where((r) => !r.aggregating && r.score != null).take(3).toList()));
-        if (finMe != null) slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: 68, color: c.bg, child: rowW(finMe, pinned: false))));
+        if (finMe != null) slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: pinnedHeight(finMe), color: c.bg, child: rowW(finMe))));
         slivers.add(SliverList(delegate: SliverChildListDelegate([for (final r in fin.skip(3)) if (!r.me) rowW(r)])));
         addBox(Center(child: Txt.cap('최종 ${ref.read(apiProvider).isRemote ? fin.where((r) => !r.aggregating).length : lb.total - 2}명 · 결과 이의는 점수 장부에서 1회')), bottom: 0);
       case ChallengePhase.active:
         if (!visible) {
           addBox(Align(alignment: Alignment.centerLeft, child: const ChChip('순위 비공개 중 · 내 행만 보여요', icon: Icons.visibility_off_rounded)));
-          slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: 68, color: c.bg, child: rowW(me))));
+          slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: pinnedHeight(me), color: c.bg, child: rowW(me))));
           addBox(centerCard(Icons.visibility_off_rounded, '순위 비공개', '설정에서 "순위에 내 행 보이기"를 켜면 전체 순위를 볼 수 있어요.', extra: ChLink('설정으로', onTap: () => context.push(R.settings))));
           break;
         }
@@ -298,7 +301,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           child: today ? const ChChip('잠정 · 매시간 갱신 · 내일 09:00 확정', icon: Icons.schedule_rounded) : ChChip('확정 · ${ch.today.month}.${ch.today.day} 09:00', tone: Tone.good, icon: Icons.check_rounded),
         ));
         final ranked = list.where((r) => !r.pending).toList();
-        final pending = list.where((r) => r.pending && !r.aggregating).toList();
+        final pending = list.where((r) => r.pending && !r.aggregating && !(r.me && me.pending)).toList();
         final others = ranked.where((r) => !r.me).toList();
         final top3 = others.where((r) => !r.aggregating && r.score != null).take(3).toList();
         final rest = ranked.where((r) => (r.rank > 3 || r.aggregating) && !r.me).toList();
@@ -309,7 +312,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           final minDays = st?.minDays ?? me.minDays ?? 7;
           addBox(centerCard(Icons.hourglass_top_rounded, '순위 대기 · 참여 $days/$minDays일', '점검 기간이 끝난 뒤 참여일이 쌓이면 순위에 들어가요'));
         } else {
-          slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: !today && me.avg != null ? 100 : 76, color: c.bg, child: rowW(me, pinned: true))));
+          slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: pinnedHeight(me, pinned: true), color: c.bg, child: rowW(me, pinned: true))));
         }
         slivers.add(SliverList(delegate: SliverChildListDelegate([for (final r in rest) rowW(r)])));
         if (pending.isNotEmpty) {

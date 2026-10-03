@@ -21,6 +21,18 @@ class _Api extends MockChalloryApi {
   }
 }
 
+class _PendingMeApi extends MockChalloryApi {
+  @override
+  Future<Leaderboard> fetchLeaderboard() async {
+    calls.add('leaderboard');
+    return Leaderboard(total: 3, today: mockLeaderboard.today, cumulative: const [
+      LeaderRow(rank: 1, name: '하니', score: 90, avg: 60, rate: 0.5, days: 14, minDays: 7, participantId: 'p-2'),
+      LeaderRow(rank: 0, name: '지수', pending: true, days: 3, minDays: 7, me: true, participantId: 'p-1'),
+      LeaderRow(rank: 0, name: '늦은참가', pending: true, days: 2, minDays: 7, participantId: 'p-3'),
+    ]);
+  }
+}
+
 void main() {
   tearDown(resetSession);
 
@@ -47,5 +59,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.sessions.length, 1);
     expect(find.text('챌린지에서 나갔어요'), findsOneWidget);
+  });
+
+  testWidgets('순위 비공개 + 누적: 일평균 줄이 있어도 내 행 고정 영역이 넘치지 않음', (tester) async {
+    final container = await pumpApp(tester, location: R.rank, overrides: [apiProvider.overrideWithValue(_Api())]);
+    container.read(rankVisibleProvider.notifier).set(false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('누적'));
+    await tester.pumpAndSettle();
+    expect(find.text('일평균 40.0점 · 참여율 100%'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('내가 순위 대기면 카드만 보이고 목록에는 다시 나오지 않음', (tester) async {
+    await pumpApp(tester, location: R.rank, overrides: [apiProvider.overrideWithValue(_PendingMeApi())]);
+    await tester.tap(find.text('누적'));
+    await tester.pumpAndSettle();
+    expect(find.text('순위 대기 · 참여 3/7일'), findsOneWidget);
+    expect(find.textContaining('지수 · 참여'), findsNothing);
+    expect(find.textContaining('늦은참가 · 참여 2/7일'), findsOneWidget);
   });
 }
