@@ -85,7 +85,6 @@ emit(`-- 생성 파일: node supabase/seed/generate_seed.mjs > supabase/seed.sql
 -- 프로토타입 예시: ${CHALLENGE.name} ${CHALLENGE.start}~${CHALLENGE.end}, 오늘 ${CHALLENGE.today}(D+${CHALLENGE.dayIndex}).
 -- 원천 값만 넣고 점수는 끝의 배치 함수가 계산한다. 10.12 지수 저녁(사진 중복)은 판정 전(R-0415 미결) 상태.
 begin;
-set local session_replication_role = default;
 insert into auth.users (id, email) values (${q(OP)}, 'minho@example.com') on conflict do nothing;
 insert into users (id, provider, nickname, is_operator) values (${q(OP)}, 'kakao', '민호', true) on conflict do nothing;
 insert into challenges (id, name, status, start_date, end_date, capacity, invite_code, rules_md, operator_id)

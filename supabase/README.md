@@ -72,7 +72,7 @@ deno task test    # 단위 테스트(모의 어댑터, 네트워크·키 불필�
 ```bash
 supabase link --project-ref <ref>
 supabase db push                      # migrations/ 적용
-psql "$DATABASE_URL" -f supabase/seed.sql   # (선택) 프로토타입 예시 데이터
+supabase db query --linked -f supabase/seed.sql   # (선택) 프로토타입 예시 데이터(psql 없이 Management API 로). psql 이 있으면 psql "$DATABASE_URL" -f 도 같음
 supabase functions deploy --use-api photo-upload-url meals meal-manual meal-confirm meal-skip analyze-meal sync-activity reports account \
   verdict notify announce export purge-photos   # --use-api: Docker 없이 서버에서 번들
 supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \

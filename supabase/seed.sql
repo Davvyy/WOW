@@ -2,7 +2,6 @@
 -- 프로토타입 예시: 가을 걷기 챌린지 2026-10-06~2026-11-02, 오늘 2026-10-13(D+8).
 -- 원천 값만 넣고 점수는 끝의 배치 함수가 계산한다. 10.12 지수 저녁(사진 중복)은 판정 전(R-0415 미결) 상태.
 begin;
-set local session_replication_role = default;
 insert into auth.users (id, email) values ('f5896671-44c4-42b3-a27f-3ef99d04cb3b', 'minho@example.com') on conflict do nothing;
 insert into users (id, provider, nickname, is_operator) values ('f5896671-44c4-42b3-a27f-3ef99d04cb3b', 'kakao', '민호', true) on conflict do nothing;
 insert into challenges (id, name, status, start_date, end_date, capacity, invite_code, rules_md, operator_id)
