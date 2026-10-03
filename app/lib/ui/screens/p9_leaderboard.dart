@@ -12,6 +12,7 @@ import '../widgets/common.dart';
 import '../../state/session.dart';
 
 const _avatarColors = [Color(0xFFB85C2A), Color(0xFF2F6E8F), Color(0xFF5E7A2F), Color(0xFF7A4F9A), Color(0xFF9A4F6E), Color(0xFF4F6E9A)];
+String _avgText(LeaderRow r) => '일평균 ${fmtK1(r.avg!)}점 · 참여율 ${((r.rate ?? 0) * 100).round()}%';
 Color _avatarColor(String name) => _avatarColors[name.runes.fold<int>(0, (a, r) => a + r) % _avatarColors.length];
 
 class _Avatar extends StatelessWidget {
@@ -56,6 +57,22 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     showChSheet<void>(context, builder: (_) => _ReportSheet(target: target.name, participantId: target.participantId));
   }
 
+  /// 챌린지 나가기: 확인 뒤 서버 호출. 성공하면 선택이 첫 참가로 돌아간다.
+  Future<void> _leave() async {
+    final s = currentSession;
+    final id = s.challengeId;
+    if (id == null) return;
+    final ok = await showChDialog<bool>(context, title: '${s.challenge.name}에서 나갈까요?',
+        body: const Txt('순위에서 빠지고 기록은 보관돼요 · 이 챌린지에는 다시 참가할 수 없어요'),
+        actions: [
+          Builder(builder: (ctx) => ChButton('취소', kind: BtnKind.quiet, onPressed: () => Navigator.of(ctx).pop(false))),
+          Builder(builder: (ctx) => ChButton('나가기', kind: BtnKind.critical, onPressed: () => Navigator.of(ctx).pop(true))),
+        ]);
+    if (ok != true || !mounted) return;
+    final err = await ref.read(challengesActionsProvider).leave(id);
+    if (mounted) showToast(context, err ?? '챌린지에서 나갔어요');
+  }
+
   /// 서버 모드에서 스냅샷을 아직 못 받았을 때(로딩·오류)
   Widget _loadingScaffold(BuildContext context, String meta) {
     final c = context.c;
@@ -92,6 +109,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     final visible = ref.watch(rankVisibleProvider);
     final act = ref.watch(activityProvider);
     final remote = ref.read(apiProvider).isRemote;
+    final sessions = ref.watch(sessionsProvider).value ?? const <ChallengeSession>[];
+    final current = ref.watch(sessionProvider).value;
     final loaded = watchLeaderboard(ref);
     if (loaded == null) return _loadingScaffold(context, ch.name);
     final lb = loaded;
@@ -168,6 +187,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                     if (mine && r.delta > 0) Semantics(label: '${r.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${r.delta}', size: 11, color: c.good))),
                     if (mine && reviewMe && today) InkWell(onTap: () => context.push('${R.ledger}?v=review'), child: Txt('소명하기', size: 11, weight: FontWeight.w600, color: c.brand)),
                   ]),
+                  if (!today && r.avg != null) Txt.cap(_avgText(r), maxLines: 1),
                   if (pinned && mine && r.rank != 1 && r.rank != 0)
                     Txt(
                         today || third == null || (r.score ?? 0) >= third
@@ -193,7 +213,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       );
     }
 
-    Widget podium(List<LeaderRow> top) {
+    Widget podium(List<LeaderRow> top, {bool showAvg = false}) {
       Widget p(LeaderRow? r, {required bool first}) {
         if (r == null) return const SizedBox.shrink();
         return Container(
@@ -211,6 +231,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 ]),
                 Txt(r.name, size: 13, weight: FontWeight.w600, maxLines: 1),
                 NumText(fmtK1(r.score!), size: 19, weight: FontWeight.w700),
+                if (showAvg && r.avg != null) Txt(_avgText(r), size: 11, color: c.fg2, align: TextAlign.center),
               ]),
             ),
           ),
@@ -241,14 +262,22 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     void addBox(Widget w, {double bottom = 10}) => slivers.add(SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(bottom: bottom), child: w)));
 
     final showSeg = phase == ChallengePhase.active;
+    if (sessions.length >= 2) {
+      addBox(ChSeg<String>(
+        small: true,
+        items: [for (final s in sessions) (s.challengeId ?? '', s.challenge.name)],
+        value: current?.challengeId ?? '',
+        onChanged: (id) => ref.read(selectedChallengeProvider.notifier).select(id),
+      ));
+    }
     if (showSeg) addBox(ChSeg<bool>(label: '기간', items: const [(true, '오늘 (잠정)'), (false, '누적')], value: today, onChanged: (v) => setState(() => _today = v)));
 
     switch (phase) {
       case ChallengePhase.recruiting:
-        addBox(centerCard(Icons.event_rounded, '10월 6일에 시작해요', '첫 3일(점검 기간) 점수는 누적에 들어가지 않아요.', extra: ChLink('규칙 미리 보기', onTap: () => context.go(R.rules))));
+        addBox(centerCard(Icons.event_rounded, '${ch.start.month}월 ${ch.start.day}일에 시작해요', '첫 3일(점검 기간) 점수는 누적에 들어가지 않아요.', extra: ChLink('규칙 미리 보기', onTap: () => context.go(R.rules))));
       case ChallengePhase.closing:
         addBox(Align(alignment: Alignment.centerLeft, child: const ChChip('최종 집계 중 · 운영자 확인 후 발표돼요', tone: Tone.review, icon: Icons.hourglass_top_rounded)));
-        addBox(centerCard(Icons.hourglass_top_rounded, '최종 집계 중', '11.3 09:00 확정 · 미결 검토가 끝나면 발표돼요. 발표 뒤 7일 동안 이의를 남길 수 있어요.'));
+        addBox(centerCard(Icons.hourglass_top_rounded, '최종 집계 중', '${fmtMd(ch.end.add(const Duration(days: 1)))} 09:00 확정 · 미결 검토가 끝나면 발표돼요. 발표 뒤 7일 동안 이의를 남길 수 있어요.'));
       case ChallengePhase.published:
         addBox(Align(alignment: Alignment.centerLeft, child: ChChip('최종 결과 · 이의 기간 ~${ch.objectionUntil}', tone: Tone.good, icon: Icons.verified_rounded)));
         final fin = watchFinalRows(ref);
@@ -268,12 +297,28 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           alignment: Alignment.centerLeft,
           child: today ? const ChChip('잠정 · 매시간 갱신 · 내일 09:00 확정', icon: Icons.schedule_rounded) : ChChip('확정 · ${ch.today.month}.${ch.today.day} 09:00', tone: Tone.good, icon: Icons.check_rounded),
         ));
-        final others = list.where((r) => !r.me).toList();
+        final ranked = list.where((r) => !r.pending).toList();
+        final pending = list.where((r) => r.pending && !r.aggregating).toList();
+        final others = ranked.where((r) => !r.me).toList();
         final top3 = others.where((r) => !r.aggregating && r.score != null).take(3).toList();
-        final rest = list.where((r) => (r.rank > 3 || r.aggregating) && !r.me).toList();
-        addBox(podium(top3));
-        slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: 76, color: c.bg, child: rowW(me, pinned: true))));
+        final rest = ranked.where((r) => (r.rank > 3 || r.aggregating) && !r.me).toList();
+        addBox(podium(top3, showAvg: !today));
+        if (me.pending) {
+          final st = currentSession.stats;
+          final days = st?.days ?? me.days ?? 0;
+          final minDays = st?.minDays ?? me.minDays ?? 7;
+          addBox(centerCard(Icons.hourglass_top_rounded, '순위 대기 · 참여 $days/$minDays일', '점검 기간이 끝난 뒤 참여일이 쌓이면 순위에 들어가요'));
+        } else {
+          slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: !today && me.avg != null ? 100 : 76, color: c.bg, child: rowW(me, pinned: true))));
+        }
         slivers.add(SliverList(delegate: SliverChildListDelegate([for (final r in rest) rowW(r)])));
+        if (pending.isNotEmpty) {
+          addBox(const SectionTitle('순위 대기'), bottom: 4);
+          addBox(Txt.cap('참여 ${pending.first.minDays ?? 7}일을 채우면 순위에 들어가요'), bottom: 6);
+          for (final r in pending) {
+            addBox(Txt('${r.name} · 참여 ${r.days ?? 0}/${r.minDays ?? 7}일'), bottom: 4);
+          }
+        }
         addBox(Center(child: Txt.cap('전체 ${lb.total}명 · 20명씩 더 보기')), bottom: 10);
         if (weekly != null) {
           addBox(ChCard(
@@ -299,15 +344,22 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             title: '순위',
             meta: ch.name,
             actions: [
-              if (phase == ChallengePhase.active && today && visible)
+              if (phase == ChallengePhase.active)
                 PopupMenuButton<String>(
                   tooltip: '더보기',
                   icon: Icon(Icons.more_vert_rounded, color: c.fg),
-                  onSelected: (_) {
-                    final target = list.where((r) => !r.me && !r.aggregating).firstOrNull;
+                  onSelected: (v) {
+                    if (v == 'leave') {
+                      _leave();
+                      return;
+                    }
+                    final target = list.where((r) => !r.me && !r.aggregating && !r.pending).firstOrNull;
                     if (target != null) _report(target);
                   },
-                  itemBuilder: (_) => const [PopupMenuItem(value: 'report', child: Text('익명으로 신고'))],
+                  itemBuilder: (_) => [
+                    if (today && visible) const PopupMenuItem(value: 'report', child: Text('익명으로 신고')),
+                    const PopupMenuItem(value: 'leave', child: Text('챌린지 나가기')),
+                  ],
                 ),
             ],
           ),
