@@ -56,6 +56,22 @@ Deno.test('끼니 생성: 객체 없음 422, 재검증 불일치 422, 분석 없
   assertEquals(calls.includes('analyze:m2'), false);
 });
 
+Deno.test('끼니 생성: slot 이 snack 일 때만 간식 플래그를 넘긴다(D55)', async () => {
+  const seen: [string, boolean, boolean][] = [];
+  const { deps } = mealDeps({
+    createMeal: (photoId: string, queued: boolean, snack: boolean) => {
+      seen.push([photoId, queued, snack]);
+      return Promise.resolve({ meal_id: 'm3', analyze: false, slot: snack ? 'snack' : 'breakfast' });
+    },
+  });
+  const r = await createMealFlow(deps, { photo_id: 'p1', queued: true, slot: 'snack' });
+  assertEquals(r.slot, 'snack');
+  await createMealFlow(deps, { photo_id: 'p2' });
+  await createMealFlow(deps, { photo_id: 'p3', slot: 'breakfast' });
+  await createMealFlow(deps, { photo_id: 'p4', slot: true });
+  assertEquals(seen, [['p1', true, true], ['p2', false, false], ['p3', false, false], ['p4', false, false]]);
+});
+
 Deno.test('계정 삭제: 확인 문구, DB → Storage(100개 단위) → 로그인 차단 순서', async () => {
   const order: string[] = [];
   const paths = Array.from({ length: 150 }, (_, i) => `c/p/${i}.jpg`);

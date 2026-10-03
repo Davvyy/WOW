@@ -7,11 +7,11 @@ export interface CreateMealDeps {
   download(path: string): Promise<Uint8Array | null>;
   photoPath(photoId: string): Promise<string | null>;
   verifyPhoto(m: { photo_id: string; sha256: string; bytes: number; width: number; height: number }): Promise<{ verified: boolean }>;
-  createMeal(photoId: string, queued: boolean): Promise<Record<string, unknown> & { meal_id: string; analyze?: boolean }>;
+  createMeal(photoId: string, queued: boolean, snack: boolean): Promise<Record<string, unknown> & { meal_id: string; analyze?: boolean }>;
   triggerAnalyze(mealId: string): Promise<void>;
 }
 
-export async function createMealFlow(deps: CreateMealDeps, body: { photo_id?: unknown; queued?: unknown }) {
+export async function createMealFlow(deps: CreateMealDeps, body: { photo_id?: unknown; queued?: unknown; slot?: unknown }) {
   if (typeof body.photo_id !== 'string') throw new HttpError(422, 'photo_id');
   const path = await deps.photoPath(body.photo_id);
   if (!path) throw new HttpError(404, 'photo not found');
@@ -21,7 +21,8 @@ export async function createMealFlow(deps: CreateMealDeps, body: { photo_id?: un
   if (!size) throw new HttpError(422, 'JPEG/PNG 만 받을 수 있어요');
   const v = await deps.verifyPhoto({ photo_id: body.photo_id, sha256: await sha256Bytes(bytes), bytes: bytes.length, width: size.width, height: size.height });
   if (!v.verified) throw new HttpError(422, '사진이 업로드 정보와 달라요(photo_mismatch)');
-  const meal = await deps.createMeal(body.photo_id, body.queued === true);
+  // 촬영 화면에서 간식을 고른 경우만 사용자 선택을 따른다. 아침·점심·저녁은 서버 시각으로 태그(D55)
+  const meal = await deps.createMeal(body.photo_id, body.queued === true, body.slot === 'snack');
   // 3초 안에 홈 복귀: 분석은 기다리지 않는다
   if (meal.analyze && !meal.replayed) await deps.triggerAnalyze(meal.meal_id);
   return meal;
