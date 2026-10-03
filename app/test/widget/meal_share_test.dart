@@ -97,7 +97,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
       await tester.pumpAndSettle();
-      expect(find.byType(Image).evaluate().where((e) => (e.widget as Image).image is MemoryImage), hasLength(1));
+      expect(find.descendant(of: find.byType(MealShareCard), matching: find.byType(Image)).evaluate().where((e) => (e.widget as Image).image is MemoryImage), hasLength(1));
     });
 
     testWidgets('AI 초안은 공유 아이콘이 없다', (tester) async {

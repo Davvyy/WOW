@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../core/engine/engine.dart';
@@ -10,8 +12,11 @@ import '../../state/session.dart';
 /// 05 meals.status 매핑: 분석 중=captured · 확정 대기=captured(noAnalysis)/failed · 초안=draft ·
 /// 확정=confirmed/corrected · 자동 확정=auto · 건너뜀=skipped · void는 정정 이력으로만.
 class MealSlotCard extends StatelessWidget {
-  const MealSlotCard({super.key, required this.meal, this.onTap});
+  const MealSlotCard({super.key, required this.meal, this.onTap, this.photo});
   final MealRecord meal;
+
+  /// 이 폰에 보관된 실제 사진(없으면 아이콘 썸네일). 사진 기반 상태(분석 중~확정)에서만 쓴다.
+  final Uint8List? photo;
   final VoidCallback? onTap;
 
   static List<Color> _gradient(MealSlot s) => switch (s) {
@@ -34,12 +39,38 @@ class MealSlotCard extends StatelessWidget {
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: c.borderStrong, width: 1.5)),
           child: Icon(icon, color: c.fg2, size: 26),
         );
-    Widget thumbFood(IconData icon) => Container(
+    // [status] 가 true 면 아이콘이 상태(분석 중·업로드 대기)를 뜻하므로 사진 위에도 작게 남긴다.
+    Widget thumbFood(IconData icon, {bool status = false}) {
+      final p = photo;
+      if (p == null) {
+        return Container(
           width: 56,
           height: 56,
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _gradient(m.slot))),
           child: Icon(icon, color: Colors.white, size: 26),
         );
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 56,
+          height: 56,
+          child: Stack(fit: StackFit.expand, children: [
+            Image.memory(p, fit: BoxFit.cover, gaplessPlayback: true, excludeFromSemantics: true),
+            if (status)
+              Positioned(
+                right: 3,
+                bottom: 3,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(color: Color(0x99000000), shape: BoxShape.circle),
+                  child: Icon(icon, color: Colors.white, size: 12),
+                ),
+              ),
+          ]),
+        ),
+      );
+    }
 
     Widget thumb;
     String desc;
@@ -61,7 +92,7 @@ class MealSlotCard extends StatelessWidget {
       case MealStatus.failed:
         if (m.pendingUpload) {
           // 연결이 없어 아직 서버에 못 올린 사진(앱 전용 폴더에 보관, 연결되면 이어서 보냄)
-          thumb = thumbFood(Icons.cloud_upload_rounded);
+          thumb = thumbFood(Icons.cloud_upload_rounded, status: true);
           desc = '연결되면 사진을 보낼게요 · 확정 전까지는 $subM kcal로 잠정 계산돼요';
           badge = const ChChip('업로드 대기', tone: Tone.warn, icon: Icons.cloud_upload_rounded);
           right = isSnack ? null : kcalRight(subM, '대체값', muted: true);
@@ -71,7 +102,7 @@ class MealSlotCard extends StatelessWidget {
           badge = const ChChip('확정 대기', tone: Tone.warn, icon: Icons.edit_rounded);
           right = isSnack ? null : kcalRight(subM, '대체값', muted: true);
         } else {
-          thumb = thumbFood(Icons.hourglass_top_rounded);
+          thumb = thumbFood(Icons.hourglass_top_rounded, status: true);
           desc = '분석 중… 끝나면 알려드려요';
           badge = const ChChip('분석 중', icon: Icons.hourglass_top_rounded);
           right = Container(width: 44, height: 14, decoration: BoxDecoration(color: c.border, borderRadius: BorderRadius.circular(8)));

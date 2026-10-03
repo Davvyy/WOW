@@ -216,6 +216,15 @@ final sharePhotoStoreProvider = Provider<SharePhotoStore>((ref) => AppConfig.has
     ? FileSharePhotoStore(() async => Directory('${(await getApplicationSupportDirectory()).path}/share_photos'))
     : MemorySharePhotoStore());
 
+/// 홈 끼니 카드 썸네일: 이 폰에 보관된 사진(서버 끼니 id 기준, 없으면 null → 아이콘 썸네일)
+final mealPhotoProvider = FutureProvider.autoDispose.family<Uint8List?, String>((ref, serverId) async {
+  try {
+    return await ref.watch(sharePhotoStoreProvider).get(serverId);
+  } catch (_) {
+    return null; // 보관 사진을 못 읽어도 카드는 아이콘으로 보인다
+  }
+});
+
 /// 폰 기본 공유 창
 final mealSharerProvider = Provider<MealSharer>((ref) => const SystemMealSharer());
 
@@ -554,6 +563,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
 
   String? _applyCreated(MealSlot localSlot, CreatedMeal meal, bool aiConsent) {
     lastCapturedSlot = meal.slot;
+    ref.invalidate(mealPhotoProvider(meal.mealId)); // 업로드 직후 보관된 사진을 카드가 다시 읽는다
     final cur = of(localSlot);
     if (meal.slot != localSlot) _put(of(localSlot).copyWith(status: MealStatus.empty, pendingUpload: false, time: ''));
     _put(of(meal.slot).copyWith(status: MealStatus.captured, time: cur.time, serverId: meal.mealId, version: 1,

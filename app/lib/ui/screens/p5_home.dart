@@ -46,6 +46,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  /// 오늘 카드는 이 폰에 보관된 사진이 있으면 썸네일로 보여 준다(지난 날은 서버 끼니 id 가 없어 그대로)
+  Widget _slotCard(MealRecord m, bool isToday, VoidCallback? onTap) {
+    final id = isToday ? m.serverId : null;
+    final photo = id == null ? null : ref.watch(mealPhotoProvider(id)).value;
+    return MealSlotCard(meal: m, onTap: onTap, photo: photo);
+  }
+
   DateTime _dateOf(int day) => curChallenge.start.add(Duration(days: day - 1));
 
   void _swipe(DragEndDetails d) {
@@ -403,7 +410,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       if (!lifecycle)
         for (final s in [MealSlot.breakfast, MealSlot.lunch, MealSlot.dinner, MealSlot.snack])
-          MealSlotCard(meal: dayMeals.firstWhere((m) => m.slot == s), onTap: slotTargets[s]),
+          _slotCard(dayMeals.firstWhere((m) => m.slot == s), isToday, slotTargets[s]),
       if (showNudge)
         ChCard(
           outline: true,
