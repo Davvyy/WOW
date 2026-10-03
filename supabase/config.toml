@@ -452,6 +452,12 @@ import_map = "./functions/deno.json"
 entrypoint = "./functions/meal-confirm/index.ts"
 
 # 참가자 JWT
+[functions.meal-delete]
+verify_jwt = true
+import_map = "./functions/deno.json"
+entrypoint = "./functions/meal-delete/index.ts"
+
+# 참가자 JWT
 [functions.meal-skip]
 verify_jwt = true
 import_map = "./functions/deno.json"

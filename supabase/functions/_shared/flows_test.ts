@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from '@std/assert';
-import { createMealFlow, deleteAccountFlow } from './flows.ts';
+import { createMealFlow, deleteAccountFlow, deleteMealFlow, mealIdOf } from './flows.ts';
 import { HttpError } from './http.ts';
 import { imageSize, sha256Bytes } from './image.ts';
 
@@ -85,4 +85,35 @@ Deno.test('계정 삭제: 확인 문구, DB → Storage(100개 단위) → 로�
   const r = await deleteAccountFlow(deps, { confirm: '삭제' });
   assertEquals(order, ['db', 'storage:100', 'storage:50', 'auth']);
   assertEquals(r.photos_removed, 150);
+});
+
+Deno.test('끼니 삭제: meal_id 가 없거나 UUID 가 아니면 422', () => {
+  for (const body of [{}, { meal_id: 3 }, { meal_id: 'abc' }, null]) {
+    const e = (() => { try { mealIdOf(body); } catch (err) { return err; } })();
+    assertEquals(e instanceof HttpError && e.status, 422);
+  }
+  assertEquals(mealIdOf({ meal_id: '6F1C2E0A-1b2c-4d3e-8f9a-0b1c2d3e4f5a' }), '6F1C2E0A-1b2c-4d3e-8f9a-0b1c2d3e4f5a');
+});
+
+Deno.test('끼니 삭제: DB 다음 purge_path 만 Storage 에서 지우고 계약 본문만 돌려준다', async () => {
+  const order: string[] = [];
+  const row = { meal_id: 'm1', deleted: 2, local_date: '2026-10-13', slot: 'lunch' };
+  const deps = (purge: string | null) => ({
+    deleteMeal: (id: string) => { order.push(`db:${id}`); return Promise.resolve({ ...row, purge_path: purge }); },
+    removeObjects: (p: string[]) => { order.push(`storage:${p.join(',')}`); return Promise.resolve(); },
+  });
+  assertEquals(await deleteMealFlow(deps('c/p/x.jpg'), 'm1'), row);
+  assertEquals(order, ['db:m1', 'storage:c/p/x.jpg']);
+  order.length = 0;
+  assertEquals(await deleteMealFlow(deps(null), 'm1'), row);
+  assertEquals(order, ['db:m1']);
+});
+
+Deno.test('끼니 삭제: Storage 삭제가 실패해도 DB 는 이미 지워져 성공 본문을 돌려준다', async () => {
+  const row = { meal_id: 'm1', deleted: 1, local_date: '2026-10-13', slot: 'snack' };
+  const deps = {
+    deleteMeal: () => Promise.resolve({ ...row, purge_path: 'c/p/y.jpg' }),
+    removeObjects: () => Promise.reject(new HttpError(502, 'storage remove: boom')),
+  };
+  assertEquals(await deleteMealFlow(deps, 'm1'), row);
 });

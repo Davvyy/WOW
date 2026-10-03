@@ -44,3 +44,38 @@ export async function deleteAccountFlow(deps: DeleteAccountDeps, body: { confirm
   await deps.disableAuthUser();                             // 즉시 로그인 차단(소프트 삭제, 30일 내 하드 삭제)
   return { photos_removed: r.storage_paths.length, participants: r.participants, deleted: r.deleted };
 }
+
+// ---------------------------------------------------------------- POST meal-delete (docs/02 D57)
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** 본문 검사: meal_id(UUID) 없으면 422. 멱등 키 검사보다 먼저 한다(meal-confirm 과 같은 순서). */
+export function mealIdOf(body: unknown): string {
+  const id = (body as { meal_id?: unknown } | null)?.meal_id;
+  if (typeof id !== 'string' || !UUID.test(id)) throw new HttpError(422, 'meal_id');
+  return id;
+}
+
+export interface DeletedMeal {
+  meal_id: string;
+  deleted: number;
+  local_date: string;
+  slot: string;
+}
+
+export interface DeleteMealDeps {
+  deleteMeal(mealId: string): Promise<DeletedMeal & { purge_path?: string | null }>;
+  removeObjects(paths: string[]): Promise<void>;
+}
+
+export async function deleteMealFlow(deps: DeleteMealDeps, mealId: string): Promise<DeletedMeal> {
+  const r = await deps.deleteMeal(mealId); // DB: 그룹 삭제·재계산·검토 정리·사진 purged_at(한 트랜잭션)
+  if (r.purge_path) {
+    try {
+      await deps.removeObjects([r.purge_path]);
+    } catch (e) {
+      // DB 는 이미 지워졌다 → 실패를 돌려주면 재시도가 404 가 된다. 남은 객체는 로그로 남긴다.
+      console.error('meal-delete storage remove', r.purge_path, e instanceof Error ? e.message : e);
+    }
+  }
+  return { meal_id: r.meal_id, deleted: r.deleted, local_date: r.local_date, slot: r.slot };
+}
