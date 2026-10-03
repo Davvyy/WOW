@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import 'background_push.dart';
 import 'push_service.dart';
 
 /// FCM(Android) · APNs 경유 FCM(iOS). 네이티브 설정 파일(google-services.json · GoogleService-Info.plist)이 있어야 한다.
@@ -14,6 +15,8 @@ class FirebasePushService implements PushService {
     if (kIsWeb || !(defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) return null;
     try {
       if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+      // 앱이 꺼져 있을 때 받은 걸음 동기화 리마인드(N-02 sync)는 별도 isolate 에서 바로 올린다
+      FirebaseMessaging.onBackgroundMessage(onBackgroundPush);
       return FirebasePushService._(FirebaseMessaging.instance);
     } catch (e) {
       debugPrint('push: Firebase 초기화 건너뜀 ($e)');

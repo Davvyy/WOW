@@ -142,6 +142,8 @@ analyze-meal 초안 저장 → N-04 큐 → 바로 발송(data: type=N-04, meal_
 - FCM 설정(직접 해야 함): Firebase 프로젝트에 Android·iOS 앱(`app.challory.challory`)을 추가하고 Firebase 콘솔에서 받은 `android/app/google-services.json`·`ios/Runner/GoogleService-Info.plist` 를 넣은 뒤 `--dart-define=FCM=true` 로 빌드합니다. Android Gradle 플러그인(`com.google.gms.google-services`)은 이미 들어 있고 `google-services.json` 이 있을 때만 적용되므로, 파일이 없으면 푸시 없이 빌드됩니다. 이 파일은 프로젝트별 설정이라 저장소에 넣지 않습니다(`android/.gitignore`). iOS 는 Xcode 에서 Push Notifications 와 Background Modes › Remote notifications 를 켜고, Firebase 콘솔에 APNs 인증 키를 올립니다. 서버에는 Firebase 서비스 계정 키 JSON 을 담은 `FCM_SERVICE_ACCOUNT` 시크릿이 필요합니다(supabase/README.md).
 - P12 는 OS 알림 권한이 거부 상태면 상단에 "알림이 꺼져 있어요" 배너를 띄우고, "알림 켜기"로 권한 창을 다시 띄웁니다(OS 가 막았으면 설정 앱 안내).
 - Android 13+ 알림 권한(`POST_NOTIFICATIONS`)은 `firebase_messaging` 매니페스트에 들어 있습니다.
+- 앱이 꺼져 있거나 백그라운드일 때 받은 N-02 sync 는 FCM 백그라운드 처리기(`lib/services/push/background_push.dart`, 별도 isolate)가 저장된 로그인으로 건강 데이터 3일치를 읽어 `sync-activity` 로 올립니다(세션이 만료됐으면 갱신 후). 다른 알림은 OS 알림만 뜨고 앱을 열 때 다시 읽습니다. 설정에서 '강제 종료'한 앱은 OS 가 푸시를 막고, iOS 는 Background Modes 설정 전이라 아직 해당 없습니다.
+- 알림은 기본 채널 `challory`("챌로리 알림", 중요도 기본: 소리 있음·다른 앱 위로 튀어나오지 않음)로 표시됩니다. 채널은 `MainActivity` 가 만들고 매니페스트의 `default_notification_channel_id` 로 지정합니다.
 
 ## 폰트와 라이선스
 
