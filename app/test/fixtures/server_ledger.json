@@ -52,16 +52,29 @@
             "steps_spike_ratio": 2.5,
             "late_upload_window": "12:00:00"
         },
-        "today": "2026-10-01",
+        "stats": {
+            "avg": null,
+            "days": 0,
+            "rate": null,
+            "avail": 0,
+            "meals": 0,
+            "score": null,
+            "total": 0,
+            "pending": true,
+            "min_days": 1
+        },
+        "today": "2026-10-03",
         "joined": 12,
         "notice": null,
         "challenge": {
             "id": "6a026e42-81f4-4b9f-a040-223f93f99180",
+            "kind": "operator",
             "name": "가을 걷기 챌린지",
             "status": "running",
             "capacity": 60,
             "end_date": "2026-11-02",
             "rules_md": "## 운영자 추가 규칙\n- 회식 날(10.17)은 저녁 자동 확정 대신 대체값 적용을 요청할 수 있어요(운영자에게 메시지).\n- 상품은 상위 3명 + 반영률 100% 달성자 추첨 2명.",
+            "join_open": true,
             "start_date": "2026-10-06",
             "invite_code": "K7Q2MD",
             "published_at": null
@@ -73,8 +86,10 @@
             "status": "active",
             "nickname": "지수",
             "height_cm": 175.0,
+            "joined_at": "2026-10-03T01:00:00+00:00",
             "birth_year": 1996,
             "bmr_locked": 1650,
+            "check_start": "2026-10-06",
             "rank_eligible": true,
             "warning_count": 0,
             "weight_locked": 70.0,
@@ -91,13 +106,13 @@
             "new_s_d": 12.7,
             "prev_s_d": 41.2,
             "review_id": "0b296258-ab4c-48da-a3df-304c3ecbf46f",
-            "daily_score_id": "120b5444-27ae-4411-a3c2-b3562a2cf07f"
+            "daily_score_id": "b47f1529-9d18-434c-9717-a5aa1129994b"
         }
     ],
     "start_date": "2026-10-06",
     "daily_scores": [
         {
-            "id": "7ee3a5dd-b6dd-4f0c-a79e-31a86b577fe5",
+            "id": "02cd5c95-c65f-4432-b118-528eca4cc520",
             "a_d": 309.7,
             "bmr": 1650,
             "d_d": 199.7,
@@ -180,7 +195,7 @@
             "under_review": false
         },
         {
-            "id": "3ff47287-d39e-43a8-b2c5-1b30cb84f889",
+            "id": "6b87d3a6-1f05-426f-a48c-ddcd2914440f",
             "a_d": 365.9,
             "bmr": 1650,
             "d_d": 215.9,
@@ -263,7 +278,7 @@
             "under_review": false
         },
         {
-            "id": "90e0adee-827f-4900-913b-392bb8e9af57",
+            "id": "0fa92c40-8ddd-4e34-953a-6f589a2e073e",
             "a_d": 300.5,
             "bmr": 1650,
             "d_d": -222.0,
@@ -341,7 +356,7 @@
             "under_review": false
         },
         {
-            "id": "4ec9c961-f9ea-4936-91ec-a9675d615530",
+            "id": "c0810d8e-5489-4ac6-bad5-e8fc46104ac2",
             "a_d": 353.0,
             "bmr": 1650,
             "d_d": 443.0,
@@ -424,7 +439,7 @@
             "under_review": false
         },
         {
-            "id": "908961b7-a0ab-4250-9b76-d7ccbb959a3a",
+            "id": "6449ce16-578e-4205-ab65-5812fdf9e03c",
             "a_d": 402.5,
             "bmr": 1650,
             "d_d": 432.5,
@@ -507,7 +522,7 @@
             "under_review": false
         },
         {
-            "id": "f9ac3716-de28-4d34-ba64-795996c6ec33",
+            "id": "9d186bfe-fc1e-49aa-bf24-99a8b5f6b9e2",
             "a_d": 294.0,
             "bmr": 1650,
             "d_d": 624.0,
@@ -590,7 +605,7 @@
             "under_review": false
         },
         {
-            "id": "120b5444-27ae-4411-a3c2-b3562a2cf07f",
+            "id": "b47f1529-9d18-434c-9717-a5aa1129994b",
             "a_d": 356.0,
             "bmr": 1650,
             "d_d": 63.5,
@@ -674,7 +689,7 @@
             "under_review": false
         },
         {
-            "id": "0c1212b5-096b-4450-bbd9-a68b2a8102db",
+            "id": "cf8af729-187a-4dfb-b320-7fe53b3ee3c9",
             "a_d": 294.0,
             "bmr": 1650,
             "d_d": 144.0,
@@ -792,6 +807,7 @@
         {
             "fill": 0,
             "rank": 4,
+            "pending": false,
             "aggregating": true
         },
         {
@@ -837,6 +853,7 @@
         {
             "fill": 0,
             "rank": 8,
+            "pending": false,
             "aggregating": true
         },
         {
@@ -862,21 +879,31 @@
     ],
     "snapshot_cumulative": [
         {
+            "avg": 79.6,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 1,
+            "rate": 1.000,
             "badge": null,
-            "score": 318.3,
+            "score": 159.2,
+            "pending": false,
+            "min_days": 2,
             "nickname": "강남콩",
             "cheer_count": 0,
             "participant_id": "d4eafb39-08aa-4c7d-a9e1-cc677ac36c3a"
         },
         {
+            "avg": 78.2,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 2,
+            "rate": 1.000,
             "badge": null,
-            "score": 312.6,
+            "score": 156.3,
+            "pending": false,
+            "min_days": 2,
             "nickname": "지수",
             "cheer_count": 0,
             "participant_id": "64e704c4-7aa0-4e4f-a943-f1955ce2a795"
@@ -884,74 +911,110 @@
         {
             "fill": 0,
             "rank": 3,
+            "pending": false,
             "aggregating": true
         },
         {
+            "avg": 67.1,
             "tie": false,
+            "days": 4,
             "fill": 0,
             "rank": 4,
+            "rate": 1.000,
             "badge": null,
-            "score": 268.4,
+            "score": 134.2,
+            "pending": false,
+            "min_days": 2,
             "nickname": "한강러너",
             "cheer_count": 0,
             "participant_id": "f48db9cf-f06d-4736-a98f-efd0bc835ca7"
         },
         {
+            "avg": 59.5,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 5,
+            "rate": 1.000,
             "badge": null,
-            "score": 238.0,
+            "score": 119.0,
+            "pending": false,
+            "min_days": 2,
             "nickname": "밤산책",
             "cheer_count": 1,
             "participant_id": "d36c7a3f-56a1-4551-a21c-f6ff5aeb8edf"
         },
         {
+            "avg": 54.2,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 6,
+            "rate": 1.000,
             "badge": null,
-            "score": 216.6,
+            "score": 108.3,
+            "pending": false,
+            "min_days": 2,
             "nickname": "도토리",
             "cheer_count": 0,
             "participant_id": "dfea97bd-5581-42d1-a00c-287812cd9f26"
         },
         {
+            "avg": 46.3,
             "tie": false,
+            "days": 4,
             "fill": 3,
             "rank": 7,
+            "rate": 1.000,
             "badge": null,
-            "score": 185.3,
+            "score": 92.7,
+            "pending": false,
+            "min_days": 2,
             "nickname": "마포구민",
             "cheer_count": 0,
             "participant_id": "fabccdf6-4477-4d7b-a306-4380b611f1c9"
         },
         {
+            "avg": 40.3,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 8,
+            "rate": 1.000,
             "badge": null,
-            "score": 161.0,
+            "score": 80.5,
+            "pending": false,
+            "min_days": 2,
             "nickname": "초록이",
             "cheer_count": 0,
             "participant_id": "b37ce5f7-9bff-4c29-aa07-e7d8004f6514"
         },
         {
+            "avg": 0.0,
             "tie": true,
+            "days": 4,
             "fill": 1,
             "rank": 9,
+            "rate": 1.000,
             "badge": null,
             "score": 0.0,
+            "pending": false,
+            "min_days": 2,
             "nickname": "라떼한잔",
             "cheer_count": 0,
             "participant_id": "623dc3cb-779d-48e9-afc8-b561ed04d47f"
         },
         {
+            "avg": 0.0,
             "tie": true,
+            "days": 4,
             "fill": 2,
             "rank": 9,
+            "rate": 1.000,
             "badge": null,
             "score": 0.0,
+            "pending": false,
+            "min_days": 2,
             "nickname": "야근요정",
             "cheer_count": 0,
             "participant_id": "8e78377b-02ff-4fb3-ac09-98768fd95378"
@@ -959,6 +1022,7 @@
         {
             "fill": 0,
             "rank": 9,
+            "pending": false,
             "aggregating": true
         }
     ],
@@ -966,14 +1030,20 @@
         {
             "fill": 0,
             "rank": 1,
+            "pending": false,
             "aggregating": true
         },
         {
+            "avg": 79.6,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 2,
+            "rate": 1.000,
             "badge": null,
-            "score": 318.3,
+            "score": 159.2,
+            "pending": false,
+            "min_days": 2,
             "nickname": "강남콩",
             "cheer_count": 0,
             "participant_id": "d4eafb39-08aa-4c7d-a9e1-cc677ac36c3a"
@@ -981,74 +1051,110 @@
         {
             "fill": 0,
             "rank": 3,
+            "pending": false,
             "aggregating": true
         },
         {
+            "avg": 67.1,
             "tie": false,
+            "days": 4,
             "fill": 0,
             "rank": 4,
+            "rate": 1.000,
             "badge": null,
-            "score": 268.4,
+            "score": 134.2,
+            "pending": false,
+            "min_days": 2,
             "nickname": "한강러너",
             "cheer_count": 0,
             "participant_id": "f48db9cf-f06d-4736-a98f-efd0bc835ca7"
         },
         {
+            "avg": 59.5,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 5,
+            "rate": 1.000,
             "badge": null,
-            "score": 238.0,
+            "score": 119.0,
+            "pending": false,
+            "min_days": 2,
             "nickname": "밤산책",
             "cheer_count": 0,
             "participant_id": "d36c7a3f-56a1-4551-a21c-f6ff5aeb8edf"
         },
         {
+            "avg": 54.2,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 6,
+            "rate": 1.000,
             "badge": null,
-            "score": 216.6,
+            "score": 108.3,
+            "pending": false,
+            "min_days": 2,
             "nickname": "도토리",
             "cheer_count": 0,
             "participant_id": "dfea97bd-5581-42d1-a00c-287812cd9f26"
         },
         {
+            "avg": 46.3,
             "tie": false,
+            "days": 4,
             "fill": 3,
             "rank": 7,
+            "rate": 1.000,
             "badge": null,
-            "score": 185.3,
+            "score": 92.7,
+            "pending": false,
+            "min_days": 2,
             "nickname": "마포구민",
             "cheer_count": 0,
             "participant_id": "fabccdf6-4477-4d7b-a306-4380b611f1c9"
         },
         {
+            "avg": 40.3,
             "tie": false,
+            "days": 4,
             "fill": 4,
             "rank": 8,
+            "rate": 1.000,
             "badge": null,
-            "score": 161.0,
+            "score": 80.5,
+            "pending": false,
+            "min_days": 2,
             "nickname": "초록이",
             "cheer_count": 0,
             "participant_id": "b37ce5f7-9bff-4c29-aa07-e7d8004f6514"
         },
         {
+            "avg": 0.0,
             "tie": true,
+            "days": 4,
             "fill": 1,
             "rank": 9,
+            "rate": 1.000,
             "badge": null,
             "score": 0.0,
+            "pending": false,
+            "min_days": 2,
             "nickname": "라떼한잔",
             "cheer_count": 0,
             "participant_id": "623dc3cb-779d-48e9-afc8-b561ed04d47f"
         },
         {
+            "avg": 0.0,
             "tie": true,
+            "days": 4,
             "fill": 2,
             "rank": 9,
+            "rate": 1.000,
             "badge": null,
             "score": 0.0,
+            "pending": false,
+            "min_days": 2,
             "nickname": "야근요정",
             "cheer_count": 0,
             "participant_id": "8e78377b-02ff-4fb3-ac09-98768fd95378"
@@ -1056,6 +1162,7 @@
         {
             "fill": 0,
             "rank": 9,
+            "pending": false,
             "aggregating": true
         }
     ]

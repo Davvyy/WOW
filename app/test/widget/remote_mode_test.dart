@@ -72,12 +72,12 @@ Future<void> _pump(WidgetTester tester, String location, _RemoteFake api) async 
 }
 
 void main() {
-  testWidgets('P9 누적: 서버 스냅샷 · 내 행 312.6 · 집계 중 행', (tester) async {
+  testWidgets('P9 누적: 서버 스냅샷 · 내 행 순위 점수 156.3 · 집계 중 행', (tester) async {
     final api = _RemoteFake();
     await _pump(tester, R.rank, api);
     await tester.tap(find.text('누적'));
     await tester.pumpAndSettle();
-    expect(find.text('312.6'), findsWidgets);
+    expect(find.text('156.3'), findsWidgets);
     expect(find.textContaining('집계 중'), findsWidgets);
   });
 

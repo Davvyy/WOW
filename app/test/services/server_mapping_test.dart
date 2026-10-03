@@ -74,7 +74,11 @@ void main() {
         myCumulative: 312.6,
       );
       final me = lb.meIn(lb.cumulative)!;
-      expect(me.score, 312.6);
+      // 누적 스냅샷 점수 = 순위 점수(일평균 × (1 + 참여율), D49). 시드 10.13 기준 반영 가능 4일 → 참여율 1.0
+      expect(me.score, closeTo(me.avg! * 2, 0.11));
+      expect(me.rate, 1.0);
+      expect(me.days, 4);
+      expect(me.pending, isFalse);
       expect(me.participantId, pid);
       expect(me.underReview, isFalse);
       final ranks = lb.cumulative.map((r) => r.rank).toList();
