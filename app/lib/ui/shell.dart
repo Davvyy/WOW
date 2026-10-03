@@ -51,8 +51,11 @@ class AppShell extends ConsumerWidget {
             ),
           ),
         );
+    // 다시 읽는 동안(참가·나가기·판정 푸시·온보딩 뒤)은 이전 값으로 그린다: 탭 상태와 토스트가 유지된다
     return s.when(
-      loading: () => card(Icons.hourglass_top_rounded, '챌린지를 불러오고 있어요', '잠시만 기다려 주세요'),
+      skipLoadingOnReload: true,
+      skipLoadingOnRefresh: true,
+      loading:() => card(Icons.hourglass_top_rounded, '챌린지를 불러오고 있어요', '잠시만 기다려 주세요'),
       error: (e, _) => card(Icons.cloud_off_rounded, '챌린지를 불러오지 못했어요', apiErrorText(e),
           action: ChButton('다시 불러오기', small: true, kind: BtnKind.quiet, onPressed: () => ref.invalidate(sessionsProvider))),
       data: (v) => v == null

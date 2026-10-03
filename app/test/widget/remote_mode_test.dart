@@ -1,4 +1,5 @@
 // 서버 모드(isRemote) 화면: 리더보드·장부를 서버 응답(픽스처)으로 그리고, 신고는 스냅샷의 participant_id 로 보낸다.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -22,10 +23,14 @@ class _RemoteFake extends MockChalloryApi {
   final bool noSession;
   final String? status;
   final reported = <String?>[];
+
+  /// 채워 두면 다음 세션 목록 응답을 붙잡아 둔다(다시 읽는 중 화면 확인용)
+  Completer<void>? hold;
   @override
   bool get isRemote => true;
   @override
   Future<List<ChallengeSession>> fetchSessions() async {
+    if (hold != null) await hold!.future;
     final s = await fetchSession();
     return s == null ? const [] : [s];
   }
@@ -119,6 +124,23 @@ void main() {
     await _pump(tester, R.home, _RemoteFake());
     expect(find.text('가을 걷기 챌린지'), findsWidgets);
     expect(find.textContaining('D+8/28'), findsWidgets);
+  });
+
+  testWidgets('세션 목록을 다시 읽는 동안 홈을 로딩 화면으로 바꾸지 않는다', (tester) async {
+    final api = _RemoteFake();
+    await _pump(tester, R.home, api);
+    expect(find.text('가을 걷기 챌린지'), findsWidgets);
+    final c = ProviderScope.containerOf(tester.element(find.byType(Scaffold).first));
+    api.hold = Completer<void>();
+    c.invalidate(sessionsProvider); // 참가·나가기·판정 푸시·온보딩 뒤와 같음
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(c.read(sessionProvider).isLoading, isTrue, reason: '다시 읽는 중');
+    expect(find.text('챌린지를 불러오고 있어요'), findsNothing);
+    expect(find.text('가을 걷기 챌린지'), findsWidgets);
+    api.hold!.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('가을 걷기 챌린지'), findsWidgets);
   });
 
   testWidgets('참가 중인 챌린지가 없으면 초대코드 안내', (tester) async {
