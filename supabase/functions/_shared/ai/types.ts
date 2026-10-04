@@ -22,6 +22,7 @@ export interface MealItemDraft {
   has_broth: boolean;
   confidence: Confidence;
   packaged: boolean; // 봉지·캔·병·상자에 든 포장 상품 → 가공식품(상품) 행 먼저 매칭(D63). count 는 보이는 포장 수, servings 는 한 포장당 양
+  single_piece: boolean; // 여러 개입 상자에서 꺼낸 낱개 포장 하나(작은 속포장)로 보임 → 앱이 '몇 개입'을 묻는다(D67). packaged 일 때만 true
 }
 
 export interface MealAnalysis {
@@ -50,6 +51,8 @@ export const MEAL_PROMPT = [
   '상품명에는 포장에 적힌 맛·종류도 그대로 붙이세요(예: "홈런볼 초코", "칙촉 오리지널").',
   '포장 상품의 count 는 따로 보이는 봉지·포장 수(낱개 포장 6개면 6)이고, servings 는 그 상품 단위 대비 한 포장당 양(보통 1.0,',
   '반만 먹었으면 0.5, 0.1 단위)입니다. 그릇에 담긴 음식은 packaged=false 입니다.',
+  '포장 상품이 소매용 바깥 포장이 아니라 여러 개입 상자에서 꺼낸 낱개 포장 하나(작은 속포장·소포장 봉지, 예: 칙촉 낱개 봉지)로 분명히 보이면',
+  'single_piece=true, 그 밖(바깥 포장·한 개짜리 상품·그릇 음식)은 single_piece=false 로 하세요.',
   '칼로리나 그램 숫자는 절대 출력하지 마세요(숫자는 count·servings 만). 음식이 아니면 is_food=false, items=[].',
   'JSON 스키마에 맞는 JSON 하나만 출력하세요.',
 ].join(' ');
@@ -71,8 +74,9 @@ export const MEAL_SCHEMA = {
           has_broth: { type: 'boolean' },
           confidence: { type: 'string', enum: ['high', 'mid', 'low'] },
           packaged: { type: 'boolean' },
+          single_piece: { type: 'boolean' },
         },
-        required: ['name_candidates', 'count', 'servings', 'has_broth', 'confidence', 'packaged'],
+        required: ['name_candidates', 'count', 'servings', 'has_broth', 'confidence', 'packaged', 'single_piece'],
       },
     },
   },
@@ -106,7 +110,7 @@ export function parseMealAnalysis(raw: unknown): MealAnalysis {
     const servings = Math.min(SERVINGS_MAX, Math.max(SERVINGS_MIN, Math.round(raw * 10) / 10));
     const conf = ['high', 'mid', 'low'].includes(x.confidence as string) ? x.confidence as Confidence : 'low';
     return { name_candidates: names.slice(0, 3), count, servings, portion_bucket: bucketOf(servings), has_broth: x.has_broth === true, confidence: conf,
-      packaged: x.packaged === true };
+      packaged: x.packaged === true, single_piece: x.packaged === true && x.single_piece === true };
   });
   return { is_food: true, items };
 }

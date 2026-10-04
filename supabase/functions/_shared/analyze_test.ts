@@ -293,3 +293,37 @@ Deno.test('개입 수는 고른 후보에만: 다른 상품 후보의 칩 kcal �
   assertEquals(out.items[0].candidate_food_codes, [CHIC, OTHER]);
   assertEquals([out.items[0].serving_kcal, out.items[0].candidate_kcal], [37.6, [37.6, 190]]);
 });
+
+// 낱개 포장 한 개(D67): 포장 상품이 큰 상자에서 꺼낸 낱개 봉지 하나로 보이면 single_piece=true → 초안 항목에 저장(앱이 '몇 개입' 배너)
+Deno.test('스키마·프롬프트: 항목별 single_piece(낱개 포장 한 개), 없으면 false, 포장 상품만', () => {
+  const item = MEAL_SCHEMA.properties.items.items;
+  assertEquals(item.properties.single_piece, { type: 'boolean' });
+  assertEquals((item.required as readonly string[]).includes('single_piece'), true);
+  assertEquals(MEAL_PROMPT.includes('single_piece'), true);
+  assertEquals(MEAL_PROMPT.includes('낱개 포장'), true);
+  const base = { name_candidates: ['칙촉'], count: 1, servings: 1, has_broth: false, confidence: 'high', packaged: true };
+  const parsed = parseMealAnalysis({
+    is_food: true,
+    items: [{ ...base, single_piece: true }, base, { ...base, single_piece: 'yes' }, { ...base, packaged: false, single_piece: true }],
+  });
+  assertEquals(parsed.items.map((i) => i.single_piece), [true, false, false, false]);
+});
+
+Deno.test('낱개 포장 한 개로 본 포장 상품: 초안 항목에 single_piece 저장, 그 밖은 false', async () => {
+  const saved: { items: { single_piece: boolean }[] }[] = [];
+  const d: AnalyzeDeps = {
+    ...productDeps(new MockAdapter({
+      is_food: true,
+      items: [
+        { name_candidates: ['롯데 칙촉', '칙촉'], count: 1, servings: 1, has_broth: false, confidence: 'high', packaged: true, single_piece: true },
+        { name_candidates: ['흰쌀밥'], count: 1, servings: 1, has_broth: false, confidence: 'high', packaged: false },
+      ],
+    }), []),
+    saveDraft: (_id, r) => { saved.push(r); return Promise.resolve(); },
+  };
+  const out = await analyzeMeal('m1', d);
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals(out.items.map((i) => i.single_piece), [true, false]);
+  assertEquals(saved[0].items.map((i) => i.single_piece), [true, false]);
+  assertEquals([out.items[0].serving_kcal, out.items[0].ai_kcal], [150.3, 150.3], 'kcal 은 그대로(1회분) — 앱이 묻는다');
+});

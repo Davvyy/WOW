@@ -35,6 +35,7 @@ export interface DraftItem {
   candidates: string[]; // [선택된 이름, …나머지 후보] — P7 후보 칩
   candidate_kcal: number[]; // 후보별 1인분 kcal(매칭 실패 후보는 선택 항목 값)
   candidate_food_codes: (string | null)[];
+  single_piece: boolean; // 포장 상품이 낱개 포장 하나로 보임(D67) → meal_items.ai_single_piece
 }
 
 export interface AnalyzeDeps {
@@ -133,6 +134,7 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
       needs_check: needsCheck,
       serving_kcal: serving,
       ai_kcal: round1(serving * mult * it.count),
+      single_piece: it.single_piece,
     });
   }
   await applyProductPieces(analysis, out, deps);

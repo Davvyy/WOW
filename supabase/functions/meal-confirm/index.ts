@@ -15,6 +15,10 @@ Deno.serve((req) =>
     if (!Number.isInteger(version) || version < 1) throw new HttpError(428, 'If-Match: version 헤더가 필요해요');
     const db = serviceClient();
     const out = await withIdempotency(new PgIdempotencyStore(db), user.id, req.headers.get('idempotency-key'), 'meal-confirm', { ...body, version }, async () => {
+      // '몇 개입'으로 1개 단위로 바꾼 포장 상품은 단위 정정: AI 초안도 같은 단위로 맞춰 하향 수정 표시가 올라가지 않게(D67).
+      // 맞추지 못해도 확정은 그대로 한다(그때는 confirm_meal 이 예전처럼 판정).
+      const { error: e0 } = await db.rpc('rebase_ai_kcal_for_pieces', { p_user: user.id, p_meal: body.meal_id, p_items: body.items, p_version: version });
+      if (e0) console.error('rebase_ai_kcal_for_pieces', e0);
       const { data, error } = await db.rpc('confirm_meal', { p_user: user.id, p_meal: body.meal_id, p_items: body.items, p_version: version });
       if (error) throw fromDbError(error);
       return { status: 200, body: data };

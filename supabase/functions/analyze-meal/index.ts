@@ -56,7 +56,7 @@ Deno.serve((req) =>
             input_type: 'ai', count: it.count, portion_bucket: it.portion_bucket, portion_multiplier: it.portion_multiplier,
             confidence: it.confidence, match_score: it.match_score, needs_check: it.needs_check, ai_kcal: it.ai_kcal,
             has_broth: it.has_broth, serving_kcal: it.serving_kcal, candidate_kcal: it.candidate_kcal,
-            candidate_food_codes: it.candidate_food_codes,
+            candidate_food_codes: it.candidate_food_codes, ai_single_piece: it.single_piece,
           })));
           if (error) throw error;
         }
