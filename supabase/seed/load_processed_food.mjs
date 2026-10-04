@@ -10,6 +10,7 @@
 //  - 1개 = 포장 전체(식품중량이 1회 섭취참고량의 1.5배 이하) → 1회 섭취참고량 → 포장 전체(500 이하) → 기준량(100g·ml).
 //    kcal·탄단지는 기준량당 값 × 1개 양 ÷ 기준량. 라벨은 '1개(40g)' · '1회분(30g)' · '100g'.
 //  - food_code 는 식약처 상품 코드(P…), is_product = true 로 음식(D…) 자동 매칭과 나눈다.
+//  - package_g = 포장 전체 양(식품중량의 g·ml 숫자, 읽을 수 없으면 null). 앱의 '몇 개입' 낱개 계산(D64)에 쓴다.
 //  - 제조사가 '해당없음'·빈 값이면 수입업체, 그다음 유통업체를 maker 로 쓴다(중복 판단도 이 이름으로).
 //  - 파일당 5,000건(세 번째 인자로 바꿈)씩 나눠 쓰고, 같은 food_code 의 상품 행은 값만 갱신한다
 //    (다시 돌려도 된다. 음식 행은 덮어쓰지 않는다).
@@ -112,6 +113,7 @@ export function pickProducts(rows) {
       return {
         food_code: r.code, name_kr: String(r.name).trim(), category: (r.lv4 || '').trim() || r.lv3, serving_g: u.amount, kcal: u.kcal,
         carb_g: u.carb, protein_g: u.prot, fat_g: u.fat, maker: makerOf(r), unit_label: u.label,
+        package_g: parseAmount(r.size)?.value ?? null,
       };
     });
   return { products, skipped };
@@ -131,13 +133,14 @@ export function chunkSql(products, size = CHUNK_ROWS) {
   const out = [];
   for (let i = 0; i < products.length; i += size) {
     const values = products.slice(i, i + size)
-      .map((p) => `(${[p.food_code, p.name_kr, p.category, p.serving_g, p.kcal, p.carb_g, p.protein_g, p.fat_g, true, p.maker, p.unit_label].map(lit).join(', ')})`)
+      .map((p) => `(${[p.food_code, p.name_kr, p.category, p.serving_g, p.kcal, p.carb_g, p.protein_g, p.fat_g, true, p.maker, p.unit_label, p.package_g].map(lit).join(', ')})`)
       .join(',\n');
     out.push(
-      `insert into food_db_cache (food_code, name_kr, category, serving_g, kcal, carb_g, protein_g, fat_g, is_product, maker, unit_label) values\n${values}\n` +
+      `insert into food_db_cache (food_code, name_kr, category, serving_g, kcal, carb_g, protein_g, fat_g, is_product, maker, unit_label, package_g) values\n${values}\n` +
         `on conflict (food_code) do update set name_kr = excluded.name_kr, category = excluded.category, serving_g = excluded.serving_g,\n` +
         `  kcal = excluded.kcal, carb_g = excluded.carb_g, protein_g = excluded.protein_g, fat_g = excluded.fat_g,\n` +
-        `  is_product = excluded.is_product, maker = excluded.maker, unit_label = excluded.unit_label, updated_at = now()\n` +
+        `  is_product = excluded.is_product, maker = excluded.maker, unit_label = excluded.unit_label,\n` +
+        `  package_g = excluded.package_g, updated_at = now()\n` +
         `  where food_db_cache.is_product;\n`,
     );
   }

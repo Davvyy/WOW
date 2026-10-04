@@ -73,7 +73,7 @@ test('상품 행: 분류는 lv4(없으면 lv3), 1개 값·제조사·라벨', ()
   const { products } = pickProducts([row({ lv4: '' })]);
   assert.deepEqual(products[0], {
     food_code: 'P1', name_kr: '칙촉', category: '과자류·빵류 또는 떡류', serving_g: 30, kcal: 150.3, carb_g: 18.3, protein_g: 2, fat_g: 7.7,
-    maker: '롯데웰푸드 주식회사', unit_label: '1회분(30g)',
+    maker: '롯데웰푸드 주식회사', unit_label: '1회분(30g)', package_g: 180,
   });
   assert.equal(pickProducts([row({})]).products[0].category, '비스킷/쿠키/크래커');
 });
@@ -83,7 +83,7 @@ test('SQL: 5,000건씩 나눈 upsert(is_product = true, 다시 돌려도 값만 
   const chunks = chunkSql(products, 5);
   assert.equal(chunks.length, 3);
   assert.equal((chunks[2].match(/\('P/g) ?? []).length, 2);
-  assert.match(chunks[0], /^insert into food_db_cache \(food_code, name_kr, category, serving_g, kcal, carb_g, protein_g, fat_g, is_product, maker, unit_label\) values/);
+  assert.match(chunks[0], /^insert into food_db_cache \(food_code, name_kr, category, serving_g, kcal, carb_g, protein_g, fat_g, is_product, maker, unit_label, package_g\) values/);
   assert.match(chunks[0], /'O''Neil'/);
   assert.match(chunks[0], /, true, /);
   assert.match(chunks[0], /on conflict \(food_code\) do update set .*is_product = excluded\.is_product.*unit_label = excluded\.unit_label/s);
@@ -112,4 +112,21 @@ test('파일당 행 수: 세 번째 인자(양의 정수), 없으면 5,000', () 
   assert.throws(() => chunkSizeArg('0'));
   assert.throws(() => chunkSizeArg('abc'));
   assert.throws(() => chunkSizeArg('1.5'));
+});
+
+test('포장 전체 양(package_g): 식품중량(size)의 g·ml 숫자, 읽을 수 없으면 null', () => {
+  const pg = (o) => pickProducts([row(o)]).products[0].package_g;
+  assert.equal(pg({}), 180);
+  assert.equal(pg({ size: '130ml', per: '100ml', serv: '100ml' }), 130);
+  assert.equal(pg({ size: '100ml(g)' }), 100);
+  assert.equal(pg({ size: '' }), null);
+  assert.equal(pg({ size: '1식' }), null);
+});
+
+test('upsert 는 package_g 도 넣고 갱신한다(다시 돌리면 포장 양이 채워진다)', () => {
+  const sql = chunkSql(pickProducts([row({})]).products)[0];
+  assert.match(sql, /'1회분\(30g\)', 180\)/);
+  assert.match(sql, /do update set [\s\S]*package_g = excluded\.package_g[\s\S]*where food_db_cache\.is_product;\s*$/);
+  const none = chunkSql(pickProducts([row({ size: '' })]).products)[0];
+  assert.match(none, /'1회분\(30g\)', null\)/);
 });
