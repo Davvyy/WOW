@@ -144,4 +144,25 @@ begin
   perform tests.ok(not exists (select 1 from jsonb_array_elements(r -> 'chips') e where (e ->> 'score')::numeric = 1),
     '상품 매칭: 제조사에 없는 브랜드를 뗀 이름은 같은 이름으로 치지 않음');
 end $$;
+
+-- ---------------- 상품 매칭: 띄어쓰기 무시 같은 이름의 다른 상품이 g당 kcal 30% 넘게 다르면 자동 대신 후보 칩(확인 필요), 그 상품들 먼저
+insert into food_db_cache (food_code, name_kr, category, serving_g, kcal, is_product, maker, unit_label, package_g) values
+  ('P900-000000000-0301', '로제떡볶이', '즉석조리식품', 100, 144, true, '떡볶이회사A', '100g', null),
+  ('P900-000000000-0302', '로제 떡볶이', '즉석조리식품', 200, 538, true, '떡볶이회사B', '1회분(200g)', 600),
+  ('P900-000000000-0311', '마라라볶이', '즉석조리식품', 100, 200, true, '라볶이회사A', '100g', null),
+  ('P900-000000000-0312', '마라라볶이', '즉석조리식품', 50, 105, true, '라볶이회사B', '1회분(50g)', 300);
+do $$
+declare r jsonb;
+begin
+  r := map_food_candidates(array['로제떡볶이'], true);
+  perform tests.eq(r ->> 'match', 'chips', '상품 매칭: 같은 이름 144 vs 269 kcal/100g → 후보 칩');
+  perform tests.ok(r ->> 'food_code' is null and r ->> 'kcal' is null, '상품 매칭: 애매하면 자동 코드·kcal 없음');
+  perform tests.eq((select array_agg(e ->> 'food_code' order by o) from jsonb_array_elements(r -> 'chips') with ordinality x(e, o) where o <= 2),
+    array['P900-000000000-0301', 'P900-000000000-0302'], '상품 매칭: 같은 이름 상품들이 칩 맨 앞');
+  r := map_food_candidates(array['마라라볶이'], true);
+  perform tests.eq(r ->> 'match', 'auto', '상품 매칭: 같은 이름 200 vs 210 kcal/100g → 자동');
+  perform tests.eq(r ->> 'food_code', 'P900-000000000-0311', '상품 매칭: 비슷하면 전과 같은 상품');
+  r := map_food_candidates(array['칙촉'], true);
+  perform tests.eq(r ->> 'match', 'auto', '상품 매칭: 다른 같은 이름이 없으면 그대로 자동');
+end $$;
 rollback;

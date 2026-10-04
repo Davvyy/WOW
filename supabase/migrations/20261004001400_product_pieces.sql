@@ -116,6 +116,7 @@ $$;
 -- 상품 매칭: 띄어쓰기만 다른 같은 이름('홈런볼 초코' = '홈런볼초코')은 점수 1 로 부분 유사도('홈런볼 초코&딸기 2MIX')보다 먼저.
 -- trgm 은 띄어쓰기로 낱말을 나눠 붙여 쓴 이름의 유사도가 낮고 상위 20에도 못 들 수 있어 공백 뺀 이름으로 따로 찾는다.
 -- 원래 이름과 브랜드를 뗀 이름 모두에 쓰고, 뗀 이름은 전과 같이 그 단어가 제조사에 들 때만(I1).
+-- 고른 상품과 띄어쓰기 무시 같은 이름의 다른 상품이 g당 kcal 30% 넘게 다르면 자동 대신 후보 칩(확인 필요), 그 상품들을 칩 맨 앞에.
 create index if not exists food_db_cache_product_nospace on food_db_cache (regexp_replace(name_kr, '\s+', '', 'g')) where is_product;
 
 create or replace function map_food_pick(p_candidates text[], p_product boolean) returns jsonb
@@ -132,16 +133,30 @@ create or replace function map_food_pick(p_candidates text[], p_product boolean)
       ) m) v
     where not v.stripped or v.brand_hit),
   best as (select * from r order by score desc, brand_hit desc, stripped, ord, food_code limit 1),
-  chips as (select distinct on (food_code) * from r order by food_code, score desc)
+  -- 고른 상품과 띄어쓰기 무시 같은 이름인데 g당 kcal 이 30% 넘게 다른 상품(제조사마다 다른 '로제떡볶이' 등)
+  alts as (
+    select f.food_code, f.name_kr, f.kcal, b.score, f.is_product
+    from best b join food_db_cache f on f.is_product and f.food_code <> b.food_code
+      and regexp_replace(f.name_kr, '\s+', '', 'g') = regexp_replace(b.name_kr, '\s+', '', 'g')
+    where p_product and b.score >= 0.45 and b.serving_g > 0 and f.serving_g > 0
+      and greatest(f.kcal / f.serving_g, b.kcal / b.serving_g) > 1.3 * least(f.kcal / f.serving_g, b.kcal / b.serving_g)),
+  amb as (select exists (select 1 from alts) as yes),
+  -- 애매하면 고른 상품 → 같은 이름 상품들 → 나머지 순, 아니면 전과 같이 점수 순
+  chips as (
+    select distinct on (food_code) * from (
+      select food_code, name_kr, kcal, score, is_product, 2 as grp from r
+      union all select food_code, name_kr, kcal, score, is_product, 1 from alts
+      union all select b.food_code, b.name_kr, b.kcal, b.score, b.is_product, 0 from best b, amb where amb.yes
+    ) u order by food_code, grp, score desc)
   select jsonb_build_object(
-    'match', case when b.score >= 0.45 then 'auto' when b.score >= 0.25 then 'chips' else 'none' end,
-    'food_code', case when b.score >= 0.45 then b.food_code end,
-    'kcal', case when b.score >= 0.45 then b.kcal end,
+    'match', case when b.score >= 0.45 and not amb.yes then 'auto' when b.score >= 0.25 then 'chips' else 'none' end,
+    'food_code', case when b.score >= 0.45 and not amb.yes then b.food_code end,
+    'kcal', case when b.score >= 0.45 and not amb.yes then b.kcal end,
     'score', b.score,
     'is_product', p_product,
     'chips', (select coalesce(jsonb_agg(jsonb_build_object('food_code', z.food_code, 'name', z.name_kr, 'kcal', z.kcal, 'score', z.score,
-      'is_product', z.is_product) order by z.score desc, z.food_code), '[]') from chips z))
-  from (select 1) one left join best b on true
+      'is_product', z.is_product) order by z.grp, z.score desc, z.food_code), '[]') from chips z))
+  from (select 1) one cross join amb left join best b on true
 $$;
 revoke execute on function map_food_pick(text[], boolean) from public, anon, authenticated;
 grant execute on function map_food_pick(text[], boolean) to service_role;
