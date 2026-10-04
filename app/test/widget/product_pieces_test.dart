@@ -70,6 +70,18 @@ void main() {
     expect([u.canSplit, u.label, u.unitKcal], [true, '1회분(30g)', 150.3]);
     expect([u.withPieces(24).label, u.withPieces(24).unitKcal], ['1개(약 7.5g)', 37.6]);
     expect(const ProductUnit(unitLabel: '1개(40g)', kcal: 190, servingG: 40).canSplit, isFalse);
+    // 음료: 1회분이 ml 이면 낱개도 ml
+    const drink = ProductUnit(unitLabel: '1회분(250ml)', kcal: 100, servingG: 250, packageG: 1500);
+    expect(drink.withPieces(6).label, '1개(약 250ml)');
+    expect(const ProductUnit(unitLabel: '100ml', kcal: 40, servingG: 100, packageG: 1000).withPieces(4).label, '1개(약 250ml)');
+  });
+
+  test('반올림 차이: 서버 1개 kcal(23.6)과 앱 계산(23.5)이 0.1 달라도 내 개입 수로 본다', () {
+    // 157 kcal / 20g, 396g ÷ 132개 → 3g: 서버 numeric 23.55 → 23.6, 앱 double 23.549… → 23.5
+    const u = ProductUnit(unitLabel: '1회분(20g)', kcal: 157, servingG: 20, packageG: 396);
+    expect(pieceKcal(157, 20, 396, 132), 23.5);
+    expect(u.piecesOf(23.6, saved: 132), 132);
+    expect(u.piecesOf(157, saved: 132), isNull, reason: '1회분 kcal 은 1회분');
   });
 
   test('서버 항목: 1단위 kcal 이 1개 kcal 이면 낱개로, 1회분 kcal 이면 1회분으로 연다', () {
@@ -77,6 +89,15 @@ void main() {
     expect([piece.unitLabel, piece.candKcal.single, piece.product?.pieces], ['1개(약 7.5g)', 37.6, 24]);
     final whole = mealItemFromServer(_chicItem(pieces: 24), 0);
     expect([whole.unitLabel, whole.candKcal.single, whole.product?.pieces], ['1회분(30g)', 150, null], reason: '개입 수를 넣기 전에 만든 초안');
+    expect([piece.kind, piece.count], [ItemKind.count, 1], reason: '낱개는 개수 항목');
+    final six = mealItemFromServer(ServerMealItem(candidates: const ['칙촉'], candidateKcal: const [37.6], candidateFoodCodes: const [_chic],
+        count: 6, portionMultiplier: 1, hasBroth: false, needsCheck: false, aiKcal: 225.6, unitLabel: '1회분(30g)', unitKcal: 150.3,
+        servingG: 30, packageG: 180, pieces: 24), 0);
+    expect([six.kind, six.count, six.mult, six.unitLabel], [ItemKind.count, 6, 1.0, '1개(약 7.5g)']);
+    expect(six.rawKcal, closeTo(225.6, 1e-9));
+    final w6 = mealItemToWire(six);
+    expect([w6['count'], w6['portion_multiplier'], w6['serving_kcal']], [6, 1.0, 37.6]);
+    expect([whole.kind, mealItemFromServer(_chicItem(), 0).withPieces(24).withPieces(null).kind], [ItemKind.side, ItemKind.side]);
     final older = mealItemFromServer(_chicItem(serving: 45.1, pieces: 24), 0);
     expect([older.unitLabel, older.product?.pieces], ['1개(약 9g)', 20], reason: '예전 개입 수(20)로 만든 초안');
     final j = ServerMealItem.fromJson({
@@ -87,7 +108,7 @@ void main() {
     expect([j.unitKcal, j.servingG, j.packageG, j.pieces], [150.3, 30, 180, 24]);
   });
 
-  testWidgets("'낱개로 계산' → 24개입 저장 → 1개(약 7.5g) 37.6 kcal, 1.0개부터 · 확정은 1개 kcal × 개수", (tester) async {
+  testWidgets("'낱개로 계산' → 24개입 저장 → 1개(약 7.5g) 37.6 kcal 개수 항목, 6개 → 확정은 count 6 × 1개 kcal", (tester) async {
     final api = await _open(tester, [_chicItem()]);
     expect(find.text('가정 분량 · 1회분(30g)'), findsOneWidget);
     await tester.tap(find.text('낱개로 계산'));
@@ -101,24 +122,28 @@ void main() {
     expect(api.productPieces, isEmpty);
     await _savePieces(tester, '24');
     expect(api.productPieces, {_chic: 24});
-    expect(find.text('가정 분량 · 1개(약 7.5g)'), findsOneWidget);
-    expect(find.text('1.0개'), findsOneWidget);
+    expect(find.text('가정 분량 · 1개(약 7.5g) × 1'), findsOneWidget);
+    expect(find.text('1.0배'), findsOneWidget, reason: '개수 항목: 1개 크기 1.0배');
     expect(find.text('낱개 24개 기준 · 바꾸기'), findsOneWidget);
     expect(_cta('확정 · 약 38 kcal'), findsOneWidget, reason: '37.6 × 1');
 
-    await tester.tap(find.descendant(of: find.byType(ChSeg<int>), matching: find.text('2')));
-    await tester.pumpAndSettle();
-    expect(_cta('확정 · 약 75 kcal'), findsOneWidget, reason: '37.6 × 2 = 75.2');
+    for (var i = 0; i < 5; i++) {
+      await tester.tap(find.byTooltip('하나 더하기'));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('가정 분량 · 1개(약 7.5g) × 6'), findsOneWidget, reason: '3개를 넘어 6개까지');
+    expect(_cta('확정 · 약 226 kcal'), findsOneWidget, reason: '37.6 × 6 = 225.6');
     await tester.tap(_cta('확정'));
     await tester.pumpAndSettle();
     final w = api.sent!.single;
-    expect([w['food_code'], w['serving_kcal'], w['portion_multiplier'], w['count']], [_chic, 37.6, 2.0, 1]);
+    expect([w['food_code'], w['serving_kcal'], w['portion_multiplier'], w['count']], [_chic, 37.6, 1.0, 6]);
+    expect(wireTotal(api.sent!), 225.6);
   });
 
   testWidgets("'1회분 기준으로 되돌리기' → 개입 수를 지우고 1회분(30g) 150 kcal 로", (tester) async {
     final api = await _open(tester, [_chicItem(serving: 37.6, pieces: 24)]);
     api.productPieces[_chic] = 24;
-    expect(find.text('가정 분량 · 1개(약 7.5g)'), findsOneWidget);
+    expect(find.text('가정 분량 · 1개(약 7.5g) × 1'), findsOneWidget);
     await tester.tap(find.text('낱개 24개 기준 · 바꾸기'));
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(find.descendant(of: find.byType(Dialog), matching: find.byType(TextField))).controller!.text, '24');

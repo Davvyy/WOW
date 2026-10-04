@@ -188,12 +188,11 @@ void _piecesSearchTests() {
 
     await tester.tap(find.text('칙촉 · 롯데제과 · 1개(약 7.5g) '));
     await tester.pumpAndSettle();
-    expect(find.text('가정 분량 · 1개(약 7.5g)'), findsOneWidget);
-    expect(find.text('1.0개'), findsOneWidget);
+    expect(find.text('가정 분량 · 1개(약 7.5g) × 1'), findsOneWidget, reason: '낱개 상품은 개수 항목');
     expect(find.text('낱개 24개 기준 · 바꾸기'), findsOneWidget);
     await tester.tap(find.text('확정 · 약 38 kcal'));
     await tester.pumpAndSettle();
     final item = api.confirmedWire!.single;
-    expect([item['food_code'], item['serving_kcal'], item['portion_multiplier']], ['P101-103000100-5334', 37.6, 1.0]);
+    expect([item['food_code'], item['serving_kcal'], item['portion_multiplier'], item['count']], ['P101-103000100-5334', 37.6, 1.0, 1]);
   });
 }

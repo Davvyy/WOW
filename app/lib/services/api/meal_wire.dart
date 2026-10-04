@@ -50,12 +50,14 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
   // 3.0 을 넘어 줄이면 kcal 이 바뀌는 행과 그 밖의 개수 2 이상 행(옛 반찬 젓가락 수 포함)은 개수 항목.
   final foldedTenths = (s.portionMultiplier * s.count * 10).round();
   final ItemKind kind;
-  if (riceOrSoup && (s.count <= 1 || foldedTenths <= maxPortionTenths)) {
+  if (split) {
+    kind = ItemKind.count; // 낱개 상품: 개수 = 먹은 낱개 수(D64)
+  } else if (riceOrSoup && (s.count <= 1 || foldedTenths <= maxPortionTenths)) {
     kind = s.hasBroth ? ItemKind.soup : ItemKind.rice;
   } else {
     kind = s.count > 1 ? ItemKind.count : ItemKind.side;
   }
-  final folded = kind != ItemKind.count && s.count > 1;
+  final folded = !split && kind != ItemKind.count && s.count > 1;
   final count = kind == ItemKind.count ? s.count : 1;
   return MealItem(
     id: 's$index',

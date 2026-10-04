@@ -176,7 +176,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           unitLabels: [unit],
           products: [hit.product],
           portion: '1인분', // 상품이면 카드가 unitLabels 의 라벨을 보인다
-          kind: unit != null ? ItemKind.side : ItemKind.count,
+          kind: hit.product?.pieces != null ? ItemKind.count : (unit != null ? ItemKind.side : ItemKind.count), // 낱개 상품은 개수로
           confidence: Confidence.sure,
           fromSearch: true,
         );

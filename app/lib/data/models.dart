@@ -82,7 +82,9 @@ class MealItem {
     final kcal = <num>[...candKcal]..[cand] = next.pieces != null ? next.unitKcal : next.kcal.round();
     final labels = padded(unitLabels)..[cand] = next.label;
     final prods = padded(products)..[cand] = next;
-    return copyWith(candKcal: kcal, unitLabels: labels, products: prods, mult: 1);
+    // 낱개는 개수 항목(개수 스테퍼로 6개·10개도), 1회분으로 되돌리면 먹은 양 항목
+    return copyWith(candKcal: kcal, unitLabels: labels, products: prods, mult: 1, count: 1,
+        kind: next.pieces != null ? ItemKind.count : (kind == ItemKind.soup ? kind : ItemKind.side));
   }
 
   /// 체크 여부와 무관하게 현재 선택의 kcal
@@ -97,13 +99,13 @@ class MealItem {
   double get kcal => checked ? rawKcal : 0;
 
   MealItem copyWith({bool? checked, int? cand, double? mult, bool? brothOff, int? count, List<num>? candKcal, List<String?>? unitLabels,
-          List<ProductUnit?>? products}) =>
+          List<ProductUnit?>? products, ItemKind? kind}) =>
       MealItem(
         id: id,
         candidates: candidates,
         candKcal: candKcal ?? this.candKcal,
         portion: portion,
-        kind: kind,
+        kind: kind ?? this.kind,
         grams: grams,
         baseCount: baseCount,
         confidence: confidence,
@@ -488,10 +490,10 @@ const maxPieces = 200;
 /// 1개 kcal = 1회분 kcal ÷ 1회분 양 × (포장 양 ÷ 개입 수), 소수 1자리(서버 product_piece_kcal 과 같은 식)
 double pieceKcal(num kcal, num servingG, num packageG, int pieces) => round1(kcal / servingG * (packageG / pieces));
 
-/// 낱개 라벨: 180g ÷ 24 → '1개(약 7.5g)', 168g ÷ 24 → '1개(약 7g)'
-String pieceLabel(num packageG, int pieces) {
+/// 낱개 라벨: 180g ÷ 24 → '1개(약 7.5g)', 168g ÷ 24 → '1개(약 7g)', 음료 1,500ml ÷ 6 → '1개(약 250ml)'([unit])
+String pieceLabel(num packageG, int pieces, {String unit = 'g'}) {
   final g = round1(packageG / pieces);
-  return '1개(약 ${g == g.roundToDouble() ? g.toInt() : g}g)';
+  return '1개(약 ${g == g.roundToDouble() ? g.toInt() : g}$unit)';
 }
 
 /// 가공식품(상품) 1단위(D63)와 '몇 개입' 낱개 단위(D64).
@@ -511,7 +513,10 @@ class ProductUnit {
   bool get _split => pieces != null && canSplit;
 
   /// 이 단위의 라벨: 낱개 '1개(약 7.5g)', 아니면 1회분 라벨
-  String get label => _split ? pieceLabel(packageG!, pieces!) : unitLabel;
+  String get label => _split ? pieceLabel(packageG!, pieces!, unit: amountUnit) : unitLabel;
+
+  /// 양 단위: 1단위 라벨이 ml 이면('1회분(200ml)' · '100ml') ml, 아니면 g
+  String get amountUnit => RegExp(r'ml\)?$', caseSensitive: false).hasMatch(unitLabel) ? 'ml' : 'g';
 
   /// 이 단위 1개의 kcal
   num get unitKcal => _split ? pieceKcal(kcal, servingG, packageG!, pieces!) : kcal;
@@ -523,11 +528,12 @@ class ProductUnit {
   int? piecesOf(num serving, {int? saved}) {
     if (!canSplit || serving <= 0) return null;
     bool near(num a, num b) => (a - b).abs() < 0.051;
-    if (saved != null && saved >= minPieces && saved <= maxPieces && near(pieceKcal(kcal, servingG, packageG!, saved), serving)) return saved;
+    // 내 개입 수는 서버(numeric)와 앱(double)의 반올림이 소수 1자리에서 갈릴 수 있어 0.1 차이까지 같은 값으로 본다
+    if (saved != null && saved >= minPieces && saved <= maxPieces && (pieceKcal(kcal, servingG, packageG!, saved) - serving).abs() < 0.11) return saved;
     if (near(kcal, serving)) return null;
     final n = (packageG! * kcal / (serving * servingG)).round();
     if (n < minPieces || n > maxPieces) return null;
-    return near(pieceKcal(kcal, servingG, packageG!, n), serving) ? n : null;
+    return (pieceKcal(kcal, servingG, packageG!, n) - serving).abs() < 0.11 ? n : null;
   }
 }
 
