@@ -1,7 +1,7 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 import { analyzeMeal, type AnalyzeDeps, type FoodMatch } from './analyze.ts';
 import { MOCK_LUNCH, MockAdapter } from './ai/mock.ts';
-import { parseMealAnalysis, SchemaError } from './ai/types.ts';
+import { MEAL_PROMPT, MEAL_SCHEMA, parseMealAnalysis, SchemaError } from './ai/types.ts';
 import { selectAdapter } from './ai/select.ts';
 import { ClaudeAdapter } from './ai/claude.ts';
 import { GeminiAdapter } from './ai/gemini.ts';
@@ -126,4 +126,27 @@ Deno.test('Gemini 어댑터: 기본 모델은 새 키로도 쓸 수 있는 gemin
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
   );
   assertEquals(new GeminiAdapter({ apiKey: 'k', model: 'gemini-3.8-flash' }).url().includes('/models/gemini-3.8-flash:'), true);
+});
+
+Deno.test('AI 인분 예측(servings, 0.1 단위): 배수·ai_kcal 에 쓰고, 범위 밖은 0.1~3.0 으로, 없으면 분량 구간으로', async () => {
+  const out = await analyzeMeal('m1', deps(new MockAdapter({
+    is_food: true,
+    items: [
+      { name_candidates: ['흰쌀밥'], count: 1, servings: 1.2, has_broth: false, confidence: 'high' },
+      { name_candidates: ['김치찌개'], count: 1, servings: 0.04, has_broth: true, confidence: 'high' },
+      { name_candidates: ['곰탕'], count: 1, servings: 7, has_broth: true, confidence: 'high' },
+      { name_candidates: ['계란말이'], count: 1, servings: 1.26, has_broth: false, confidence: 'high' },
+      { name_candidates: ['김'], count: 1, portion_bucket: 'large', has_broth: false, confidence: 'high' },
+    ],
+  })));
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals(out.items.map((i) => i.portion_multiplier), [1.2, 0.1, 3, 1.3, 1.5]);
+  assertEquals(out.items[0].ai_kcal, 372); // 310 × 1.2
+  assertEquals(out.items.map((i) => i.portion_bucket), ['one', 'half', 'large', 'large', 'large']);
+});
+
+Deno.test('스키마·프롬프트: servings 를 요구한다', () => {
+  const item = MEAL_SCHEMA.properties.items.items;
+  assertEquals((item.required as readonly string[]).includes('servings'), true);
+  assertEquals(MEAL_PROMPT.includes('servings'), true);
 });

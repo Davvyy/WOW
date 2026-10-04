@@ -2,7 +2,7 @@
 // I/O는 모두 deps 로 주입한다(단위 테스트는 모의 deps, 운영은 analyze-meal/index.ts 의 Supabase 구현).
 import { type MealAnalysis, type MealImage, type MealVisionAdapter, parseMealAnalysis, type PortionBucket } from './ai/types.ts';
 
-export const PORTION_MULTIPLIER: Record<PortionBucket, number> = { half: 0.5, one: 1.0, large: 1.5 };
+export { PORTION_MULTIPLIER } from './ai/types.ts';
 
 export interface FoodMatch {
   match: 'auto' | 'chips' | 'none'; // ≥0.45 자동 / 0.25~0.45 후보 칩 / <0.25 미매칭 (04 §4.2)
@@ -93,7 +93,7 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
       serving = deps.unmatchedKcal ?? 200; // 미매칭 → 임시값 + 확인 필요
       needsCheck = true;
     }
-    const mult = PORTION_MULTIPLIER[it.portion_bucket];
+    const mult = it.servings; // AI 가 사진으로 본 인분(0.1 단위) — P7 먹은 양 기본값
     // 후보 칩: 선택 이름을 맨 앞에, 나머지 LLM 후보는 각자 DB 매칭 kcal(실패 시 선택 항목 값)
     const candidates = [chosen];
     const candidate_kcal = [serving];
