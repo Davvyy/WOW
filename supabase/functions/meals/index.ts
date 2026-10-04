@@ -1,4 +1,4 @@
-// POST /functions/v1/meals {photo_id, queued?, slot?}  (05 API #9) — slot 은 'snack' 만 반영(D55)
+// POST /functions/v1/meals {photo_id, queued?, slot?}  (05 API #9) — slot 은 촬영 화면에서 고른 끼니(D58)
 // 서명 PUT 이 끝난 사진으로 끼니를 만든다: 객체 재검증(sha256·bytes·해상도) → 서버 KST 슬롯 태그·지연 업로드 규칙·중복 해시
 // (SQL create_meal) → 국외 AI 동의자만 analyze-meal 을 백그라운드로 호출하고 즉시 반환(3초 내 홈 복귀).
 import { createMealFlow } from '../_shared/flows.ts';
@@ -31,8 +31,8 @@ Deno.serve((req) =>
           if (error) throw fromDbError(error);
           return data;
         },
-        async createMeal(photoId, queued, snack) {
-          const { data, error } = await db.rpc('create_meal', { p_user: user.id, p_photo: photoId, p_queued: queued, p_snack: snack });
+        async createMeal(photoId, queued, slot) {
+          const { data, error } = await db.rpc('create_meal', { p_user: user.id, p_photo: photoId, p_queued: queued, p_slot: slot });
           if (error) throw fromDbError(error);
           return data;
         },

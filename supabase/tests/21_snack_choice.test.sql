@@ -56,11 +56,11 @@ begin
 
   -- 인자 하나 더한 함수만 남고(PostgREST 이름 호출 모호성 없음), 권한은 service_role 만
   perform tests.ok(to_regprocedure('create_meal(uuid, uuid, boolean, timestamptz)') is null, '옛 4인자 create_meal 제거');
-  perform tests.ok(has_function_privilege('service_role', 'create_meal(uuid, uuid, boolean, timestamptz, boolean)', 'execute'),
+  perform tests.ok(has_function_privilege('service_role', 'create_meal(uuid, uuid, boolean, timestamptz, boolean, meal_slot)', 'execute'),
     'service_role 실행 가능');
-  perform tests.ok(not has_function_privilege('authenticated', 'create_meal(uuid, uuid, boolean, timestamptz, boolean)', 'execute'),
+  perform tests.ok(not has_function_privilege('authenticated', 'create_meal(uuid, uuid, boolean, timestamptz, boolean, meal_slot)', 'execute'),
     'authenticated 실행 불가');
-  perform tests.ok(not has_function_privilege('anon', 'create_meal(uuid, uuid, boolean, timestamptz, boolean)', 'execute'),
+  perform tests.ok(not has_function_privilege('anon', 'create_meal(uuid, uuid, boolean, timestamptz, boolean, meal_slot)', 'execute'),
     'anon 실행 불가');
 end $$;
 rollback;
