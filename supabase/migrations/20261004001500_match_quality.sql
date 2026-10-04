@@ -32,13 +32,17 @@ create or replace function maker_match_pos(p_maker text, p_frags text[]) returns
     and (pg_catalog.starts_with(m.k, u.x) or (pg_catalog.length(u.x) >= 3 and pg_catalog.strpos(m.nn, u.x) > 0))
 $$;
 
+-- 생성 열을 더하면 표 전체를 다시 쓰고(그동안 매칭·검색이 기다린다) 모든 색인을 다시 만든다:
+-- 잠금을 오래 기다리지 않고, 더는 쓰지 않는 공백 뺀 이름 색인(20261004001400, name_norm 이 대신)을 먼저 지워 다시 만들지 않게 한다.
+set lock_timeout = '5s';
+set statement_timeout = '10min';
+drop index if exists food_db_cache_product_nospace;
 alter table food_db_cache add column if not exists name_norm text generated always as (food_name_norm(name_kr)) stored;
 
--- 상품: 정규화 이름 같음(=)·trgm 유사도(%)·브랜드 제조사 앞글자. 공백만 뺀 이름 색인(20261004001400)은 name_norm 이 대신한다.
-create index if not exists food_db_cache_product_norm on food_db_cache (name_norm) where is_product;
+-- 상품: 정규화 이름 같음(= 은 해시 색인이 btree 보다 빨리 만들어지고 작다)·trgm 유사도(%)·브랜드 제조사 앞글자
+create index if not exists food_db_cache_product_norm on food_db_cache using hash (name_norm) where is_product;
 create index if not exists food_db_cache_product_norm_trgm on food_db_cache using gin (name_norm gin_trgm_ops) where is_product;
 create index if not exists food_db_cache_product_maker on food_db_cache ((food_maker_key(maker)) collate "C") where is_product;
-drop index if exists food_db_cache_product_nospace;
 
 -- ---------------------------------------------------------------- 브랜드 → 제조사
 create table if not exists brand_makers (
@@ -60,12 +64,12 @@ insert into brand_makers (brand, makers) values
   ('빙그레', '{빙그레}'), ('매일', '{매일유업}'), ('상하목장', '{매일유업}'), ('남양', '{남양유업,남양에프앤비}'), ('서울우유', '{서울우유}'),
   ('풀무원', '{풀무원}'), ('동원', '{동원}'), ('목우촌', '{목우촌,농협}'), ('하림', '{하림}'), ('팔도', '{팔도}'),
   ('삼양', '{삼양식품}'), ('광동', '{광동}'), ('동아', '{동아오츠카}'), ('동아오츠카', '{동아오츠카}'), ('웅진', '{웅진식품}'),
-  ('일화', '{일화}'), ('사조', '{사조}'), ('대상', '{대상}'), ('청정원', '{대상}'), ('종가', '{대상}'), ('비락', '{비락}'),
+  ('일화', '{일화}'), ('사조', '{사조}'), ('대상', '{대상}'), ('청정원', '{대상}'), ('종가', '{대상}'), ('종가집', '{대상}'), ('비락', '{비락}'),
   ('파리바게뜨', '{파리크라상}'), ('파리바게트', '{파리크라상}'),
   ('야쿠르트', '{한국야쿠르트,에치와이,야쿠르트}'), ('hy', '{한국야쿠르트,에치와이,야쿠르트}'),
   ('코카콜라', '{코카콜라,COCACOLA,LG생활건강,해태HTB,해태에이치티비}'),
   ('몬스터', '{코카콜라,COCACOLA,해태에이치티비,MONSTER}'),
-  ('스타벅스', '{스타벅스,동서식품,네슬레,NESTLE,서울우유,남양유업}'),
+  ('스타벅스', '{스타벅스,동서식품,네슬레,NESTLE}'),
   ('하겐다즈', '{HAAGEN,하겐다즈}'), ('허쉬', '{HERSHEY,THE HERSHEY,허쉬}'), ('페레로', '{FERRERO,페레로}'), ('킨더', '{FERRERO,페레로}'),
   ('하리보', '{HARIBO,하리보}'), ('켈로그', '{켈로그,농심켈로그,KELLOGG}'), ('레드불', '{RED BULL,레드불,RAUCH}')
 on conflict (brand) do update set makers = excluded.makers;
@@ -89,8 +93,9 @@ on conflict (spelling) do update set canonical = excluded.canonical;
 --  core   = 브랜드를 뗀 마지막 낱말('…맛' 은 건너뜀)이 식품 종류로 끝나면 그 종류(햄 · 카레 · 콘 · 칩 · 바 · 껌 …).
 --  powder_q = 질의가 가루·믹스·원료 제품을 말함(그러면 제품 형태로 내리지 않는다).
 --  raw    = 그 이름의 띄어 쓴 글(소문자). 아는 브랜드가 없는 질의는 전처럼 띄어 쓴 이름끼리의 유사도도 본다.
+--  lastw  = 마지막 낱말(정규화). 브랜드를 붙인 원래 이름의 포함 점수는 이 낱말이 2글자 이상이거나 상품 이름에 따로 있을 때만('동원 김' ⊄ '동원 김치참치').
 create or replace function product_name_variants(p_candidates text[])
-returns table (ord bigint, stripped boolean, vn text, raw text, frags text[], qwords text[], core text, powder_q boolean)
+returns table (ord bigint, stripped boolean, vn text, raw text, frags text[], qwords text[], core text, powder_q boolean, lastw text)
   language plpgsql stable security definer rows 6 set search_path = public, extensions as $$
 declare
   kinds constant text[] := array['아이스크림', '요구르트', '요거트', '초콜릿', '소시지', '비엔나', '라면', '우유', '카레', '짜장', '짬뽕',
@@ -126,13 +131,13 @@ begin
     k := (select t from unnest(kinds) t where cw like '%' || t order by length(t) desc limit 1);
     seen := '{}';
     if v0 <> '' then
-      ord := o; stripped := false; vn := v0; raw := raw0; frags := fr; qwords := qw; core := k; powder_q := pq; return next; seen := seen || v0;
+      ord := o; stripped := false; vn := v0; raw := raw0; frags := fr; qwords := qw; core := k; powder_q := pq; lastw := wn[cardinality(wn)]; return next; seen := seen || v0;
     end if;
     if coalesce(v1, '') <> '' and not v1 = any(seen) then
-      ord := o; stripped := true; vn := v1; raw := raw1; frags := fr; qwords := qw; core := k; powder_q := pq; return next; seen := seen || v1;
+      ord := o; stripped := true; vn := v1; raw := raw1; frags := fr; qwords := qw; core := k; powder_q := pq; lastw := wn[cardinality(wn)]; return next; seen := seen || v1;
     end if;
     if coalesce(v2, '') <> '' and not v2 = any(seen) then
-      ord := o; stripped := true; vn := v2; raw := raw2; frags := fr; qwords := qw; core := k; powder_q := pq; return next;
+      ord := o; stripped := true; vn := v2; raw := raw2; frags := fr; qwords := qw; core := k; powder_q := pq; lastw := wn[cardinality(wn)]; return next;
     end if;
   end loop;
 end $$;
@@ -144,9 +149,11 @@ end $$;
 --     (공백을 빼면 짧은 질의의 유사도가 낮아진다: '진라면' ~ '진라면(매운맛)'). 브랜드 질의는 '오리온 …' 같은 브랜드 낱말만 같은 상품이 오르지 않게 정규화 값만.
 --  C. 브랜드를 뗀 이름이 이름에 든, 그 브랜드 제조사(앞글자) 상품 상위 20('남양 17차' → '몸이맑아지는시간17차').
 -- 브랜드 일치(brand_hit) = 제조사가 질의의 아는 브랜드(어느 낱말이든)의 제조사 조각이나 첫 낱말에 맞는다(maker_match_pos).
--- 상품 이름의 브랜드 낱말은 보지 않는다(다른 회사의 협업·표기 '목우촌 주부9단 햄김치볶음밥' · '롯데드림카카오닙스'가 있어서).
+-- 상품 이름의 브랜드 낱말만으로는 보지 않는다(다른 회사의 협업·표기 '목우촌 주부9단 햄김치볶음밥' · '롯데드림카카오닙스'가 있어서).
+-- 다만 브랜드까지 붙인 이름이 통째로 같으면(위탁 제조 '스타벅스 다크초콜릿' · STEENLAND) 브랜드 일치로 본다.
 -- 브랜드를 뗀 이름은 브랜드 일치일 때만 센다(I1).
 -- 브랜드 일치 행은 뗀 이름이 이름에 통째로 들면 점수를 0.6 + 0.2 × (뗀 이름 길이 ÷ 상품 이름 길이) 이상으로 본다(자동 매칭).
+-- 브랜드를 떼지 않은 원래 이름은 마지막 낱말이 2글자 이상이거나 상품 이름에 따로(띄어 쓴 낱말로) 있을 때만('동원 김'이 '동원 김치참치'에 들어도 아님).
 -- 고르는 순서:
 --  1) 브랜드: 브랜드 일치 행이 하나라도 있으면 브랜드가 다른 제조사 행은 뒤로(다른 제조사만 있을 때만 그중에서 고른다).
 --  2) 같은 브랜드 묶음의 최고 점수 − 0.1 안의 행끼리:
@@ -155,7 +162,8 @@ end $$;
 --       핵심어는 브랜드를 뗀 마지막 낱말이 그 종류로 끝날 때만('주부9단 햄' → 햄, '부라보콘' → 콘). 가벼운 우선이라 0.1 안에서만 본다.
 --     기본 맛 — 최고 점수 − 0.05 안이면 오리지널·클래식·플레인·바닐라 이름을 먼저(맛을 말하지 않은 '롯데 몽쉘' → '몽쉘 오리지널').
 --  3) 점수, 브랜드 조각 순서(코카콜라 → 코카콜라음료 먼저), 원래 이름, 후보 순서.
--- 질의에 아는 브랜드가 있는데 고른 상품의 제조사가 그 브랜드가 아니면 자동 대신 후보 칩(확인 필요).
+-- 후보 이름 중 하나라도 아는 브랜드가 있는데 고른 상품이 그 브랜드 일치가 아니면 자동 대신 후보 칩(확인 필요).
+-- 마시는·먹는 질의에 가루 상품(제품 형태)을 골랐거나, 핵심어가 다른 음식의 꾸밈말로만 든 상품('김치덮밥')을 골라도 후보 칩.
 -- 같은 이름(정규화) 다른 상품의 g당 kcal 이 30% 넘게(차이 0.1 초과) 다르면 후보 칩(D64). 브랜드 일치로 고른 상품은 같은 브랜드 상품끼리만 본다.
 create or replace function map_product_pick(p_candidates text[]) returns jsonb
   language sql stable security definer set search_path = public, extensions set jit = off as $$
@@ -179,19 +187,23 @@ create or replace function map_product_pick(p_candidates text[]) returns jsonb
       order by length(f.name_norm), 1 limit 20) m
     where v.stripped and length(v.vn) >= 2),
   r0 as (
-    select h.food_code, h.name_kr, h.kcal, h.serving_g, h.name_norm, h.ord, h.stripped, h.vn, h.sim, c.core, c.powder_q,
+    select h.food_code, h.name_kr, h.kcal, h.serving_g, h.name_norm, h.ord, h.stripped, h.vn, h.sim, c.core, c.powder_q, c.lastw,
       cardinality(c.frags) > 0 as known,
       maker_match_pos(h.maker, c.frags || c.qwords) as maker_pos,
       h.name_norm ~ '오리지널|오리지날|original|클래식|classic|플레인|plain|바닐라' as plain,
       c.frags, c.qwords,
       not c.powder_q and (h.name_norm ~ '분말|파우더|믹스|생지|반죽|원료|베이스|농축액|시럽|조미료'
         or coalesce(h.category, '') ~ '분말|파우더|믹스|생지|반죽|원료|베이스|농축|시럽|조미료|인스턴트커피') as form_bad,
-      coalesce(h.name_norm ~ (c.core || '[a-z0-9]*$'), false) as core_end -- 끝의 영문·숫자 표기('…우유 C')는 건너뜀
+      coalesce(h.name_norm ~ (c.core || '[a-z0-9]*$'), false) as core_end, -- 끝의 영문·숫자 표기('…우유 C')는 건너뜀
+      -- 핵심어가 이름 끝이 아니라 다른 음식 앞의 꾸밈말로만 있음('김치' → '김치덮밥', '햄' → '햄김치볶음밥'): 자동 확정하지 않는다
+      coalesce(h.name_norm !~ (c.core || '[a-z0-9]*$')
+        and h.name_norm ~ (c.core || '.*(밥|찌개|전골|국|탕|면|우동|만두|떡볶이|죽|피자|버거|샌드위치)[a-z0-9]*$'), false) as core_compound
     from hits h join (select distinct on (ord) * from v order by ord) c on c.ord = h.ord),
   r1 as (
     select *, case when brand_hit and length(vn) >= 2 and strpos(name_norm, vn) > 0
+        and (stripped or length(lastw) >= 2 or exists (select 1 from regexp_split_to_table(name_kr, '\s+') t where food_name_norm(t) = lastw))
       then greatest(sim, 0.6 + 0.2 * length(vn) / length(name_norm)) else sim end::real as score
-    from (select *, maker_pos is not null as brand_hit from r0) x where not stripped or brand_hit),
+    from (select *, maker_pos is not null or (not stripped and known and name_norm = vn) as brand_hit from r0) x where not stripped or brand_hit),
   r2 as (select *, case when bool_or(brand_hit) over () and not brand_hit then 1 else 0 end as tier from r1),
   r3 as (select *, score >= max(score) over (partition by tier) - 0.1 as near,
     plain and score >= max(score) over (partition by tier) - 0.05 as plain_near from r2),
@@ -218,7 +230,10 @@ create or replace function map_product_pick(p_candidates text[]) returns jsonb
         union all select b.food_code, b.name_kr, b.kcal, b.score, 0, 0 from best b, amb where amb.yes
       ) u order by food_code, grp, rk) d
     order by grp, rk, food_code limit 10),
-  auto as (select b.score >= 0.45 and not amb.yes and (not b.known or b.brand_hit) as yes from best b, amb)
+  -- 후보 이름 중 하나라도 아는 브랜드가 있으면, 고른 상품이 그 브랜드 일치일 때만 자동('롯데 자일리톨 껌' · '자일리톨' 처럼 브랜드 없는 후보로 우회하지 않게)
+  auto as (select b.score >= 0.45 and not amb.yes and not b.form_bad and not b.core_compound
+    and ((b.brand_hit and cardinality(b.frags) > 0) or not exists (select 1 from v where cardinality(v.frags) > 0)) as yes
+    from best b, amb)
   select jsonb_build_object(
     'match', case when coalesce(auto.yes, false) then 'auto' when b.score >= 0.25 then 'chips' else 'none' end,
     'food_code', case when auto.yes then b.food_code end,
@@ -265,3 +280,7 @@ revoke execute on function product_name_variants(text[]), map_product_pick(text[
   from public, anon, authenticated;
 grant execute on function product_name_variants(text[]), map_product_pick(text[]), map_dish_pick(text[]), map_food_pick(text[], boolean)
   to service_role;
+
+analyze food_db_cache;
+reset lock_timeout;
+reset statement_timeout;
