@@ -259,6 +259,12 @@ Deno.test('프롬프트: 포장 상품 이름은 포장에 적힌 맛·종류까
   assertEquals(MEAL_PROMPT.includes('"칙촉 오리지널"'), true);
 });
 
+Deno.test('프롬프트: 포장 상품은 count = 따로 보이는 봉지·포장 수, servings = 한 포장당 양(보통 1.0)', () => {
+  assertEquals(MEAL_PROMPT.includes('포장 상품의 count 는 따로 보이는 봉지·포장 수'), true);
+  assertEquals(MEAL_PROMPT.includes('servings 는 그 상품 단위 대비 한 포장당 양(보통 1.0'), true);
+  assertEquals(MEAL_PROMPT.includes('count 는 1 로 두고'), false);
+});
+
 Deno.test('개입 수 조회가 안 되면 1회분 초안 그대로(분석은 계속)', async () => {
   const d: AnalyzeDeps = {
     ...productDeps(new MockAdapter(chicItem(2)), []),

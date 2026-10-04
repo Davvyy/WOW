@@ -21,7 +21,7 @@ export interface MealItemDraft {
   portion_bucket: PortionBucket; // servings 의 요약
   has_broth: boolean;
   confidence: Confidence;
-  packaged: boolean; // 봉지·캔·병·상자에 든 포장 상품 → 가공식품(상품) 행 먼저 매칭(D63). servings 는 상품 단위(봉·개·캔) 수
+  packaged: boolean; // 봉지·캔·병·상자에 든 포장 상품 → 가공식품(상품) 행 먼저 매칭(D63). count 는 보이는 포장 수, servings 는 한 포장당 양
 }
 
 export interface MealAnalysis {
@@ -48,8 +48,8 @@ export const MEAL_PROMPT = [
   '봉지·캔·병·상자에 든 포장 상품(과자·음료·아이스크림·컵라면 등)이면 packaged=true 로 하고, name_candidates 에 포장에 적힌 브랜드와 상품명을 그대로',
   '(예: "롯데 칙촉", "칙촉", 마지막은 일반 음식명 "초코칩쿠키") 넣되 용량·중량 숫자는 빼세요.',
   '상품명에는 포장에 적힌 맛·종류도 그대로 붙이세요(예: "홈런볼 초코", "칙촉 오리지널").',
-  '포장 상품의 servings 는 보이는 상품 단위(봉·개·캔) 수입니다(0.1 단위, 예: 한 봉 1.0, 반 봉 0.5, 두 개 2.0). count 는 1 로 두고,',
-  '같은 포장 상품 여러 개가 따로 보일 때만 그 개수로 하되 그때 servings 는 한 개당 먹은 양입니다. 그릇에 담긴 음식은 packaged=false 입니다.',
+  '포장 상품의 count 는 따로 보이는 봉지·포장 수(낱개 포장 6개면 6)이고, servings 는 그 상품 단위 대비 한 포장당 양(보통 1.0,',
+  '반만 먹었으면 0.5, 0.1 단위)입니다. 그릇에 담긴 음식은 packaged=false 입니다.',
   '칼로리나 그램 숫자는 절대 출력하지 마세요(숫자는 count·servings 만). 음식이 아니면 is_food=false, items=[].',
   'JSON 스키마에 맞는 JSON 하나만 출력하세요.',
 ].join(' ');
