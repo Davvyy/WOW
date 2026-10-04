@@ -260,9 +260,17 @@ class LedgerRow {
     required this.meals,
     this.revisionReason,
     this.sBefore,
+    this.localDate,
+    this.finalizedAt,
   });
   final int d;
   final String date;
+
+  /// 날짜(YYYY-MM-DD, KST). 서버 행만 채운다(모의 장부는 null).
+  final String? localDate;
+
+  /// 확정 시각(daily_scores.finalized_at). 확정 전이거나 서버가 주지 않으면 null.
+  final DateTime? finalizedAt;
   final int steps;
   final int bmr;
   final double a;

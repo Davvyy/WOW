@@ -475,36 +475,8 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     try {
       final rows = await api.fetchMealsOn(todayKst());
       if (!ref.mounted) return null;
-      // 촬영 시각 순(같으면 서버 순서 그대로)
-      final order = [for (var i = 0; i < rows.length; i++) (i, rows[i])]..sort((a, b) {
-          final ta = a.$2.capturedAt, tb = b.$2.capturedAt;
-          final c = ta == null || tb == null ? 0 : ta.compareTo(tb);
-          return c != 0 ? c : a.$1.compareTo(b.$1);
-        });
       final knownKeys = {for (final m in state) if (m.serverId != null) m.serverId!: m.localKey};
-      String two(int v) => v.toString().padLeft(2, '0');
-      final next = <MealRecord>[];
-      for (final (_, m) in order) {
-        final slot = m.slot;
-        if (slot == null) continue;
-        final items = [for (var i = 0; i < m.items.length; i++) mealItemFromServer(m.items[i], i)];
-        final t = m.capturedAt == null ? null : toKstWall(m.capturedAt!);
-        next.add(MealRecord(
-          slot: slot,
-          status: m.status,
-          kcal: m.confirmedKcal ?? 0,
-          aiKcal: m.aiKcal,
-          items: items,
-          title: items.map((i) => i.name).take(2).join(' · '),
-          time: t == null ? '' : '${two(t.hour)}:${two(t.minute)}',
-          serverId: m.id,
-          localKey: knownKeys[m.id] ?? m.id,
-          version: m.version,
-          noAnalysis: m.engine == 'none',
-          lateUpload: m.lateUpload,
-          corrected: m.status == MealStatus.corrected,
-        ));
-      }
+      final next = mealRecordsFromServer(rows, knownKeys: knownKeys);
       next.addAll(state.where((m) => m.serverId == null && m.status == MealStatus.captured));
       state = next;
       for (final r in next) {
@@ -616,13 +588,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     state = [...state]..insert(i.clamp(0, state.length), prev);
   }
 
-  /// 지운 끼니의 공유용 사진(이 폰 7일 보관본)도 지운다
-  Future<void> _forgetPhoto(String mealId) async {
-    try {
-      await ref.read(sharePhotoStoreProvider).remove(mealId);
-    } catch (_) {}
-    if (ref.mounted) ref.invalidate(mealPhotoProvider(mealId));
-  }
+  Future<void> _forgetPhoto(String mealId) => forgetMealPhoto(ref, mealId);
 
   /// P6 촬영 직후: 새 끼니를 더한다(같은 슬롯의 다른 끼니는 그대로). 분석 중(captured) → AI 초안(draft).
   /// 국외 AI 미동의면 분석 없이 저장. [photo] 가 있으면 업로드 파이프라인(리사이즈·EXIF 제거·SHA-256 → 서버 끼니 생성)을 탄다.
@@ -751,6 +717,48 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
 }
 
 final mealsProvider = NotifierProvider<MealsNotifier, List<MealRecord>>(MealsNotifier.new);
+
+/// 서버 끼니 → 화면 끼니(촬영 시각 순, 같으면 서버 순서 그대로). 슬롯이 없는 행은 뺀다.
+/// [knownKeys] 는 서버 id → 이 폰의 로컬 키(촬영으로 만든 끼니는 그 키를 유지한다).
+List<MealRecord> mealRecordsFromServer(List<ServerMeal> rows, {Map<String, String?> knownKeys = const {}}) {
+  final order = [for (var i = 0; i < rows.length; i++) (i, rows[i])]..sort((a, b) {
+      final ta = a.$2.capturedAt, tb = b.$2.capturedAt;
+      final c = ta == null || tb == null ? 0 : ta.compareTo(tb);
+      return c != 0 ? c : a.$1.compareTo(b.$1);
+    });
+  String two(int v) => v.toString().padLeft(2, '0');
+  final next = <MealRecord>[];
+  for (final (_, m) in order) {
+    final slot = m.slot;
+    if (slot == null) continue;
+    final items = [for (var i = 0; i < m.items.length; i++) mealItemFromServer(m.items[i], i)];
+    final t = m.capturedAt == null ? null : toKstWall(m.capturedAt!);
+    next.add(MealRecord(
+      slot: slot,
+      status: m.status,
+      kcal: m.confirmedKcal ?? 0,
+      aiKcal: m.aiKcal,
+      items: items,
+      title: items.map((i) => i.name).take(2).join(' · '),
+      time: t == null ? '' : '${two(t.hour)}:${two(t.minute)}',
+      serverId: m.id,
+      localKey: knownKeys[m.id] ?? m.id,
+      version: m.version,
+      noAnalysis: m.engine == 'none',
+      lateUpload: m.lateUpload,
+      corrected: m.status == MealStatus.corrected,
+    ));
+  }
+  return next;
+}
+
+/// 지운 끼니의 공유용 사진(이 폰 7일 보관본)도 지운다
+Future<void> forgetMealPhoto(Ref ref, String mealId) async {
+  try {
+    await ref.read(sharePhotoStoreProvider).remove(mealId);
+  } catch (_) {}
+  if (ref.mounted) ref.invalidate(mealPhotoProvider(mealId));
+}
 
 // ---------- 오늘 계산(엔진) ----------
 final todayResultProvider = Provider<SimulateResult>((ref) {

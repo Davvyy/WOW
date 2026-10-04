@@ -60,6 +60,8 @@ LedgerRow ledgerRowFromServer(Map<String, dynamic> row, DateTime start,
     ],
     revisionReason: verdictRev == null ? null : reviewTypes[verdictRev['review_id']],
     sBefore: revisions.isEmpty ? null : _d(revisions.first['prev_s_d']),
+    localDate: row['local_date'] as String,
+    finalizedAt: row['finalized_at'] == null ? null : DateTime.parse(row['finalized_at'] as String),
   );
 }
 

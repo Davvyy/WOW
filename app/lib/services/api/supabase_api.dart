@@ -306,7 +306,7 @@ class SupabaseChalloryApi implements ChalloryApi {
       final me = await _me();
       final start = DateTime.parse((me['challenges'] as Map)['start_date'] as String);
       final rows = await _client.from('daily_scores')
-          .select('id, local_date, bmr, a_d, i_d, f_p, d_d, s_d, is_counted, is_final, under_review, breakdown')
+          .select('id, local_date, bmr, a_d, i_d, f_p, d_d, s_d, is_counted, is_final, finalized_at, under_review, breakdown')
           .eq('participant_id', me['id']).order('local_date');
       final ids = [for (final r in rows) r['id'] as String];
       final revs = ids.isEmpty ? <Map<String, dynamic>>[] : await _client.from('score_revisions')
