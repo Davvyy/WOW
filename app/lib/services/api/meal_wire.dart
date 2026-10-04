@@ -55,7 +55,7 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
     candidates: s.candidates,
     candKcal: [for (final k in s.candidateKcal) k.round()],
     foodCodes: s.candidateFoodCodes,
-    portion: product ?? (kind == ItemKind.rice ? '1공기' : (kind == ItemKind.count ? '개' : '1인분')),
+    portion: kind == ItemKind.rice ? '1공기' : (kind == ItemKind.count ? '개' : '1인분'), // 상품 단위 라벨은 unitLabels(고른 후보만)
     unitLabels: [for (var i = 0; i < s.candidates.length; i++) i == s.chosen ? product : null],
     kind: kind,
     baseCount: count,

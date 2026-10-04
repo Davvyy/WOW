@@ -173,7 +173,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           candKcal: [hit.kcal],
           foodCodes: [hit.foodCode],
           unitLabels: [unit],
-          portion: unit ?? '1인분',
+          portion: '1인분', // 상품이면 카드가 unitLabels 의 라벨을 보인다
           kind: unit != null ? ItemKind.side : ItemKind.count,
           confidence: Confidence.sure,
           fromSearch: true,

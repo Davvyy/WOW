@@ -241,7 +241,7 @@ void main() {
         'has_broth': false, 'needs_check': false, 'ai_kcal': 380, 'food_db_cache': {'unit_label': '1개(40g)'},
       });
       final it = mealItemFromServer(s, 0);
-      expect([it.kind, it.unitLabel, it.portion, it.mult, it.rawKcal], [ItemKind.side, '1개(40g)', '1개(40g)', 2.0, 380.0]);
+      expect([it.kind, it.unitLabel, it.portion, it.mult, it.rawKcal], [ItemKind.side, '1개(40g)', '1인분', 2.0, 380.0]);
       expect(it.copyWith(cand: 1).unitLabel, isNull);
       final w = mealItemToWire(it);
       expect([w['food_code'], w['serving_kcal'], w['count'], w['portion_multiplier']], ['P103-102020500-3561', 190, 1, 2.0]);
