@@ -577,7 +577,7 @@ class _ItemCard extends StatelessWidget {
         return '1공기 · 약 ${fmtInt(it.grams ?? 0)} g';
       case ItemKind.count:
         final unit = it.portion == '조각' ? '조각' : it.portion.replaceFirst(RegExp('^1'), '');
-        return '${it.count}$unit${it.grams != null ? ' · 약 ${fmtInt(it.grams! * it.count)} g' : ''}';
+        return '${it.count}$unit${it.grams != null ? ' · 약 ${fmtInt(it.grams! * it.count * it.mult)} g' : ''}';
       case ItemKind.soup:
         return '1인분 · 약 ${fmtInt(it.grams ?? 0)} g${it.brothOff ? ' · 국물 안 먹음 −40%' : ''}';
       case ItemKind.side:
@@ -677,6 +677,8 @@ class _ItemCard extends StatelessWidget {
                 row('국물 안 먹음 (−40%)', ChSwitch(value: it.brothOff, onChanged: (v) => onChange((i) => i.copyWith(brothOff: v)), label: '국물 안 먹음')),
               if (it.kind == ItemKind.count)
                 row('개수', stepper('하나 빼기', '하나 더하기', '${it.count}', it.count > 1 ? () => onChange((i) => i.copyWith(count: i.count - 1)) : null, it.count < 9 ? () => onChange((i) => i.copyWith(count: i.count + 1)) : null)),
+              // 개수 항목: 개수 아래 1개 크기 배수(AI 가 예측한 크기를 지킨다)
+              if (it.kind == ItemKind.count) _PortionStepper(item: it, onChange: onChange),
               if (it.confidence == Confidence.manual)
                 Align(alignment: Alignment.centerRight, child: ChLink('항목 삭제', trailing: false, onTap: onRemove)),
             ], gap: 10)),
@@ -688,6 +690,7 @@ class _ItemCard extends StatelessWidget {
 }
 
 /// 먹은 양(밥·국·반찬·기타 공통, D60): 0.1인분 단위 스테퍼(0.1~3.0) + ½·1·1.5·2 빠른 선택.
+/// 개수 항목은 같은 스테퍼로 '1개 크기'(0.1배 단위)를 고른다.
 /// 값은 0.1 단위 정수로 더하고 빼서 배수 = 정수 / 10 (부동소수 오차가 쌓이지 않게).
 class _PortionStepper extends StatelessWidget {
   const _PortionStepper({required this.item, required this.onChange});
@@ -700,7 +703,9 @@ class _PortionStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final tenths = portionTenths(item.mult);
-    final unit = item.kind == ItemKind.rice ? '공기' : '인분';
+    final isCount = item.kind == ItemKind.count;
+    final unit = isCount ? '배' : (item.kind == ItemKind.rice ? '공기' : '인분');
+    final label = isCount ? '1개 크기' : '먹은 양';
     final text = '${(tenths / 10).toStringAsFixed(1)}$unit';
     void set(int t) => onChange((i) => i.copyWith(mult: t.clamp(minPortionTenths, maxPortionTenths) / 10));
     Widget btn(String tip, IconData icon, VoidCallback? onTap) => IconButton(
@@ -712,21 +717,21 @@ class _PortionStepper extends StatelessWidget {
         );
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
-        Expanded(child: Txt.cap('먹은 양 · 0.1$unit 단위', color: c.fg2)),
+        Expanded(child: Txt.cap(isCount ? label : '$label · 0.1$unit 단위', color: c.fg2)),
         Container(
           decoration: BoxDecoration(border: Border.all(color: c.borderStrong), borderRadius: BorderRadius.circular(999)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            btn('덜 먹음', Icons.remove_rounded, tenths > minPortionTenths ? () => set(tenths - 1) : null),
+            btn(isCount ? '1개 크기 줄이기' : '덜 먹음', Icons.remove_rounded, tenths > minPortionTenths ? () => set(tenths - 1) : null),
             SizedBox(
               width: 68,
-              child: Center(child: Semantics(liveRegion: true, label: '먹은 양 $text', excludeSemantics: true, child: Txt(text, size: 16, weight: FontWeight.w700))),
+              child: Center(child: Semantics(liveRegion: true, label: '$label $text', excludeSemantics: true, child: Txt(text, size: 16, weight: FontWeight.w700))),
             ),
-            btn('더 먹음', Icons.add_rounded, tenths < maxPortionTenths ? () => set(tenths + 1) : null),
+            btn(isCount ? '1개 크기 늘리기' : '더 먹음', Icons.add_rounded, tenths < maxPortionTenths ? () => set(tenths + 1) : null),
           ]),
         ),
       ]),
       const SizedBox(height: 8),
-      ChSeg<int>(small: true, label: '먹은 양 빠른 선택', items: _quick, value: tenths, onChanged: set),
+      ChSeg<int>(small: true, label: '$label 빠른 선택', items: _quick, value: tenths, onChanged: set),
     ]);
   }
 }
