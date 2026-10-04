@@ -11,7 +11,6 @@ import '../../core/format.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
-import '../../services/health/health_models.dart' show kstDateString;
 import '../../state/app_state.dart';
 import '../../state/past_meals.dart';
 import '../widgets/challenge_cards.dart';
@@ -84,10 +83,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  DateTime _dateOf(int day) => curChallenge.start.add(Duration(days: day - 1));
+  /// [day] 일째 날짜(달력 날짜 필드로 계산: 서머타임이 있는 시간대에서도 하루씩)
+  DateTime _dateOf(int day) {
+    final s = curChallenge.start;
+    return DateTime(s.year, s.month, s.day + day - 1);
+  }
 
   /// [day] 의 날짜(YYYY-MM-DD, KST)
-  String _localDateOf(int day) => kstDateString(_dateOf(day));
+  String _localDateOf(int day) => localDateOfDay(curChallenge.start, day);
 
   void _swipe(DragEndDetails d) {
     final v = d.primaryVelocity ?? 0;

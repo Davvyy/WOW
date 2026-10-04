@@ -46,4 +46,13 @@ void main() {
     final open = ledgerRowFromServer({'id': 'ds-8', 'local_date': '2026-10-13', 'is_final': false, 'breakdown': const <String, dynamic>{}}, mockChallenge.start);
     expect(open.finalizedAt, isNull);
   });
+
+  test('날짜 계산은 기기 시간대(서머타임)와 무관: 10.20 시작 7일째 = 10.26', () {
+    final start = DateTime(2026, 10, 20);
+    expect(localDateOfDay(start, 7), '2026-10-26');
+    expect(dayOfLocalDate(start, '2026-10-26'), 7);
+    expect(localDateOfDay(DateTime(2026, 10, 6), 28), '2026-11-02');
+    expect(dayOfLocalDate(DateTime(2026, 10, 6), '2026-11-02'), 28);
+    expect(dayOfLocalDate(start, 'oops'), isNull);
+  });
 }

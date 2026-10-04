@@ -70,7 +70,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   }
 
   /// 연 끼니로 화면 값을 채운다. 오늘은 initState 에서, 지난 날은 그 날짜 끼니를 읽은 첫 build 에서.
-  void _init(MealRecord? found) {
+  /// [loadError] 가 있으면(그 날짜 끼니를 못 읽음) '기록을 찾지 못했어요' 대신 그 문구로 알린다.
+  void _init(MealRecord? found, {String? loadError}) {
     _inited = true;
     final key = widget.mealKey;
     final past = widget.date != null;
@@ -82,7 +83,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     if (_missing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        showToast(context, '기록을 찾지 못했어요');
+        showToast(context, loadError ?? '기록을 찾지 못했어요');
         context.go(R.home);
       });
     }
@@ -263,11 +264,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   /// 홈으로. 지난 날 끼니였으면 홈도 그 날짜를 보여 준다(바뀐 목록이 바로 보이게).
   void _goHome() {
     final date = widget.date;
-    final day = date == null ? null : DateTime.tryParse(date);
-    if (day != null) {
-      final s = curChallenge.start;
-      ref.read(selectedDayProvider.notifier).set(day.difference(DateTime(s.year, s.month, s.day)).inDays + 1);
-    }
+    final day = date == null ? null : dayOfLocalDate(curChallenge.start, date);
+    if (day != null) ref.read(selectedDayProvider.notifier).set(day);
     context.go(R.home);
   }
 
@@ -316,7 +314,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           final key = widget.mealKey;
           _init(key == null ? null : past.value!.where((m) => m.matches(key)).firstOrNull);
         } else if (past.hasError) {
-          _init(null);
+          _init(null, loadError: apiErrorText(past.error!));
         } else {
           return ChScaffold(title: '$label 확인', backFallback: R.home, children: const [
             Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator())),
@@ -334,6 +332,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final pastMode = _pastMode(watch: true);
     final canEdit = !isPast || pastMode == PastEditMode.full || pastMode == PastEditMode.correctOnly;
     final readOnlyNote = pastMode == PastEditMode.readOnly;
+    // 장부를 못 읽음: 고칠 수 있는지 몰라 버튼을 숨기고 새로고침을 안내한다
+    final ledgerError = isPast && pastMode == null && ref.watch(ledgerProvider).hasError;
     // 지금 목록의 이 끼니(새 기록이면 아직 없음)
     final live = meals.where((x) => x.matches(_key)).firstOrNull;
     final skipsUsed = ref.watch(skipsUsedProvider);
@@ -406,9 +406,10 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final children = <Widget>[
       photo(),
       if (readOnlyNote) InlineNote(Icons.lock_rounded, '수정 기한(확정 후 ${currentEditWindow.inHours}시간)이 지나 볼 수만 있어요'),
-      if (searchMode && !canEdit)
+      if (ledgerError) const InlineNote(Icons.info_rounded, '점수 정보를 불러오지 못했어요. 당겨서 새로고침해 주세요'),
+      if (searchMode && readOnlyNote)
         const InlineNote(Icons.info_rounded, '확정된 음식 항목이 없어요')
-      else if (searchMode) ...[
+      else if (searchMode && canEdit) ...[
         InfoBanner(
           tone: Tone.warn,
           icon: Icons.search_rounded,
@@ -447,7 +448,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           InfoBanner(
             tone: Tone.warn,
             icon: Icons.schedule_rounded,
-            child: boldThen(context, '자동 확정 ${fmtInt(autoVal)} kcal', ' · 09:00까지 확정하지 않아 $autoRuleAi으로 계산됐어요. 아래 항목을 고쳐 저장하면 확정값으로 바뀌어요(48시간 안).', color: c.warn),
+            child: boldThen(context, '자동 확정 ${fmtInt(autoVal)} kcal', ' · 09:00까지 확정하지 않아 $autoRuleAi으로 계산됐어요.${readOnlyNote ? '' : ' 아래 항목을 고쳐 저장하면 확정값으로 바뀌어요(48시간 안).'}', color: c.warn),
           ),
         if (isSnackLevel)
           InfoBanner(
@@ -476,6 +477,14 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     return ChScaffold(
       title: slot == MealSlot.snack ? '간식 확인' : '$label 확인',
       backFallback: R.home,
+      // 지난 날: 당겨서 장부(고칠 수 있는지)와 그 날짜 끼니를 다시 읽는다
+      onRefresh: date == null
+          ? null
+          : () async {
+              ref.invalidate(ledgerProvider);
+              ref.invalidate(pastMealsProvider(date));
+              await ref.read(ledgerProvider.future).then((_) {}, onError: (_) {});
+            },
       actions: [
         // 공유 카드는 오늘 끼니만(카드에 오늘 날짜가 찍힌다)
         if (!isPast && live != null && canShareMeal(live))

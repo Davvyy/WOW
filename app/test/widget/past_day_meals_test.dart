@@ -41,16 +41,26 @@ class _PastApi extends MockChalloryApi {
   int ledgerReads = 0;
   final confirmed = <String>[];
   ApiException? deleteError;
+  ApiException? confirmError;
+  ApiException? ledgerError;
+  ApiException? mealsError;
+  int mealReads = 0;
 
   @override
   bool get isRemote => true;
 
   @override
-  Future<List<ServerMeal>> fetchMealsOn(String localDate) async => localDate == _past ? List.of(meals) : const [];
+  Future<List<ServerMeal>> fetchMealsOn(String localDate) async {
+    if (localDate != _past) return const [];
+    mealReads++;
+    if (mealsError != null) throw mealsError!;
+    return List.of(meals);
+  }
 
   @override
   Future<List<LedgerRow>> fetchLedger() async {
     ledgerReads++;
+    if (ledgerError != null) throw ledgerError!;
     return [
       ledgerRowFromServer({
         'id': 'ds-7',
@@ -72,6 +82,7 @@ class _PastApi extends MockChalloryApi {
   @override
   Future<ConfirmResult> confirmMeal(String mealId, int version, List<Map<String, dynamic>> items, {required String idempotencyKey}) async {
     calls.add('meal-confirm');
+    if (confirmError != null) throw confirmError!;
     confirmed.add(mealId);
     final kcal = wireTotal(items);
     meals = [
@@ -235,5 +246,95 @@ void main() {
     final cards = tester.widgetList<MealSlotCard>(find.byType(MealSlotCard));
     expect(cards, hasLength(4));
     expect(cards.every((w) => w.onTap == null), isTrue);
+  });
+
+  _fixRound1();
+}
+
+ServerMeal _noItems(String id, MealStatus status) =>
+    ServerMeal(id: id, status: status, version: 1, slot: MealSlot.lunch, capturedAt: DateTime.utc(2026, 10, 12, 3, 30));
+
+ServerMeal _auto() => ServerMeal(id: 'b-1', status: MealStatus.auto, version: 2, confirmedKcal: 546, aiKcal: 420, slot: MealSlot.breakfast,
+    capturedAt: DateTime.utc(2026, 10, 11, 22, 40), items: [_item('계란토스트', 420)]);
+
+const _ledgerErrorNote = '점수 정보를 불러오지 못했어요. 당겨서 새로고침해 주세요';
+
+void _fixRound1() {
+  testWidgets('확정을 서버가 거절(412)하면 되돌리고 그 날짜 끼니와 장부를 다시 읽는다', (tester) async {
+    final api = _PastApi(isFinal: false);
+    final c = await _pump(tester, api);
+    await _pickPastDay(tester, c);
+    final n = c.read(pastMealsProvider(_past).notifier);
+    final items = n.byKey('b-2')!.items;
+    // 그새 다른 기기에서 바뀜(version 3)
+    api.meals = [api.meals.first, ServerMeal(id: 'b-2', status: MealStatus.draft, version: 3, aiKcal: 300, slot: MealSlot.breakfast,
+        capturedAt: DateTime.utc(2026, 10, 12, 1, 10), items: [_item('요거트 볼', 300)])];
+    api.confirmError = const ApiException(412, 'version mismatch');
+    final ledger = api.ledgerReads, meals = api.mealReads;
+    expect(await n.confirm('b-2', items, 300, finalDay: false), apiErrorText(const ApiException(412, '')));
+    await tester.pumpAndSettle();
+    expect(api.mealReads, greaterThan(meals));
+    expect(api.ledgerReads, greaterThan(ledger));
+    final b2 = c.read(pastMealsProvider(_past)).value!.firstWhere((m) => m.serverId == 'b-2');
+    expect(b2.version, 3, reason: '다음 확정은 새 버전으로');
+    expect(b2.status, MealStatus.draft);
+  });
+
+  testWidgets('지우기를 서버가 거절(422)하면 그 날짜 끼니와 장부를 다시 읽는다', (tester) async {
+    final api = _PastApi(isFinal: false)..deleteError = const ApiException(422, '확정된 날짜의 기록은 지울 수 없어요');
+    final c = await _pump(tester, api);
+    await _pickPastDay(tester, c);
+    final ledger = api.ledgerReads, meals = api.mealReads;
+    expect(await c.read(pastMealsProvider(_past).notifier).delete('b-2'), '확정된 날짜의 기록은 지울 수 없어요');
+    await tester.pumpAndSettle();
+    expect(api.mealReads, greaterThan(meals));
+    expect(api.ledgerReads, greaterThan(ledger));
+    expect(_rowsOf(MealSlot.breakfast), findsNWidgets(2));
+  });
+
+  testWidgets('장부를 못 읽으면 P7 은 버튼 없이 안내만(보기만 안내는 없음)', (tester) async {
+    final api = _PastApi(isFinal: false)..ledgerError = const ApiException(500, 'boom');
+    await _pump(tester, api, location: R.meal(MealSlot.breakfast, meal: 'b-2', date: _past));
+    expect(find.text('요거트 볼'), findsWidgets);
+    expect(find.text(_ledgerErrorNote), findsOneWidget);
+    expect(_cta('확정'), findsNothing);
+    expect(find.byTooltip('기록 지우기'), findsNothing);
+    expect(find.textContaining('볼 수만 있어요'), findsNothing);
+  });
+
+  testWidgets("항목 없는 끼니: '확정된 음식 항목이 없어요'는 보기만일 때만", (tester) async {
+    final api = _PastApi(isFinal: false)..ledgerError = const ApiException(500, 'boom');
+    api.meals = [...api.meals, _noItems('l-1', MealStatus.failed)];
+    await _pump(tester, api, location: R.meal(MealSlot.lunch, meal: 'l-1', search: true, date: _past));
+    expect(find.text(_ledgerErrorNote), findsOneWidget);
+    expect(find.text('확정된 음식 항목이 없어요'), findsNothing);
+  });
+
+  testWidgets("항목 없는 끼니 + 기한 지남: '확정된 음식 항목이 없어요'", (tester) async {
+    final api = _PastApi(isFinal: true, finalizedAt: DateTime.now().subtract(const Duration(hours: 49)));
+    api.meals = [...api.meals, _noItems('l-1', MealStatus.failed)];
+    await _pump(tester, api, location: R.meal(MealSlot.lunch, meal: 'l-1', search: true, date: _past));
+    expect(find.text('확정된 음식 항목이 없어요'), findsOneWidget);
+  });
+
+  testWidgets('자동 확정 끼니: 기한이 지나면 고쳐 저장하라는 문구를 빼고, 기한 안이면 남긴다', (tester) async {
+    final closed = _PastApi(isFinal: true, finalizedAt: DateTime.now().subtract(const Duration(hours: 49)))..meals = [_auto()];
+    await _pump(tester, closed, location: R.meal(MealSlot.breakfast, meal: 'b-1', date: _past));
+    expect(find.textContaining('09:00까지 확정하지 않아'), findsOneWidget);
+    expect(find.textContaining('아래 항목을 고쳐 저장하면'), findsNothing);
+  });
+
+  testWidgets('자동 확정 끼니: 기한 안이면 고쳐 저장 문구가 있다', (tester) async {
+    final open = _PastApi(isFinal: true, finalizedAt: DateTime.now().subtract(const Duration(hours: 47)))..meals = [_auto()];
+    await _pump(tester, open, location: R.meal(MealSlot.breakfast, meal: 'b-1', date: _past));
+    expect(find.textContaining('아래 항목을 고쳐 저장하면'), findsOneWidget);
+  });
+
+  testWidgets('그 날짜 끼니를 못 읽으면 서버 문구로 안내하고 홈으로', (tester) async {
+    final api = _PastApi(isFinal: false)..mealsError = const ApiException(500, '잠시 뒤에 다시 열어 주세요');
+    await _pump(tester, api, location: R.meal(MealSlot.breakfast, meal: 'b-2', date: _past));
+    expect(find.text('잠시 뒤에 다시 열어 주세요'), findsOneWidget);
+    expect(find.text('기록을 찾지 못했어요'), findsNothing);
+    expect(find.text('아침 확인'), findsNothing);
   });
 }

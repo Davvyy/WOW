@@ -6,6 +6,7 @@ import '../core/engine/engine.dart' show MealStatus;
 import '../data/models.dart';
 import '../services/api/challory_api.dart';
 import '../services/api/meal_wire.dart';
+import '../services/health/health_models.dart' show kstDateString;
 import '../services/health/health_source.dart' show newUuidV4;
 import 'app_state.dart';
 import 'session.dart';
@@ -35,6 +36,17 @@ PastEditMode? pastEditModeOn(List<LedgerRow>? ledger, String localDate, {DateTim
   final row = ledger.where((r) => r.localDate == localDate).firstOrNull;
   if (row == null) return PastEditMode.full;
   return pastEditMode(isFinal: !row.provisional, finalizedAt: row.finalizedAt, now: now ?? DateTime.now(), editWindow: currentEditWindow);
+}
+
+/// 챌린지 [start] 기준 [day]일째(1~)의 날짜(YYYY-MM-DD). 날짜 필드만으로 UTC 에서 계산해
+/// 기기 시간대의 서머타임(하루가 23·25시간)과 무관하다.
+String localDateOfDay(DateTime start, int day) => kstDateString(DateTime.utc(start.year, start.month, start.day + day - 1));
+
+/// [localDate](YYYY-MM-DD)가 챌린지 [start] 기준 며칠째(1~)인지. 날짜가 아니면 null.
+int? dayOfLocalDate(DateTime start, String localDate) {
+  final d = DateTime.tryParse(localDate);
+  if (d == null) return null;
+  return DateTime.utc(d.year, d.month, d.day).difference(DateTime.utc(start.year, start.month, start.day)).inDays + 1;
 }
 
 /// 지난 날(YYYY-MM-DD, KST) 본인 끼니. 오늘 목록([mealsProvider])과 따로 둔다(오늘 엔진 입력에 섞이지 않게).
@@ -68,7 +80,7 @@ class PastMealsNotifier extends AsyncNotifier<List<MealRecord>> {
   }
 
   /// 확정·정정(P7). [finalDay] 면(확정된 날짜의 수정) 정정(corrected)으로 둔다. 이미 확정된 끼니를 고쳐도 정정.
-  /// 서버가 거절하면 이전 상태로 되돌리고 서버 문구를 돌려준다(성공 시 null). 성공하면 장부와 이 날짜 끼니를 다시 읽는다.
+  /// 서버가 거절하면 이전 상태로 되돌리고 서버 문구를 돌려준다(성공 시 null). 성공하든 거절되든 장부와 이 날짜 끼니를 다시 읽는다.
   Future<String?> confirm(String key, List<MealItem> items, double total, {required bool finalDay, double? aiKcal}) async {
     final prev = byKey(key);
     if (prev == null) return '기록을 찾지 못했어요';
@@ -95,7 +107,10 @@ class PastMealsNotifier extends AsyncNotifier<List<MealRecord>> {
       unawaited(_reload());
       return null;
     } catch (e) {
-      if (ref.mounted && byKey(key) != null) _put(prev);
+      if (ref.mounted) {
+        if (byKey(key) != null) _put(prev);
+        _refreshAfterRefusal();
+      }
       return apiErrorText(e);
     } finally {
       link.close();
@@ -129,13 +144,22 @@ class PastMealsNotifier extends AsyncNotifier<List<MealRecord>> {
         return null;
       }
       _restore(i, prev);
+      _refreshAfterRefusal();
       return e.status == 0 ? '연결이 불안정해요. 잠시 뒤 다시 지워 주세요' : apiErrorText(e);
     } catch (e) {
       _restore(i, prev);
+      _refreshAfterRefusal();
       return apiErrorText(e);
     } finally {
       link.close();
     }
+  }
+
+  /// 서버가 거절함: 버전·확정 여부가 바뀌었을 수 있으니 장부와 이 날짜 끼니를 다시 읽는다(다음 시도는 새 값으로)
+  void _refreshAfterRefusal() {
+    if (!ref.mounted) return;
+    ref.invalidate(ledgerProvider);
+    unawaited(_reload());
   }
 
   void _restore(int i, MealRecord prev) {
