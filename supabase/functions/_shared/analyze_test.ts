@@ -252,3 +252,9 @@ Deno.test('개입 수가 없으면 1회분 그대로, 포장 상품이 없으면
   assertEquals(dish.items[0].food_code, null, '포장 상품이 아니면 상품 매칭 없음');
   assertEquals(calls, 1, '포장 상품 코드가 없으면 조회하지 않음');
 });
+
+Deno.test('프롬프트: 포장 상품 이름은 포장에 적힌 맛·종류까지(홈런볼 초코, 칙촉 오리지널)', () => {
+  assertEquals(MEAL_PROMPT.includes('맛·종류'), true);
+  assertEquals(MEAL_PROMPT.includes('"홈런볼 초코"'), true);
+  assertEquals(MEAL_PROMPT.includes('"칙촉 오리지널"'), true);
+});
