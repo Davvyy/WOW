@@ -7,7 +7,12 @@
 --    브랜드가 맞는 상품이 모두 가루·꾸밈말뿐이면 다른 회사 상품을 브랜드로 밀지 않는다(스타벅스 → 가루뿐 → 다른 회사 마시는 카페라떼가 먼저).
 --  - 칩 순서: 같은 묶음(애매함: 고른 상품 → 같은 이름 상품 → 나머지) 안에서 밀리지 않은 상품 → 밀린 상품, 각각 전과 같은 순서.
 --    모두 밀렸으면 순서는 그대로. 애매할 때 앞의 두 묶음(고른 상품·같은 이름 상품)은 그대로 둔다.
+--  - 마시는 질의(핵심어 = 브랜드를 뗀 마지막 낱말('…맛' 제외)이 라떼·커피·아메리카노·콜드브루·주스·에이드·스무디·우유·두유·요구르트·드링크·
+--    콜라·사이다·탄산수·차·티·음료·워터로 끝남, 스파게티·떠먹는 요구르트 제외)면 같은 순서 칸(밀림·전 순서의 점수까지 같은 상품)에서
+--    마시는 상품(단위 라벨 ml, 또는 분류가 …음료·주스·탄산수·액상차·액상커피)을 먼저('스타벅스 카페라떼' → 같은 이름 초콜릿과자보다 마시는 카페라떼).
+--    자동이면 적용하지 않는다(첫 칩 = 고른 상품). 마시는 질의가 아니면 순서는 전과 같다.
 --  - 자동 여부·고른 상품(best)·점수·애매함은 그대로(자동이면 고른 상품은 밀리지 않은 상품이라 첫 칩도 그대로).
+--  - 후보 행에 unit_label 을 더 싣는다(마시는 상품 판단용).
 --  - 나머지는 20261004001500 의 map_product_pick 그대로.
 
 create or replace function map_product_pick(p_candidates text[]) returns jsonb
@@ -15,17 +20,17 @@ create or replace function map_product_pick(p_candidates text[]) returns jsonb
   with v as materialized (select * from product_name_variants(p_candidates)),
   -- 후보 행에 상품 칸을 함께 싣는다(다시 food_db_cache 와 조인하면 계획기가 전체 색인을 훑는다)
   hits as materialized (
-    select f.food_code, f.name_kr, f.kcal, f.serving_g, f.name_norm, f.maker, f.category, v.ord, v.stripped, v.vn, 1::real as sim
+    select f.food_code, f.name_kr, f.kcal, f.serving_g, f.name_norm, f.maker, f.category, v.ord, v.stripped, v.vn, 1::real as sim, f.unit_label
     from v join food_db_cache f on f.is_product and f.name_norm = v.vn
     union all
-    select m.food_code, m.name_kr, m.kcal, m.serving_g, m.name_norm, m.maker, m.category, v.ord, v.stripped, v.vn, m.sim from v, lateral (
+    select m.food_code, m.name_kr, m.kcal, m.serving_g, m.name_norm, m.maker, m.category, v.ord, v.stripped, v.vn, m.sim, m.unit_label from v, lateral (
       select f.food_code, f.name_kr, f.kcal, f.serving_g, f.name_norm, f.maker, f.category,
         case when cardinality(v.frags) = 0 then greatest(similarity(f.name_norm, v.vn), similarity(f.name_kr, v.raw))
-          else similarity(f.name_norm, v.vn) end as sim
+          else similarity(f.name_norm, v.vn) end as sim, f.unit_label
       from food_db_cache f where f.is_product and f.name_norm % v.vn order by 8 desc, 1 limit 20) m
     union all
-    select m.food_code, m.name_kr, m.kcal, m.serving_g, m.name_norm, m.maker, m.category, v.ord, v.stripped, v.vn, m.sim from v, lateral (
-      select f.food_code, f.name_kr, f.kcal, f.serving_g, f.name_norm, f.maker, f.category, similarity(f.name_norm, v.vn) as sim
+    select m.food_code, m.name_kr, m.kcal, m.serving_g, m.name_norm, m.maker, m.category, v.ord, v.stripped, v.vn, m.sim, m.unit_label from v, lateral (
+      select f.food_code, f.name_kr, f.kcal, f.serving_g, f.name_norm, f.maker, f.category, similarity(f.name_norm, v.vn) as sim, f.unit_label
       from unnest(v.frags) fr join food_db_cache f on f.is_product
         and food_maker_key(f.maker) collate "C" >= fr collate "C" and food_maker_key(f.maker) collate "C" < (fr || chr(1114111)) collate "C"
         and strpos(f.name_norm, v.vn) > 0
@@ -33,6 +38,7 @@ create or replace function map_product_pick(p_candidates text[]) returns jsonb
     where v.stripped and length(v.vn) >= 2),
   r0 as (
     select h.food_code, h.name_kr, h.kcal, h.serving_g, h.name_norm, h.ord, h.stripped, h.vn, h.sim, c.core, c.powder_q, c.lastw,
+      h.category, h.unit_label,
       cardinality(c.frags) > 0 as known,
       maker_match_pos(h.maker, c.frags || c.qwords) as maker_pos,
       h.name_norm ~ '오리지널|오리지날|original|클래식|classic|플레인|plain|바닐라' as plain,
@@ -66,6 +72,16 @@ create or replace function map_product_pick(p_candidates text[]) returns jsonb
       and abs(f.kcal / f.serving_g - b.kcal / b.serving_g) > 0.1 -- 0 kcal 근처 음료(0 vs 0.02 kcal/g)는 비율만 커서 뺀다
       and (not b.brand_hit or maker_match_pos(f.maker, b.frags || b.qwords) is not null)),
   amb as (select exists (select 1 from alts) as yes),
+  -- 후보 이름 중 하나라도 아는 브랜드가 있으면, 고른 상품이 그 브랜드 일치일 때만 자동('롯데 자일리톨 껌' · '자일리톨' 처럼 브랜드 없는 후보로 우회하지 않게)
+  auto as (select b.score >= 0.45 and not amb.yes and not b.form_bad and not b.core_compound
+    and ((b.brand_hit and cardinality(b.frags) > 0) or not exists (select 1 from v where cardinality(v.frags) > 0)) as yes
+    from best b, amb),
+  -- 마시는 질의: 후보 이름의 핵심어(브랜드를 뗀 마지막 낱말, '…맛' 제외)가 음료 낱말로 끝남
+  bev as (
+    select coalesce(bool_or(cw ~ '(라떼|라테|커피|아메리카노|콜드브루|주스|쥬스|에이드|스무디|우유|두유|요구르트|야쿠르트|드링크|콜라|사이다|탄산수|탄산음료|차|티|음료|워터)$'
+      and cw !~ '스파게티$' and v0 !~ '떠먹는'), false) as yes
+    from (select food_name_norm(v.raw) as v0, food_name_norm((select w from regexp_split_to_table(v.raw, '\s+') with ordinality t(w, n)
+        where w !~ '맛$' order by n desc limit 1)) as cw from v) q),
   -- 점검에 밀린 상품(칩 순서에만 쓴다): 제품 형태 · 핵심어가 꾸밈말로만 · 브랜드 불일치 · 약한 점수.
   --  브랜드 불일치 = 아는 브랜드 질의에서 제조사가 안 맞는데, 형태·핵심어 점검을 통과한 브랜드 일치 상품이 따로 있음(점수는 따지지 않음).
   --    브랜드 상품이 가루·꾸밈말뿐이면 다른 회사 상품을 브랜드로 밀지 않는다('스타벅스 카페라떼' → 가루뿐 → 다른 회사 카페라떼가 먼저).
@@ -74,20 +90,22 @@ create or replace function map_product_pick(p_candidates text[]) returns jsonb
     select r.*, form_bad or core_compound or score < 0.45
       or (not brand_hit and exists (select 1 from r c where c.brand_hit and c.known and not c.form_bad and not c.core_compound)) as demoted
     from r),
+  -- 같은 순서 칸(밀림, 고르는 순서의 점수까지 같은 상품: rk 에서 붙어 있는 묶음)과 그 칸의 첫 rk. 마시는 질의면 칸 안에서 마시는 상품 먼저
+  rt as (
+    select rd.*, min(rk) over (partition by demoted, tier, near, form_bad, core_end, plain_near, score) as tie_pos,
+      bev.yes and not coalesce(auto.yes, false)
+        and (coalesce(unit_label, '') ~* 'ml' or coalesce(category, '') ~ '음료|주스|탄산수|액상차|액상커피') as drink
+    from rd cross join bev left join auto on true),
   -- 애매하면 고른 상품 → 같은 이름 상품들 → 나머지, 아니면 고르는 순서대로(첫 칩 = 고른 상품). 최대 10개
-  -- 나머지 묶음 안에서는 밀리지 않은 상품 → 밀린 상품(각각 고르는 순서대로, 모두 밀렸으면 그대로)
+  -- 나머지 묶음 안에서는 밀리지 않은 상품 → 밀린 상품(각각 고르는 순서대로, 모두 밀렸으면 그대로). 마시는 질의면 같은 순서 칸 안에서 마시는 상품 먼저
   chips as (
     select * from (
       select distinct on (food_code) * from (
-        select food_code, name_kr, kcal, score, 2 as grp, demoted, rk from rd
-        union all select food_code, name_kr, kcal, score, 1, false, 0 from alts
-        union all select b.food_code, b.name_kr, b.kcal, b.score, 0, false, 0 from best b, amb where amb.yes
+        select food_code, name_kr, kcal, score, 2 as grp, demoted, tie_pos, drink, rk from rt
+        union all select food_code, name_kr, kcal, score, 1, false, 0::bigint, false, 0 from alts
+        union all select b.food_code, b.name_kr, b.kcal, b.score, 0, false, 0::bigint, false, 0 from best b, amb where amb.yes
       ) u order by food_code, grp, rk) d
-    order by grp, demoted, rk, food_code limit 10),
-  -- 후보 이름 중 하나라도 아는 브랜드가 있으면, 고른 상품이 그 브랜드 일치일 때만 자동('롯데 자일리톨 껌' · '자일리톨' 처럼 브랜드 없는 후보로 우회하지 않게)
-  auto as (select b.score >= 0.45 and not amb.yes and not b.form_bad and not b.core_compound
-    and ((b.brand_hit and cardinality(b.frags) > 0) or not exists (select 1 from v where cardinality(v.frags) > 0)) as yes
-    from best b, amb)
+    order by grp, demoted, tie_pos, drink desc, rk, food_code limit 10)
   select jsonb_build_object(
     'match', case when coalesce(auto.yes, false) then 'auto' when b.score >= 0.25 then 'chips' else 'none' end,
     'food_code', case when auto.yes then b.food_code end,
@@ -96,7 +114,7 @@ create or replace function map_product_pick(p_candidates text[]) returns jsonb
     'is_product', true,
     'ambiguous', amb.yes,
     'chips', (select coalesce(jsonb_agg(jsonb_build_object('food_code', z.food_code, 'name', z.name_kr, 'kcal', z.kcal, 'score', z.score,
-      'is_product', true) order by z.grp, z.demoted, z.rk, z.food_code), '[]') from chips z))
+      'is_product', true) order by z.grp, z.demoted, z.tie_pos, z.drink desc, z.rk, z.food_code), '[]') from chips z))
   from (select 1) one cross join amb left join best b on true left join auto on true
 $$;
 
