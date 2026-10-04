@@ -165,4 +165,22 @@ begin
   r := map_food_candidates(array['칙촉'], true);
   perform tests.eq(r ->> 'match', 'auto', '상품 매칭: 다른 같은 이름이 없으면 그대로 자동');
 end $$;
+
+-- 애매한 상품 칩은 음식 자동 매칭에 지지 않는다(ambiguous), 0 kcal 근처 음료는 30% 규칙에서 뺀다(g당 차이 0.1 이하)
+insert into food_db_cache (food_code, name_kr, category, serving_g, kcal, is_product, maker, unit_label, package_g) values
+  ('D900301', '로제떡볶이', '분식', 300, 600, false, null, null, null),
+  ('P900-000000000-0321', '아메리카노', '액상커피', 355, 0, true, '커피회사A', '1개(355ml)', 355),
+  ('P900-000000000-0322', '아메리카노', '액상커피', 355, 7.1, true, '커피회사B', '1개(355ml)', 355);
+do $$
+declare r jsonb;
+begin
+  r := map_food_candidates(array['로제떡볶이'], true);
+  perform tests.eq(r ->> 'match', 'chips', '애매한 상품: 같은 이름 음식이 자동이어도 상품 후보 칩');
+  perform tests.eq((r ->> 'is_product')::boolean, true, '애매한 상품: 상품 결과');
+  perform tests.eq((r ->> 'ambiguous')::boolean, true, '애매한 상품: ambiguous 표시');
+  perform tests.eq((map_food_candidates(array['로제떡볶이'], false) ->> 'food_code'), 'D900301', '음식 매칭은 그대로 음식 자동');
+  perform tests.eq((map_food_candidates(array['칙촉'], true) ->> 'ambiguous')::boolean, false, '애매하지 않으면 ambiguous = false');
+  r := map_food_candidates(array['아메리카노'], true);
+  perform tests.eq(r ->> 'match', 'auto', '0 vs 0.02 kcal/g 아메리카노는 자동(차이 0.1 이하)');
+end $$;
 rollback;

@@ -139,7 +139,8 @@ create or replace function map_food_pick(p_candidates text[], p_product boolean)
     from best b join food_db_cache f on f.is_product and f.food_code <> b.food_code
       and regexp_replace(f.name_kr, '\s+', '', 'g') = regexp_replace(b.name_kr, '\s+', '', 'g')
     where p_product and b.score >= 0.45 and b.serving_g > 0 and f.serving_g > 0
-      and greatest(f.kcal / f.serving_g, b.kcal / b.serving_g) > 1.3 * least(f.kcal / f.serving_g, b.kcal / b.serving_g)),
+      and greatest(f.kcal / f.serving_g, b.kcal / b.serving_g) > 1.3 * least(f.kcal / f.serving_g, b.kcal / b.serving_g)
+      and abs(f.kcal / f.serving_g - b.kcal / b.serving_g) > 0.1), -- 0 kcal 근처 음료(0 vs 0.02 kcal/g)는 비율만 커서 뺀다
   amb as (select exists (select 1 from alts) as yes),
   -- 애매하면 고른 상품 → 같은 이름 상품들 → 나머지 순, 아니면 전과 같이 점수 순
   chips as (
@@ -154,11 +155,28 @@ create or replace function map_food_pick(p_candidates text[], p_product boolean)
     'kcal', case when b.score >= 0.45 and not amb.yes then b.kcal end,
     'score', b.score,
     'is_product', p_product,
+    'ambiguous', amb.yes,
     'chips', (select coalesce(jsonb_agg(jsonb_build_object('food_code', z.food_code, 'name', z.name_kr, 'kcal', z.kcal, 'score', z.score,
       'is_product', z.is_product) order by z.grp, z.score desc, z.food_code), '[]') from chips z))
   from (select 1) one cross join amb left join best b on true
 $$;
 revoke execute on function map_food_pick(text[], boolean) from public, anon, authenticated;
+
+-- AI 항목 매핑(20261004001300 과 같음) + 같은 이름 상품이 애매해 후보 칩이 된 결과(ambiguous)는 음식 자동 매칭보다 먼저
+-- (포장 상품이라고 본 항목을 g당 kcal 이 전혀 다른 음식 1인분으로 확정 없이 넘기지 않게)
+create or replace function map_food_candidates(p_candidates text[], p_packaged boolean default false) returns jsonb
+  language plpgsql stable security definer set search_path = public, extensions as $fn$
+declare p jsonb; d jsonb;
+begin
+  if not coalesce(p_packaged, false) then return map_food_pick(p_candidates, false); end if;
+  p := map_food_pick(p_candidates, true);
+  if p ->> 'match' = 'auto' or coalesce((p ->> 'ambiguous')::boolean, false) then return p; end if;
+  d := map_food_pick(p_candidates, false);
+  if d ->> 'match' = 'auto' or p ->> 'match' = 'none' then return d; end if;
+  return p;
+end $fn$;
+revoke execute on function map_food_candidates(text[], boolean) from public, anon;
+grant execute on function map_food_candidates(text[], boolean) to authenticated, service_role;
 grant execute on function map_food_pick(text[], boolean) to service_role;
 -- 집합 함수 행 수 추정(기본 1000)이 커서 계획 비용이 부풀면 JIT 컴파일(수백 ms)이 붙는다: 실제 크기에 맞춘다
 alter function food_match(text, boolean, boolean) rows 20;
