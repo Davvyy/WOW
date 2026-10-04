@@ -267,9 +267,13 @@ class LedgerRow {
     this.sBefore,
     this.localDate,
     this.finalizedAt,
+    this.substituteValues = const {},
   });
   final int d;
   final String date;
+
+  /// 대체값을 더한 칸 → 쓴 값(서버 breakdown.intake.substitute_values, D61). 없으면 M_p 로 본다.
+  final Map<MealSlot, double> substituteValues;
 
   /// 날짜(YYYY-MM-DD, KST). 서버 행만 채운다(모의 장부는 null).
   final String? localDate;

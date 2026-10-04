@@ -57,14 +57,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// 오늘 슬롯 카드: 기록이 없으면 지금처럼 촬영 칸, 있으면 끼니마다 한 줄 + '추가'.
   /// 지난 날([pastDate] 의 서버 끼니를 읽었으면): 오늘처럼 끼니마다 한 줄이고 누르면 그 날짜의 P7. 촬영·'추가'는 없다.
   /// 지난 날 끼니를 못 읽었거나 모의 모드면 장부 값으로 슬롯당 한 줄(누를 수 없음).
-  Widget _slotCard(MealSlot s, List<MealRecord> dayMeals, bool isToday, String? pastDate) {
+  /// [sub] 는 이 칸의 대체값 max(M_p, 전날 같은 칸)(D61).
+  Widget _slotCard(MealSlot s, List<MealRecord> dayMeals, bool isToday, String? pastDate, double sub) {
     void camera() => context.push('${R.camera}?slot=${s.name}');
-    if (!isToday && pastDate == null) return MealSlotCard(meal: dayMeals.firstWhere((m) => m.slot == s, orElse: () => MealRecord(slot: s)));
+    if (!isToday && pastDate == null) {
+      return MealSlotCard(meal: dayMeals.firstWhere((m) => m.slot == s, orElse: () => MealRecord(slot: s)), substitute: sub);
+    }
     final list = mealsIn(dayMeals, s);
-    if (list.isEmpty) return MealSlotCard(meal: MealRecord(slot: s), onTap: isToday ? camera : null);
+    if (list.isEmpty) return MealSlotCard(meal: MealRecord(slot: s), onTap: isToday ? camera : null, substitute: sub);
     final photos = {for (final m in list) m.key: _photoOf(m)}; // 홈 build 안에서 읽어 사진이 바뀌면 다시 그린다
     return MealSlotGroupCard(
       slot: s,
+      substitute: sub,
       meals: list,
       photoOf: (m) => photos[m.key],
       onAdd: isToday ? camera : null,
@@ -170,12 +174,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     String? caption;
     final inn = sim.intake;
+    // 칸별 대체값(전날 같은 끼니가 더 크면 그 값, D61). 모두 같으면 한 번만, 다르면 칸 순서대로 743·900
+    String subOf(List<MealSlot> slots) {
+      final v = [for (final s in slots) fmtM(inn.substituteFor(s))];
+      return v.toSet().length == 1 ? v.first : v.join('·');
+    }
     if (isToday || row != null) {
-      if (inn.substituteSlots.isNotEmpty) caption = '${inn.substituteSlots.map((s) => slotLabel[s]).join('·')} 미기록 → ${fmtM(inn.mP)} kcal 적용 중';
-      if (inn.pendingSlots.isNotEmpty) caption = '${inn.pendingSlots.map((s) => slotLabel[s]).join('·')} 확정 대기 → ${fmtM(inn.mP)} kcal로 잠정 계산 중 · 검색으로 확정하면 반영';
+      if (inn.substituteSlots.isNotEmpty) caption = '${inn.substituteSlots.map((s) => slotLabel[s]).join('·')} 미기록 → ${subOf(inn.substituteSlots)} kcal 적용 중';
+      if (inn.pendingSlots.isNotEmpty) caption = '${inn.pendingSlots.map((s) => slotLabel[s]).join('·')} 확정 대기 → ${subOf(inn.pendingSlots)} kcal로 잠정 계산 중 · 검색으로 확정하면 반영';
       if (inn.draftSlots.isNotEmpty) caption = '${slotLabel[inn.draftSlots.first.slot]} 미확정 → ${fmtInt(inn.draftSlots.first.value)} kcal로 잠정 계산 중 · 확정하면 반영';
       if (sim.score.floorApplied) caption = '섭취 하한 ${fmtInt(sim.score.fP)} 적용';
-      if (row != null && row.hasRevision) caption = '저녁 무효 → 대체값 ${fmtM(inn.mP)} 적용 · ${fmtK1(row.sBefore!)} → ${fmtK1(row.s)}점';
+      if (row != null && row.hasRevision) caption = '저녁 무효 → 대체값 ${fmtM(inn.substituteFor(MealSlot.dinner))} 적용 · ${fmtK1(row.sBefore!)} → ${fmtK1(row.s)}점';
     }
 
     // 반영률: 아침·점심·저녁 확정(슬롯에 확정 끼니가 하나라도 있으면) + 걸음
@@ -440,7 +449,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       if (!lifecycle)
         for (final s in [MealSlot.breakfast, MealSlot.lunch, MealSlot.dinner, MealSlot.snack])
-          _slotCard(s, dayMeals, isToday, pastDate),
+          _slotCard(s, dayMeals, isToday, pastDate, inn.substituteFor(s)),
       if (showNudge)
         ChCard(
           outline: true,

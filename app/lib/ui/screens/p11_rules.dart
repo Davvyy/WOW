@@ -98,7 +98,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
     final (bs, be, le, de) = ss.slotStarts;
     final minRankDays = max(1, min(7, (curChallenge.days - 3) ~/ 2)); // 순위 진입 최소 참여일
     final cards = [
-      ('①', '먹은 걸 찍어요', '세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 $m kcal로, 간식은 찍은 만큼 더해져요.', '대체값 $m · 간식 ${fmtInt(r.snackKcal)} 미만', const Color(0xFF0B6E70)),
+      ('①', '먹은 걸 찍어요', '세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 $m kcal(전날 같은 끼니가 더 크면 그 값)로, 간식은 찍은 만큼 더해져요.', '대체값 $m · 간식 ${fmtInt(r.snackKcal)} 미만', const Color(0xFF0B6E70)),
       ('②', '움직여요', '걸음·달리기·계단 자동 기록만 인정. 하루 활동 최대 ${fmtInt(r.c)} kcal.', '활동 상한 ${fmtInt(r.c)} · 걸음 ${fmtInt(r.stepsCap)}', const Color(0xFF1F5E8F)),
       ('③', '점수는 이렇게', '(기초대사 + 활동) − 섭취 = 순적자. ${fmtInt(r.t)} kcal면 100점, 최대 ${fmtInt(r.sMax)}점.', 'T ${fmtInt(r.t)} · 최대 ${fmtInt(r.sMax)}점', const Color(0xFF4A3F8A)),
       ('④', '공정하게', '폰이든 워치든 같은 공식. 이상 기록은 조용히 확인하고 설명 기회를 드려요.', '소명 1회 · ${ss.appealHours}시간', const Color(0xFF3E6B3A)),

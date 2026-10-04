@@ -62,6 +62,10 @@ LedgerRow ledgerRowFromServer(Map<String, dynamic> row, DateTime start,
     sBefore: revisions.isEmpty ? null : _d(revisions.first['prev_s_d']),
     localDate: row['local_date'] as String,
     finalizedAt: row['finalized_at'] == null ? null : DateTime.parse(row['finalized_at'] as String),
+    substituteValues: {
+      for (final e in (intake['substitute_values'] as Map? ?? const {}).entries)
+        ?_slot(e.key): _d(e.value),
+    },
   );
 }
 

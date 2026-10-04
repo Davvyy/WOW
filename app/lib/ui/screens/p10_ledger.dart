@@ -319,7 +319,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       ChChip('섭취 하한 ${fmtInt(t.score.fP)} = max(${fmtInt(engine.rules.fMin)}, ${engine.rules.fRatio}×BMR)'),
       ChChip('활동 상한 ${fmtInt(engine.rules.c)}'),
       for (final d in t.intake.draftSlots) ChChip('미확정 초안 ${fmtInt(d.value)} 잠정 반영(${slotLabel[d.slot]})', tone: Tone.warn),
-      for (final s in t.intake.substituteSlots) ChChip('대체값 $m 적용(${slotLabel[s]})', tone: Tone.warn),
+      for (final s in t.intake.substituteSlots) ChChip('대체값 ${fmtM(t.intake.substituteFor(s))} 적용(${slotLabel[s]})', tone: Tone.warn),
       const ChChip('체중 비례 목표 시 —점 [미결]'),
     ];
 

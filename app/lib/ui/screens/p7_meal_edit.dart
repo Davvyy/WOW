@@ -355,6 +355,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final isSnackLevel = total > 0 && total < engine.rules.snackKcal;
     final auto = _origin.status == MealStatus.auto;
     final m = fmtM(meM);
+    // 이 칸의 대체값: 오늘은 max(M_p, 전날 같은 끼니)(D61), 지난 날은 M_p
+    final sub = fmtM(isPast ? meM : ref.watch(todayResultProvider).intake.substituteFor(slot));
     // 간식은 대체값이 없어 1.3×AI 그대로 자동 확정(D55). 끼니는 max(M_p, 1.3×AI).
     final isSnackSlot = slot == MealSlot.snack;
     final autoVal = isSnackSlot ? engine.rules.autoConfirm * _aiTotal : engine.autoConfirmValue(curMe.bmr, _aiTotal);
@@ -425,7 +427,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
         InfoBanner(
           tone: Tone.warn,
           icon: Icons.search_rounded,
-          child: boldThen(context, '음식을 찾지 못했어요.', ' 이름으로 검색해 주세요. 사진은 저장됐고, 확정하기 전까지는 $m kcal로 잠정 계산돼요.', color: c.warn),
+          child: boldThen(context, '음식을 찾지 못했어요.', ' 이름으로 검색해 주세요. 사진은 저장됐고, 확정하기 전까지는 $sub kcal로 잠정 계산돼요.', color: c.warn),
         ),
         ChButton('음식 이름 검색 · 최근 음식', kind: BtnKind.secondary, icon: Icons.search_rounded, onPressed: _openSearch),
         ChButton('직접 입력 (이름·kcal)', kind: BtnKind.quiet, icon: Icons.edit_rounded, onPressed: _manualEntry),
@@ -521,7 +523,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
                 ),
               // 건너뜀은 오늘만
               if (!isPast && skipLimit && !searchMode)
-                Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Icon(Icons.info_rounded, size: 14, color: c.warn), const SizedBox(width: 4), Expanded(child: Txt.cap('이번 주 건너뜀 ${engine.rules.skipPerWeek}회를 모두 썼어요. 안 먹은 끼니는 $m kcal로 계산돼요.', color: c.warn))])),
+                Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Icon(Icons.info_rounded, size: 14, color: c.warn), const SizedBox(width: 4), Expanded(child: Txt.cap('이번 주 건너뜀 ${engine.rules.skipPerWeek}회를 모두 썼어요. 안 먹은 끼니는 $sub kcal로 계산돼요.', color: c.warn))])),
               Row(children: [
                 if (!isPast) ...[
                   ChButton(skipLimit ? '건너뜀' : '건너뜀 (남은 $remaining회)', kind: BtnKind.quiet, expand: false, onPressed: skipLimit || !canSkip ? null : _skip),

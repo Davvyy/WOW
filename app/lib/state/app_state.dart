@@ -189,7 +189,7 @@ SimulateResult resultFromLedgerRow(LedgerRow r) => SimulateResult(
       bmrRaw: null,
       activity: ActivityResult(stepsOut: r.steps, stepsNetKcal: 0, sessionsNetKcal: 0, floorsKcal: 0, aRaw: r.a, aD: r.a, aCapped: false, sessionMets: const []),
       intake: IntakeResult(iD: r.i, mP: engine.m(r.bmr), mainMealCount: 0, snackCount: 0, substituteSlots: r.substituted, draftSlots: const [],
-          pendingSlots: const [], skipsToday: 0, skipOver: false),
+          pendingSlots: const [], skipsToday: 0, skipOver: false, substituteValues: r.substituteValues),
       score: ScoreResult(fP: r.f, floorApplied: r.floorApplied, dD: r.dd, sD: r.s, ratio: r.dd / engine.rules.t),
     );
 
@@ -766,6 +766,8 @@ final todayResultProvider = Provider<SimulateResult>((ref) {
   final act = ref.watch(activityProvider);
   final skips = ref.watch(skipsUsedProvider);
   ref.watch(sessionProvider); // 규칙·잠긴 BMR 이 바뀌면 다시 계산
+  // 빈 칸 대체값 = max(M_p, 전날 같은 칸 등록 kcal)(D61). 어제 장부 행을 아직 못 읽었으면 M_p 그대로.
+  final yesterday = ref.watch(ledgerProvider).value?.where((r) => r.d == curChallenge.dayIndex - 1).firstOrNull;
   return engine.simulate(SimulateInput(
     bmr: curMe.bmr, // 서버가 잠근 BMR(시작 후 프로필 변경 없음)
     weightKg: curMe.weightKg,
@@ -774,6 +776,7 @@ final todayResultProvider = Provider<SimulateResult>((ref) {
     floors: act.floors,
     meals: [for (final m in meals) m.toInput()],
     skipsUsedThisWeek: skips,
+    prevSlots: yesterday == null ? const {} : prevSlotKcal(yesterday.meals),
   ));
 });
 

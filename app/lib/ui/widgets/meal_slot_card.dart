@@ -26,9 +26,10 @@ class _MealLook {
       };
 
   /// [photo]: 이 폰에 보관된 실제 사진(없으면 아이콘 썸네일). 사진 기반 상태(분석 중~확정)에서만 쓴다.
-  factory _MealLook.of(BuildContext context, MealRecord m, Uint8List? photo) {
+  /// [substitute]: 이 칸의 대체값 max(M_p, 전날 같은 칸)(D61). 없으면 M_p.
+  factory _MealLook.of(BuildContext context, MealRecord m, Uint8List? photo, [double? substitute]) {
     final c = context.c;
-    final subM = fmtM(meM);
+    final subM = fmtM(substitute ?? meM);
 
     Widget thumbEmpty(IconData icon) => Container(
           width: 56,
@@ -149,19 +150,22 @@ class _MealLook {
 /// 식사 카드(슬롯) — docs/06 §5.4. 썸네일 56 · 끼니명 · kcal · 상태 배지.
 /// 기록이 없는 슬롯과 지난 날 장부 요약(모의 모드 등, 슬롯당 한 줄)에 쓴다. 기록이 있는 슬롯은 [MealSlotGroupCard].
 class MealSlotCard extends StatelessWidget {
-  const MealSlotCard({super.key, required this.meal, this.onTap, this.photo});
+  const MealSlotCard({super.key, required this.meal, this.onTap, this.photo, this.substitute});
   final MealRecord meal;
 
   /// 이 폰에 보관된 실제 사진(없으면 아이콘 썸네일). 사진 기반 상태(분석 중~확정)에서만 쓴다.
   final Uint8List? photo;
   final VoidCallback? onTap;
 
+  /// 빈 칸·분석 중 칸에 보이는 대체값(없으면 M_p)
+  final double? substitute;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final m = meal;
     final label = slotLabel[m.slot]!;
-    final look = _MealLook.of(context, m, photo);
+    final look = _MealLook.of(context, m, photo, substitute);
 
     return Semantics(
       button: onTap != null,
@@ -200,16 +204,19 @@ class MealSlotCard extends StatelessWidget {
 
 /// 슬롯 카드 안의 끼니 한 줄: 썸네일 56 · 음식 이름(없으면 상태 문구) · 시각·상태 배지 · kcal. 누르면 그 끼니(P7).
 class MealRow extends StatelessWidget {
-  const MealRow({super.key, required this.meal, this.onTap, this.photo});
+  const MealRow({super.key, required this.meal, this.onTap, this.photo, this.substitute});
   final MealRecord meal;
   final Uint8List? photo;
   final VoidCallback? onTap;
+
+  /// 분석 중·확정 대기 줄에 보이는 대체값(없으면 M_p)
+  final double? substitute;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final m = meal;
-    final look = _MealLook.of(context, m, photo);
+    final look = _MealLook.of(context, m, photo, substitute);
     return Semantics(
       button: onTap != null,
       label: '${slotLabel[m.slot]}${m.time.isEmpty ? '' : ' ${m.time}'} ${look.desc}',
@@ -245,7 +252,8 @@ class MealRow extends StatelessWidget {
 
 /// 기록이 있는 슬롯 카드(오늘·지난 날): 머리글(아침 · 반영 kcal 합계) + 끼니마다 한 줄([MealRow]) + '추가'(같은 슬롯으로 촬영).
 class MealSlotGroupCard extends StatelessWidget {
-  const MealSlotGroupCard({super.key, required this.slot, required this.meals, required this.onTapMeal, this.onAdd, this.photoOf, this.canOpen});
+  const MealSlotGroupCard({super.key, required this.slot, required this.meals, required this.onTapMeal, this.onAdd, this.photoOf, this.canOpen,
+    this.substitute});
   final MealSlot slot;
 
   /// 이 슬롯의 끼니(촬영 시각 순, 1건 이상)
@@ -260,6 +268,9 @@ class MealSlotGroupCard extends StatelessWidget {
 
   /// 끼니의 보관 사진(없으면 null → 아이콘 썸네일)
   final Uint8List? Function(MealRecord meal)? photoOf;
+
+  /// 이 칸의 대체값(분석 중·확정 대기 줄에 표시, 없으면 M_p)
+  final double? substitute;
 
   @override
   Widget build(BuildContext context) {
@@ -286,7 +297,7 @@ class MealSlotGroupCard extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 4),
-          for (final m in meals) MealRow(meal: m, photo: photoOf?.call(m), onTap: canOpen?.call(m) == false ? null : () => onTapMeal(m)),
+          for (final m in meals) MealRow(meal: m, photo: photoOf?.call(m), substitute: substitute, onTap: canOpen?.call(m) == false ? null : () => onTapMeal(m)),
           if (onAdd != null)
             Semantics(
               button: true,
