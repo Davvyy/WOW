@@ -150,3 +150,51 @@ Deno.test('스키마·프롬프트: servings 를 요구한다', () => {
   assertEquals((item.required as readonly string[]).includes('servings'), true);
   assertEquals(MEAL_PROMPT.includes('servings'), true);
 });
+
+// 가공식품(D63): 포장 상품은 상품 행(1개 kcal)으로, 일반 음식 매칭에는 상품이 섞이지 않는다
+const PRODUCTS: Record<string, [string, number]> = { 칙촉: ['P101-103000100-5334', 150.3], '롯데 칙촉': ['P101-103000100-5334', 150.3] };
+function productDeps(adapter: MockAdapter, calls: [string[], boolean][]): AnalyzeDeps {
+  return {
+    ...deps(adapter),
+    mapFood: (cands: string[], packaged = false): Promise<FoodMatch> => {
+      calls.push([cands, packaged]);
+      const hit = packaged ? cands.find((c) => PRODUCTS[c]) : undefined;
+      if (!hit) return mapFood(cands);
+      const [code, kcal] = PRODUCTS[hit];
+      return Promise.resolve({ match: 'auto', food_code: code, kcal, score: 1, chips: [{ food_code: code, name: '칙촉', kcal, score: 1 }] });
+    },
+  };
+}
+
+Deno.test('포장 상품: 칙촉 2개 → 상품 행, ai_kcal = 1개 kcal × 개수(servings)', async () => {
+  const calls: [string[], boolean][] = [];
+  const out = await analyzeMeal('m1', productDeps(new MockAdapter({
+    is_food: true,
+    items: [{ name_candidates: ['롯데 칙촉', '칙촉', '초코칩쿠키'], count: 1, servings: 2, has_broth: false, confidence: 'high', packaged: true }],
+  }), calls));
+  if (out.status !== 'draft') throw new Error('expected draft');
+  const it = out.items[0];
+  assertEquals([it.food_code, it.chosen_name, it.serving_kcal, it.portion_multiplier, it.ai_kcal], ['P101-103000100-5334', '칙촉', 150.3, 2, 300.6]);
+  assertEquals(calls.every(([, p]) => p), true, '포장 상품 항목은 모든 매핑을 상품 먼저로');
+});
+
+Deno.test('포장 상품이 아니면 상품으로 매핑하지 않는다(packaged 기본 false)', async () => {
+  const calls: [string[], boolean][] = [];
+  const out = await analyzeMeal('m1', productDeps(new MockAdapter({
+    is_food: true,
+    items: [{ name_candidates: ['칙촉'], count: 1, servings: 1, has_broth: false, confidence: 'high' }],
+  }), calls));
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals(out.items[0].food_code, null);
+  assertEquals(calls.some(([, p]) => p), false);
+});
+
+Deno.test('스키마·프롬프트: 항목별 packaged(포장 상품), 없으면 false', () => {
+  const item = MEAL_SCHEMA.properties.items.items;
+  assertEquals(item.properties.packaged, { type: 'boolean' });
+  assertEquals((item.required as readonly string[]).includes('packaged'), true);
+  assertEquals(MEAL_PROMPT.includes('packaged'), true);
+  const base = { name_candidates: ['칙촉'], count: 1, servings: 1, has_broth: false, confidence: 'high' };
+  const parsed = parseMealAnalysis({ is_food: true, items: [{ ...base, packaged: true }, base, { ...base, packaged: 'yes' }] });
+  assertEquals(parsed.items.map((i) => i.packaged), [true, false, false]);
+});

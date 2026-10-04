@@ -33,7 +33,8 @@ export interface DraftItem {
 export interface AnalyzeDeps {
   adapter: MealVisionAdapter;
   loadImage(mealId: string): Promise<MealImage>;
-  mapFood(candidates: string[]): Promise<FoodMatch>;
+  /** 후보 이름 → 식약처 DB. packaged(포장 상품)면 상품 행 먼저, 아니면 음식 행만(D63) */
+  mapFood(candidates: string[], packaged?: boolean): Promise<FoodMatch>;
   saveDraft(mealId: string, r: { status: 'draft' | 'failed'; engine: string; ai_kcal: number | null; items: DraftItem[]; reason?: string }): Promise<void>;
   notify(mealId: string, kind: 'done' | 'failed'): Promise<void>;
   unmatchedKcal?: number; // 미매칭 임시값(분류 중앙값 [제안]), 기본 200
@@ -74,7 +75,7 @@ export async function callWithRetry(adapter: MealVisionAdapter, image: MealImage
 export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<AnalyzeDeps, 'mapFood' | 'unmatchedKcal'>): Promise<DraftItem[]> {
   const out: DraftItem[] = [];
   for (const it of analysis.items) {
-    const m = await deps.mapFood(it.name_candidates as string[]);
+    const m = await deps.mapFood(it.name_candidates as string[], it.packaged);
     let food_code: string | null = null;
     let serving: number;
     let chosen = it.name_candidates[0];
@@ -93,14 +94,14 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
       serving = deps.unmatchedKcal ?? 200; // 미매칭 → 임시값 + 확인 필요
       needsCheck = true;
     }
-    const mult = it.servings; // AI 가 사진으로 본 인분(0.1 단위) — P7 먹은 양 기본값
+    const mult = it.servings; // AI 가 사진으로 본 인분(0.1 단위, 포장 상품은 상품 단위 수) — P7 먹은 양 기본값
     // 후보 칩: 선택 이름을 맨 앞에, 나머지 LLM 후보는 각자 DB 매칭 kcal(실패 시 선택 항목 값)
     const candidates = [chosen];
     const candidate_kcal = [serving];
     const candidate_food_codes: (string | null)[] = [food_code];
     for (const name of it.name_candidates as string[]) {
       if (candidates.includes(name) || candidates.length >= 3) continue;
-      const cm = await deps.mapFood([name]);
+      const cm = await deps.mapFood([name], it.packaged);
       const hit = cm.match === 'auto' ? { code: cm.food_code, kcal: cm.kcal } : cm.chips[0] ? { code: cm.chips[0].food_code, kcal: cm.chips[0].kcal } : null;
       if (hit && hit.code && candidate_food_codes.includes(hit.code)) continue;
       candidates.push(name);

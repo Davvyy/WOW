@@ -21,6 +21,7 @@ export interface MealItemDraft {
   portion_bucket: PortionBucket; // servings 의 요약
   has_broth: boolean;
   confidence: Confidence;
+  packaged: boolean; // 봉지·캔·병·상자에 든 포장 상품 → 가공식품(상품) 행 먼저 매칭(D63). servings 는 상품 단위(봉·개·캔) 수
 }
 
 export interface MealAnalysis {
@@ -43,7 +44,11 @@ export const MEAL_PROMPT = [
   '사진 속 음식을 한국어 표준 음식명으로 식별하세요. 밥·국/찌개/탕·반찬·김치·면·빵·음료·과일 단위로 나눕니다.',
   '각 항목마다 가능성 높은 이름 3개(name_candidates), 개수(count),',
   '보통 1인분 대비 사진 속 양(servings: 0.1~3.0, 0.1 단위. 예: 반 그릇 0.5, 1인분 1.0, 조금 많음 1.2, 곱빼기 1.5, 2인분 2.0),',
-  '국물 음식 여부(has_broth), 확신도(confidence: high/mid/low)를 내세요.',
+  '국물 음식 여부(has_broth), 확신도(confidence: high/mid/low), 포장 상품 여부(packaged)를 내세요.',
+  '봉지·캔·병·상자에 든 포장 상품(과자·음료·아이스크림·컵라면 등)이면 packaged=true 로 하고, name_candidates 에 포장에 적힌 브랜드와 상품명을 그대로',
+  '(예: "롯데 칙촉", "칙촉", 마지막은 일반 음식명 "초코칩쿠키") 넣되 용량·중량 숫자는 빼세요.',
+  '포장 상품의 servings 는 보이는 상품 단위(봉·개·캔) 수입니다(0.1 단위, 예: 한 봉 1.0, 반 봉 0.5, 두 개 2.0). count 는 1 로 두고,',
+  '같은 포장 상품 여러 개가 따로 보일 때만 그 개수로 하되 그때 servings 는 한 개당 먹은 양입니다. 그릇에 담긴 음식은 packaged=false 입니다.',
   '칼로리나 그램 숫자는 절대 출력하지 마세요(숫자는 count·servings 만). 음식이 아니면 is_food=false, items=[].',
   'JSON 스키마에 맞는 JSON 하나만 출력하세요.',
 ].join(' ');
@@ -64,8 +69,9 @@ export const MEAL_SCHEMA = {
           servings: { type: 'number', minimum: 0.1, maximum: 3 },
           has_broth: { type: 'boolean' },
           confidence: { type: 'string', enum: ['high', 'mid', 'low'] },
+          packaged: { type: 'boolean' },
         },
-        required: ['name_candidates', 'count', 'servings', 'has_broth', 'confidence'],
+        required: ['name_candidates', 'count', 'servings', 'has_broth', 'confidence', 'packaged'],
       },
     },
   },
@@ -97,7 +103,8 @@ export function parseMealAnalysis(raw: unknown): MealAnalysis {
     const raw = typeof x.servings === 'number' && Number.isFinite(x.servings) ? x.servings : PORTION_MULTIPLIER[legacy];
     const servings = Math.min(SERVINGS_MAX, Math.max(SERVINGS_MIN, Math.round(raw * 10) / 10));
     const conf = ['high', 'mid', 'low'].includes(x.confidence as string) ? x.confidence as Confidence : 'low';
-    return { name_candidates: names.slice(0, 3), count, servings, portion_bucket: bucketOf(servings), has_broth: x.has_broth === true, confidence: conf };
+    return { name_candidates: names.slice(0, 3), count, servings, portion_bucket: bucketOf(servings), has_broth: x.has_broth === true, confidence: conf,
+      packaged: x.packaged === true };
   });
   return { is_food: true, items };
 }

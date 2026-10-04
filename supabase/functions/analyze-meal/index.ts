@@ -33,8 +33,9 @@ Deno.serve((req) =>
         if (error || !data) throw new HttpError(422, 'photo object missing');
         return { bytes: new Uint8Array(await data.arrayBuffer()), mimeType: 'image/jpeg' };
       },
-      async mapFood(candidates) {
-        const { data, error } = await db.rpc('map_food_candidates', { p_candidates: candidates });
+      async mapFood(candidates, packaged = false) {
+        // 포장 상품은 가공식품(상품) 행 먼저, 아니면 음식 행만(D63)
+        const { data, error } = await db.rpc('map_food_candidates', { p_candidates: candidates, p_packaged: packaged });
         if (error) throw error;
         return data as FoodMatch;
       },
