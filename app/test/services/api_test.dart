@@ -61,7 +61,7 @@ void main() {
       expect(wireTotal(wire), 780);
       expect(wire.last['eaten'], isFalse);
     });
-    test('곱빼기 ×1.5 · 국물 안 먹음 ×0.6 · 개수', () {
+    test('밥 1.5공기 · 국물 안 먹음 ×0.6 · 개수', () {
       final items = lunchDraftItems();
       final rice = items.firstWhere((i) => i.kind == ItemKind.rice).copyWith(mult: 1.5);
       final soup = items.firstWhere((i) => i.kind == ItemKind.soup).copyWith(brothOff: true);
@@ -118,6 +118,53 @@ void main() {
       }
       expect(wireTotal([for (final it in reopened) mealItemToWire(it)]), wireTotal(wire));
       expect(reopened.where((i) => !i.checked).map((i) => i.name), [draft.last.name], reason: '김은 먹지 않음 그대로');
+    });
+  });
+
+  group('먹은 양 0.1인분 단위(D60)', () {
+    MealItem side(double m) => MealItem(id: 'r', candidates: const ['라면', '짜파게티'], candKcal: const [450, 600], portion: '1인분', kind: ItemKind.side, mult: m);
+    MealItem rice(double m) => MealItem(id: 'b', candidates: const ['흰쌀밥', '현미밥'], candKcal: const [310, 300], portion: '1공기', kind: ItemKind.rice, mult: m);
+    MealItem soup(double m) => MealItem(id: 's', candidates: const ['된장국'], candKcal: const [100], portion: '1인분', kind: ItemKind.soup, mult: m, brothOff: true);
+    MealItem reopen(Map<String, dynamic> w) => mealItemFromServer(ServerMealItem.fromJson(_storedByConfirm(w)), 0);
+
+    for (final m in [0.9, 1.2, 2.0]) {
+      for (final it in [side(m), rice(m), soup(m)]) {
+        test('${it.kind.name} ${m}인분: 서버로 보내고 다시 열어도 같은 배수·kcal', () {
+          final w = mealItemToWire(it);
+          expect(w['portion_multiplier'], m);
+          expect(w['count'], 1);
+          expect(wireTotal([w]), closeTo(it.kcal, 0.05), reason: 'wireTotal = 앱 합계');
+          final back = reopen(w);
+          expect(back.kind, it.kind);
+          expect(back.mult, m);
+          expect(back.rawKcal, closeTo(it.rawKcal, 0.05));
+          expect(wireTotal([mealItemToWire(back)]), wireTotal([w]));
+        });
+      }
+    }
+
+    test('라면 1.2인분 = 450 × 1.2 = 540', () {
+      expect(side(1.2).kcal, closeTo(540, 0.001));
+      expect(wireTotal([mealItemToWire(side(1.2))]), 540);
+    });
+
+    test('배수는 소수 한 자리로 보낸다(부동소수 잔여 없음)', () {
+      expect(mealItemToWire(side(0.1 + 0.2))['portion_multiplier'], 0.3);
+      expect(mealItemToWire(rice(1.15000001))['portion_multiplier'], 1.2);
+    });
+
+    test('옛 반찬 행(count 3 · 배수 1)은 개수 항목으로 같은 kcal', () {
+      final old = <String, dynamic>{
+        'chosen_name': '멸치볶음', 'name_candidates': ['멸치볶음', '진미채볶음'], 'candidate_kcal': [20, 30],
+        'serving_kcal': 20, 'count': 3, 'portion_multiplier': 1, 'eaten': true,
+      };
+      final back = reopen(old);
+      expect(back.kind, ItemKind.count);
+      expect(back.count, 3);
+      expect(back.rawKcal, 60);
+      final w = mealItemToWire(back);
+      expect([w['count'], w['portion_multiplier']], [3, 1.0]);
+      expect(wireTotal([w]), 60);
     });
   });
 
