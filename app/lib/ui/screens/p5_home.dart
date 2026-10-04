@@ -11,7 +11,9 @@ import '../../core/format.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
+import '../../services/health/health_models.dart' show kstDateString;
 import '../../state/app_state.dart';
+import '../../state/past_meals.dart';
 import '../widgets/challenge_cards.dart';
 import '../widgets/common.dart';
 import '../widgets/meal_slot_card.dart';
@@ -54,29 +56,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// 오늘 슬롯 카드: 기록이 없으면 지금처럼 촬영 칸, 있으면 끼니마다 한 줄 + '추가'.
-  /// 지난 날은 장부 값으로 슬롯당 한 줄(누를 수 없음).
-  Widget _slotCard(MealSlot s, List<MealRecord> dayMeals, bool isToday) {
+  /// 지난 날([pastDate] 의 서버 끼니를 읽었으면): 오늘처럼 끼니마다 한 줄이고 누르면 그 날짜의 P7. 촬영·'추가'는 없다.
+  /// 지난 날 끼니를 못 읽었거나 모의 모드면 장부 값으로 슬롯당 한 줄(누를 수 없음).
+  Widget _slotCard(MealSlot s, List<MealRecord> dayMeals, bool isToday, String? pastDate) {
     void camera() => context.push('${R.camera}?slot=${s.name}');
-    if (!isToday) return MealSlotCard(meal: dayMeals.firstWhere((m) => m.slot == s, orElse: () => MealRecord(slot: s)));
+    if (!isToday && pastDate == null) return MealSlotCard(meal: dayMeals.firstWhere((m) => m.slot == s, orElse: () => MealRecord(slot: s)));
     final list = mealsIn(dayMeals, s);
-    if (list.isEmpty) return MealSlotCard(meal: MealRecord(slot: s), onTap: camera);
+    if (list.isEmpty) return MealSlotCard(meal: MealRecord(slot: s), onTap: isToday ? camera : null);
     final photos = {for (final m in list) m.key: _photoOf(m)}; // 홈 build 안에서 읽어 사진이 바뀌면 다시 그린다
     return MealSlotGroupCard(
       slot: s,
       meals: list,
       photoOf: (m) => photos[m.key],
-      onAdd: camera,
+      onAdd: isToday ? camera : null,
+      // 지난 날 건너뜀은 열 것이 없다(건너뜀은 오늘만)
+      canOpen: isToday ? null : (m) => m.status != MealStatus.skipped,
       onTapMeal: (m) {
-        if (m.status == MealStatus.skipped) {
+        final search = (m.status == MealStatus.captured && m.noAnalysis) || m.status == MealStatus.failed;
+        if (!isToday) {
+          context.push(R.meal(m.slot, meal: m.key, search: search, date: pastDate));
+        } else if (m.status == MealStatus.skipped) {
           camera(); // 건너뜀은 지금처럼 촬영으로
         } else {
-          context.push(R.meal(m.slot, meal: m.key, search: (m.status == MealStatus.captured && m.noAnalysis) || m.status == MealStatus.failed));
+          context.push(R.meal(m.slot, meal: m.key, search: search));
         }
       },
     );
   }
 
   DateTime _dateOf(int day) => curChallenge.start.add(Duration(days: day - 1));
+
+  /// [day] 의 날짜(YYYY-MM-DD, KST)
+  String _localDateOf(int day) => kstDateString(_dateOf(day));
 
   void _swipe(DragEndDetails d) {
     final v = d.primaryVelocity ?? 0;
@@ -102,6 +113,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     late final List<MealRecord> dayMeals;
     late final int steps;
     LedgerRow? row;
+    // 지난 날 서버 끼니를 읽었으면 그 날짜(YYYY-MM-DD) — 끼니마다 한 줄, 눌러서 연다
+    String? pastDate;
     if (isToday) {
       sim = ref.watch(todayResultProvider);
       dayMeals = meals;
@@ -116,13 +129,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           : remote
           ? resultFromLedgerRow(row)
           : engine.simulate(SimulateInput(profile: curMe.profile, stepsTotal: steps, meals: row.meals));
-      dayMeals = [
-        for (final s in MealSlot.values)
-          () {
-            final mi = (row?.meals ?? const <MealInput>[]).where((m) => m.slot == s);
-            return mi.isEmpty ? MealRecord(slot: s) : MealRecord(slot: s, status: mi.first.status, kcal: mi.first.kcal);
-          }(),
-      ];
+      // 서버 모드는 그 날짜 끼니를 따로 읽는다(오늘 목록과 섞지 않음). 읽기 전·못 읽으면 장부 요약.
+      final past = remote ? ref.watch(pastMealsProvider(_localDateOf(day))).value : null;
+      if (past != null) pastDate = _localDateOf(day);
+      dayMeals = past ??
+          [
+            for (final s in MealSlot.values)
+              () {
+                final mi = (row?.meals ?? const <MealInput>[]).where((m) => m.slot == s);
+                return mi.isEmpty ? MealRecord(slot: s) : MealRecord(slot: s, status: mi.first.status, kcal: mi.first.kcal);
+              }(),
+          ];
     }
 
     final lifecycle = phase != ChallengePhase.active;
@@ -420,7 +437,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       if (!lifecycle)
         for (final s in [MealSlot.breakfast, MealSlot.lunch, MealSlot.dinner, MealSlot.snack])
-          _slotCard(s, dayMeals, isToday),
+          _slotCard(s, dayMeals, isToday, pastDate),
       if (showNudge)
         ChCard(
           outline: true,
@@ -476,6 +493,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 final meals = ref.read(mealsProvider.notifier);
                 await Future.wait([ref.read(activityProvider.notifier).refresh(), meals.retryPendingUploads(force: true)]);
                 await meals.loadToday();
+                // 지난 날을 보고 있으면 그 날짜 끼니도 다시 읽는다
+                final d = ref.read(selectedDayProvider);
+                if (remote && d != curChallenge.dayIndex) ref.invalidate(pastMealsProvider(_localDateOf(d)));
                 ref.invalidate(ledgerProvider);
                 ref.invalidate(leaderboardProvider);
               },

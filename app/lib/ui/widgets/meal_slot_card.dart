@@ -147,7 +147,7 @@ class _MealLook {
 }
 
 /// 식사 카드(슬롯) — docs/06 §5.4. 썸네일 56 · 끼니명 · kcal · 상태 배지.
-/// 기록이 없는 슬롯과 지난 날(장부 값, 슬롯당 한 줄)에 쓴다. 오늘 기록이 있는 슬롯은 [MealSlotGroupCard].
+/// 기록이 없는 슬롯과 지난 날 장부 요약(모의 모드 등, 슬롯당 한 줄)에 쓴다. 기록이 있는 슬롯은 [MealSlotGroupCard].
 class MealSlotCard extends StatelessWidget {
   const MealSlotCard({super.key, required this.meal, this.onTap, this.photo});
   final MealRecord meal;
@@ -243,15 +243,20 @@ class MealRow extends StatelessWidget {
   }
 }
 
-/// 오늘 기록이 있는 슬롯 카드: 머리글(아침 · 반영 kcal 합계) + 끼니마다 한 줄([MealRow]) + '추가'(같은 슬롯으로 촬영).
+/// 기록이 있는 슬롯 카드(오늘·지난 날): 머리글(아침 · 반영 kcal 합계) + 끼니마다 한 줄([MealRow]) + '추가'(같은 슬롯으로 촬영).
 class MealSlotGroupCard extends StatelessWidget {
-  const MealSlotGroupCard({super.key, required this.slot, required this.meals, required this.onTapMeal, this.onAdd, this.photoOf});
+  const MealSlotGroupCard({super.key, required this.slot, required this.meals, required this.onTapMeal, this.onAdd, this.photoOf, this.canOpen});
   final MealSlot slot;
 
   /// 이 슬롯의 끼니(촬영 시각 순, 1건 이상)
   final List<MealRecord> meals;
   final void Function(MealRecord meal) onTapMeal;
+
+  /// '추가'(같은 슬롯으로 촬영). null 이면 줄을 그리지 않는다(지난 날).
   final VoidCallback? onAdd;
+
+  /// 누를 수 있는 끼니인지(null 이면 모두). false 인 줄은 누를 수 없다.
+  final bool Function(MealRecord meal)? canOpen;
 
   /// 끼니의 보관 사진(없으면 null → 아이콘 썸네일)
   final Uint8List? Function(MealRecord meal)? photoOf;
@@ -281,7 +286,7 @@ class MealSlotGroupCard extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 4),
-          for (final m in meals) MealRow(meal: m, photo: photoOf?.call(m), onTap: () => onTapMeal(m)),
+          for (final m in meals) MealRow(meal: m, photo: photoOf?.call(m), onTap: canOpen?.call(m) == false ? null : () => onTapMeal(m)),
           if (onAdd != null)
             Semantics(
               button: true,
