@@ -1,7 +1,7 @@
 // node --test supabase/seed/match_audit_test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AUDIT, BRAND_MAKERS, auditSql, makerFragments, norm, parseRows, scoreAll, scoreRow } from './match_audit.mjs';
+import { AUDIT, BRAND_MAKERS, auditSql, candidatesOf, makerFragments, makerKey, makerMatches, norm, parseRows, scoreAll, scoreRow } from './match_audit.mjs';
 
 test('norm: SQL food_name_norm 과 같은 정규화(전각·기호·대소문자)', () => {
   assert.equal(norm('２％ 부족할 때'), '2부족할때');
@@ -24,8 +24,9 @@ test('목록: 약 200개, 이름 중복 없음, 브랜드 키는 별칭 표에 �
 test('SQL: 읽기 전용 select, 따옴표 이스케이프, --json 은 한 행 JSON', () => {
   const sql = auditSql([["롯데 칙촉", '칙촉', '롯데'], ["it's", 'x', 'y']]);
   assert.match(sql, /^select /);
-  assert.match(sql, /\(1, 'it''s'\)/);
-  assert.match(sql, /map_food_candidates\(array\[x\.q\], true\)/);
+  assert.match(sql, /\(1, 'it''s', array\['it''s'\]\)/);
+  assert.match(sql, /\(0, '롯데 칙촉', array\['롯데 칙촉', '칙촉'\]\)/);
+  assert.match(sql, /map_food_candidates\(x\.c, true\)/);
   assert.doesNotMatch(sql, /\b(insert|update|delete|create|drop|alter)\b/i);
   assert.match(auditSql(AUDIT, { json: true }), /^select json_build_object\('rows'/);
 });
@@ -50,7 +51,7 @@ test('채점: 이름·제조사(별칭, 공백·대소문자 무시)', () => {
 test('채점: unit ml · kcal 점검 · 없는 상품', () => {
   const powder = row({ name_kr: '스타벅스 카페라테', maker: 'NESTLE UK', unit_label: '100g', serving_g: 100, kcal: 429 });
   assert.equal(scoreRow(['스타벅스 카페라떼', '라떼|라테', '스타벅스', { unit: 'ml' }], powder).ok, false);
-  const rtd = row({ name_kr: '카페라떼', maker: '남양유업(주)', unit_label: '1개(320ml)', serving_g: 320, kcal: 179 });
+  const rtd = row({ name_kr: '스타벅스 카페라떼', maker: '동서식품(주)', unit_label: '1개(320ml)', serving_g: 320, kcal: 179 });
   assert.equal(scoreRow(['스타벅스 카페라떼', '라떼|라테', '스타벅스', { unit: 'ml' }], rtd).ok, true);
   assert.equal(scoreRow(['a', 'a', 'b'], row({ name_kr: 'a', maker: 'b', kcal: 400, serving_g: 30 })).kcalOk, false);
   assert.equal(scoreRow(['a', 'a', 'b'], row({ name_kr: 'a', maker: 'b', kcal: 0, serving_g: 30 })).kcalOk, false);
@@ -68,4 +69,32 @@ test('scoreAll: 통과율과 틀린 항목', () => {
   assert.equal(s.pass, 1);
   assert.equal(s.rate, 50);
   assert.deepEqual(s.misses.map((m) => m.q), ['농심 새우깡']);
+});
+
+test('후보 이름: AI 처럼 [이름, 첫 낱말을 뗀 이름]', () => {
+  assert.deepEqual(candidatesOf('동서 맥심 티오피'), ['동서 맥심 티오피', '맥심 티오피']);
+  assert.deepEqual(candidatesOf('레드불'), ['레드불']);
+});
+
+test('제조사: SQL 과 같게 2글자 조각은 앞글자만, 3글자 이상은 이름 안', () => {
+  assert.equal(makerKey('농업회사법인(주)동서웰빙'), '동서웰빙');
+  assert.equal(makerMatches('롯데웰푸드(주)', ['롯데']), true);
+  assert.equal(makerMatches('크리스피크림롯데김해아울렛점', ['롯데']), false);
+  assert.equal(makerMatches('현대상회', ['대상']), false);
+  assert.equal(makerMatches('THE HERSHEY COMPANY', ['hershey']), true);
+  assert.equal(makerMatches(null, ['롯데']), false);
+});
+
+test('채점: 이름 조각 끝의 $ 는 끝맺음', () => {
+  assert.equal(scoreRow(['비비고 김치', '김치$', 'CJ'], row({ name_kr: '비비고 김치찌개', maker: '씨제이제일제당(주)' })).ok, false);
+  assert.equal(scoreRow(['비비고 김치', '김치$', 'CJ'], row({ name_kr: '비비고 포기배추김치', maker: '씨제이제일제당(주)' })).ok, true);
+});
+
+test('scoreAll: 자동 비율과 틀린 자동', () => {
+  const entries = [['롯데 칙촉', '칙촉', '롯데'], ['농심 새우깡', '새우깡', '농심'], ['오리온 투유', '투유', '오리온']];
+  const s = scoreAll([row({ i: 0, name_kr: '칙촉', maker: '롯데제과(주)' }), row({ i: 1, name_kr: '양파링', maker: '(주)농심' }),
+    row({ i: 2, mt: 'chips', name_kr: '투유', maker: '(주)오리온' })], entries);
+  assert.equal(s.auto, 2);
+  assert.equal(s.autoRate, 66.7);
+  assert.equal(s.autoWrong, 1);
 });

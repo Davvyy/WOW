@@ -7,12 +7,14 @@
 //   (로컬 psql: node supabase/seed/match_audit.mjs sql --json | psql -At -d <db> > match_audit.json)
 //
 // 항목: [AI 이름, 기대 이름 조각('|' 로 여럿), 제조사(브랜드 키 또는 '|' 로 나눈 제조사 조각), 선택]
-//  - 이름: 고른 상품 이름(공백·기호 무시)에 조각 하나가 들면 맞음.
+//  - 매칭에는 AI 처럼 후보 이름 둘을 보낸다: [AI 이름, 첫 낱말을 뗀 이름](한 낱말이면 하나).
+//  - 이름: 고른 상품 이름(공백·기호 무시)에 조각 하나가 들면 맞음. 조각 끝의 '$' 는 그 조각으로 끝나야 맞음('김치$').
 //  - 제조사: 브랜드 키면 BRAND_MAKERS 의 제조사 조각(마이그레이션 brand_makers 와 같은 값), 아니면 적힌 조각. 공백·기호·대소문자 무시.
+//    SQL maker_match_pos 와 같게 2글자 조각은 법인 표기를 뗀 제조사의 앞글자만, 3글자 이상은 이름 안 어디든.
 //  - 선택 unit: 'ml' 이면 단위 라벨이 ml 이어야(마시는 제품이 가루로 가지 않게).
 //  - 선택 absent: 데이터에 그 상품이 없다. 미매칭(none)·음식 행, 또는 이름이 맞고 제조사가 맞거나 후보 칩(확인 필요)이면 맞음.
 //  - kcal 점검: g·ml 당 9.5 kcal 이하, 0 kcal 은 음료(ml)만.
-//  - 통과 = 이름 맞음 + 제조사 맞음(+ unit). 목표 95%.
+//  - 통과 = 이름 맞음 + 제조사 맞음(+ unit). 목표 95%. 자동 비율(auto)과 틀린 자동(확인 없이 틀린 상품)도 함께 찍는다.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -27,12 +29,12 @@ export const BRAND_MAKERS = {
   빙그레: ['빙그레'], 매일: ['매일유업'], 상하목장: ['매일유업'], 남양: ['남양유업', '남양에프앤비'], 서울우유: ['서울우유'],
   풀무원: ['풀무원'], 동원: ['동원'], 목우촌: ['목우촌', '농협'], 하림: ['하림'], 팔도: ['팔도'],
   삼양: ['삼양식품'], 광동: ['광동'], 동아: ['동아오츠카'], 동아오츠카: ['동아오츠카'], 웅진: ['웅진식품'],
-  일화: ['일화'], 사조: ['사조'], 대상: ['대상'], 청정원: ['대상'], 종가: ['대상'], 비락: ['비락'],
+  일화: ['일화'], 사조: ['사조'], 대상: ['대상'], 청정원: ['대상'], 종가: ['대상'], 종가집: ['대상'], 비락: ['비락'],
   파리바게뜨: ['파리크라상'], 파리바게트: ['파리크라상'],
   야쿠르트: ['한국야쿠르트', '에치와이', '야쿠르트'], hy: ['한국야쿠르트', '에치와이', '야쿠르트'],
   코카콜라: ['코카콜라', 'COCACOLA', 'LG생활건강', '해태HTB', '해태에이치티비'],
   몬스터: ['코카콜라', 'COCACOLA', '해태에이치티비', 'MONSTER'],
-  스타벅스: ['스타벅스', '동서식품', '네슬레', 'NESTLE', '서울우유', '남양유업'],
+  스타벅스: ['스타벅스', '동서식품', '네슬레', 'NESTLE'],
   하겐다즈: ['HAAGEN', '하겐다즈'], 허쉬: ['HERSHEY', 'THE HERSHEY', '허쉬'], 페레로: ['FERRERO', '페레로'], 킨더: ['FERRERO', '페레로'],
   하리보: ['HARIBO', '하리보'], 켈로그: ['켈로그', '농심켈로그', 'KELLOGG'], 레드불: ['RED BULL', '레드불', 'RAUCH'],
 };
@@ -44,7 +46,7 @@ export const AUDIT = [
   ['롯데 빼빼로', '빼빼로', '롯데'], ['오리온 포카칩 오리지널', '포카칩', '오리온'], ['농심 꿀꽈배기', '꿀꽈배기', '농심'], ['해태 허니버터칩', '허니버터칩', '해태'],
   ['오리온 꼬북칩 콘스프맛', '꼬북칩', '오리온'], ['크라운 산도', '산도', '크라운'], ['롯데 몽쉘', '몽쉘', '롯데'], ['오리온 오징어땅콩', '오징어땅콩', '오리온'],
   ['농심 양파링', '양파링', '농심'], ['롯데 꼬깔콘 고소한맛', '꼬깔콘', '롯데'], ['해태 맛동산', '맛동산', '해태'], ['크라운 죠리퐁', '죠리퐁', '크라운'],
-  ['오리온 다이제', '다이제', '오리온'], ['롯데 가나 마일드', '가나', '롯데'], ['오리온 닥터유 에너지바', '에너지바', '오리온'], ['오리온 고래밥', '고래밥', '오리온'],
+  ['오리온 다이제', '다이제', '오리온'], ['롯데 가나 마일드', '가나마일드', '롯데'], ['오리온 닥터유 에너지바', '에너지바', '오리온'], ['오리온 고래밥', '고래밥', '오리온'],
   ['롯데 마가렛트', '마가렛트', '롯데'], ['해태 오예스', '오예스', '해태'], ['크라운 쿠크다스', '쿠크다스', '크라운'], ['오리온 촉촉한초코칩', '촉촉한', '오리온'],
   ['농심 바나나킥', '바나나킥', '농심'], ['농심 포스틱', '포스틱', '농심'], ['롯데 제크', '제크', '롯데'], ['해태 에이스', '에이스', '해태'],
   ['오리온 썬칩', '썬칩', '오리온|FRITO', { absent: true }], ['롯데 칸쵸', '칸쵸', '롯데'],
@@ -77,15 +79,15 @@ export const AUDIT = [
   ['코카콜라 조지아 오리지널', '조지아', '코카콜라'], ['동서 맥심 모카골드 믹스', '모카골드', '동서'], ['남양 프렌치카페 카페믹스', '프렌치카페', '남양'],
   ['매일 카페라떼 마일드', '카페라떼', '매일'], ['동서 맥심 카누 아메리카노', '카누', '동서'],
   // ---- 우유·요거트
-  ['빙그레 바나나맛우유', '바나나맛우유', '빙그레'], ['서울우유 커피우유', '커피', '서울우유'], ['매일 바이오 플레인 요거트', '바이오|요거트', '매일'],
+  ['빙그레 바나나맛우유', '바나나맛우유', '빙그레'], ['서울우유 커피우유', '커피우유', '서울우유'], ['매일 바이오 플레인 요거트', '바이오', '매일'],
   ['남양 불가리스', '불가리스', '남양'], ['서울우유 흰우유', '우유', '서울우유'], ['빙그레 요플레', '요플레', '빙그레'],
-  ['서울우유 체다치즈', '치즈', '서울우유'], ['매일 상하치즈', '치즈', '매일'], ['풀무원 그릭요거트', '그릭', '풀무원'],
-  ['빙그레 딸기맛우유', '딸기맛우유', '빙그레'], ['서울우유 딸기우유', '딸기', '서울우유'], ['매일 상하목장 유기농우유', '유기농', '매일'],
+  ['서울우유 체다치즈', '체다', '서울우유'], ['매일 상하치즈', '치즈', '매일'], ['풀무원 그릭요거트', '그릭', '풀무원'],
+  ['빙그레 딸기맛우유', '딸기맛우유', '빙그레'], ['서울우유 딸기우유', '딸기우유', '서울우유'], ['매일 상하목장 유기농우유', '유기농우유', '매일'],
   ['남양 맛있는우유GT', '맛있는우유', '남양'], ['남양 초코에몽', '초코에몽', '남양'], ['서울우유 비요뜨', '비요뜨', '서울우유'],
   ['빙그레 닥터캡슐', '닥터캡슐', '빙그레'], ['매일 엔요', '엔요', '매일'], ['hy 야쿠르트', '야쿠르트', '야쿠르트'], ['매일 아몬드브리즈', '아몬드브리즈', '매일'],
   ['남양 17차', '17차', '남양'],
   // ---- 아이스크림
-  ['빙그레 메로나', '메로나', '빙그레'], ['롯데 월드콘', '월드콘', '롯데'], ['해태 부라보콘', '부라보', '해태|빙그레'], ['빙그레 붕어싸만코', '붕어싸만코', '빙그레'],
+  ['빙그레 메로나', '메로나', '빙그레'], ['롯데 월드콘', '월드콘', '롯데'], ['해태 부라보콘', '부라보콘|부라보소프트콘', '해태|빙그레'], ['빙그레 붕어싸만코', '붕어싸만코', '빙그레'],
   ['롯데 죠스바', '죠스바', '롯데'], ['빙그레 투게더', '투게더', '빙그레'], ['롯데 스크류바', '스크류바', '롯데'], ['해태 누가바', '누가바', '해태'],
   ['빙그레 비비빅', '비비빅', '빙그레'], ['롯데 수박바', '수박바', '롯데'], ['하겐다즈 바닐라', '바닐라', '하겐다즈'],
   ['롯데 설레임', '설레임', '롯데'], ['해태 바밤바', '바밤바', '해태'], ['롯데 돼지바', '돼지바', '롯데'], ['빙그레 더위사냥', '더위사냥', '빙그레'],
@@ -102,7 +104,7 @@ export const AUDIT = [
   ['오뚜기 컵밥 참치마요덮밥', '참치마요', '오뚜기'], ['CJ 햇반 컵반 미역국밥', '미역국밥', 'CJ'], ['비비고 물만두', '물만두', 'CJ'],
   ['해태 고향만두', '고향만두', '해태'], ['동원 리챔', '리챔', '동원'], ['롯데 의성마늘햄', '의성마늘', '롯데'],
   ['사조 살코기참치', '살코기', '사조'], ['오뚜기 참치', '참치', '오뚜기'], ['동원 고추참치', '고추참치', '동원'], ['하림 용가리치킨', '용가리', '하림'],
-  ['CJ 고메 치킨', '치킨', 'CJ'], ['오뚜기 3분짜장', '3분짜장', '오뚜기', { absent: true }], ['비비고 김치', '김치', 'CJ'], ['CJ 비비고 사골곰탕', '사골곰탕', 'CJ'],
+  ['CJ 고메 치킨', '치킨', 'CJ'], ['오뚜기 3분짜장', '3분짜장', '오뚜기', { absent: true }], ['비비고 김치', '김치$', 'CJ'], ['CJ 비비고 사골곰탕', '사골곰탕', 'CJ'],
   ['오뚜기 맛있는 오뚜기밥', '오뚜기밥', '오뚜기'], ['동원 양반 김', '양반', '동원'],
   // ---- 초콜릿·사탕·껌·젤리
   ['허쉬 밀크초콜릿', '허쉬', '허쉬'], ['페레로로쉐', '페레로', '페레로'], ['킨더 초콜릿', '킨더', '킨더'], ['오리온 초코송이', '초코송이', '오리온'],
@@ -112,7 +114,7 @@ export const AUDIT = [
   ['롯데 쥬시후레쉬', '쥬시후레쉬', '롯데'], ['오리온 왕꿈틀이', '꿈틀이', '오리온'], ['롯데 ABC 초코쿠키', 'abc', '롯데'],
   // ---- 시리얼
   ['켈로그 콘푸로스트', '콘푸로스트', '켈로그'], ['켈로그 첵스초코', '첵스', '켈로그'], ['포스트 그래놀라', '그래놀라', '동서'],
-  ['켈로그 스페셜K', '스페셜', '켈로그'], ['포스트 오레오 오즈', '오레오', '동서'], ['포스트 아몬드 후레이크', '아몬드', '동서'], ['켈로그 프링글스 오리지널', '프링글스', '켈로그'],
+  ['켈로그 스페셜K', '스페셜k', '켈로그'], ['포스트 오레오 오즈', '오레오', '동서'], ['포스트 아몬드 후레이크', '아몬드후레이크', '동서'], ['켈로그 프링글스 오리지널', '프링글스', '켈로그'],
   // ---- 건강·기타
   ['정관장 홍삼정 에브리타임', '홍삼', '정관장'],
 ];
@@ -124,16 +126,29 @@ export const norm = (s) => String(s ?? '').normalize('NFKC').toLowerCase().repla
 /** 기대 제조사 조각: 브랜드 키면 BRAND_MAKERS, 아니면 '|' 로 나눈 조각 */
 export const makerFragments = (mk) => (BRAND_MAKERS[mk] ?? String(mk).split('|')).map(norm);
 
+/** SQL food_maker_key 와 같게: 정규화 + 앞머리 법인 표기 제거 */
+export const makerKey = (s) => norm(s).replace(/^(주식회사|유한회사|농업회사법인|영농조합법인|재단법인|사단법인|주|유)+/, '');
+
+/** SQL maker_match_pos 와 같은 제조사 맞음: 2글자 이하 조각은 앞글자, 3글자 이상은 이름 안 */
+export const makerMatches = (maker, frags) =>
+  maker != null && frags.some((f) => f && (makerKey(maker).startsWith(f) || (f.length >= 3 && norm(maker).includes(f))));
+
+/** 매칭에 보낼 후보 이름: [AI 이름, 첫 낱말을 뗀 이름] */
+export const candidatesOf = (q) => {
+  const w = String(q).trim().split(/\s+/);
+  return w.length >= 2 ? [q, w.slice(1).join(' ')] : [q];
+};
+
 const lit = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
 /** 감사 SQL(읽기 전용). json=true 면 한 행 JSON({rows:[…]})으로 감싼다(psql -At 용) */
 export function auditSql(entries = AUDIT, { json = false } = {}) {
-  const values = entries.map(([q], i) => `(${i}, ${lit(q)})`).join(',\n  ');
+  const values = entries.map(([q], i) => `(${i}, ${lit(q)}, array[${candidatesOf(q).map(lit).join(', ')}])`).join(',\n  ');
   const body = `select x.i, x.q, m->>'match' as mt, f.food_code, f.name_kr, f.maker, f.unit_label, f.kcal, f.serving_g, f.category,
   coalesce(f.is_product, false) as is_product
 from (values
   ${values}
-) x(i, q), lateral (select map_food_candidates(array[x.q], true) as m) y
+) x(i, q, c), lateral (select map_food_candidates(x.c, true) as m) y
 left join food_db_cache f on f.food_code = coalesce(m->>'food_code', m->'chips'->0->>'food_code')
 order by x.i`;
   return json ? `select json_build_object('rows', coalesce(json_agg(t order by t.i), '[]'))::text from (\n${body}\n) t;\n` : `${body};\n`;
@@ -151,8 +166,8 @@ export function scoreRow(entry, row) {
   const [q, want, mk, opt = {}] = entry;
   const name = norm(row?.name_kr);
   const picked = row?.food_code != null;
-  const nameHit = picked && want.split('|').map(norm).some((w) => name.includes(w));
-  const makerHit = picked && makerFragments(mk).some((m) => norm(row.maker).includes(m));
+  const nameHit = picked && want.split('|').some((w) => (w.endsWith('$') ? name.endsWith(norm(w)) : name.includes(norm(w))));
+  const makerHit = picked && makerMatches(row.maker, makerFragments(mk));
   const ml = /ml\)?$/i.test(String(row?.unit_label ?? ''));
   const unitOk = !opt.unit || (opt.unit === 'ml' ? ml : true);
   const kcal = Number(row?.kcal), g = Number(row?.serving_g);
@@ -161,16 +176,19 @@ export function scoreRow(entry, row) {
   // 없는 상품: 미매칭·음식 행이거나, 이름이 맞고 (제조사가 맞거나 자동 확정이 아닌 후보 칩)이면 맞음
   if (opt.absent) ok = !picked || !row.is_product || (nameHit && (makerHit || row.mt !== 'auto'));
   else ok = nameHit && makerHit && unitOk;
-  return { q, ok, nameOk: opt.absent ? ok : nameHit, makerOk: opt.absent ? ok : makerHit, unitOk, kcalOk, absent: !!opt.absent };
+  const auto = row?.mt === 'auto';
+  return { q, ok, auto, nameOk: opt.absent ? ok : nameHit, makerOk: opt.absent ? ok : makerHit, unitOk, kcalOk, absent: !!opt.absent };
 }
 
-/** 전체 채점: {total, pass, rate, misses:[…], kcalBad:[…]} */
+/** 전체 채점: {total, pass, rate, auto, autoRate, autoWrong, misses:[…], kcalBad:[…]} */
 export function scoreAll(rows, entries = AUDIT) {
   const byI = new Map(rows.map((r) => [Number(r.i), r]));
   const results = entries.map((e, i) => ({ i, row: byI.get(i), ...scoreRow(e, byI.get(i)) }));
   const pass = results.filter((r) => r.ok).length;
+  const auto = results.filter((r) => r.auto).length;
+  const pct = (n) => Math.round((n / entries.length) * 1000) / 10;
   return {
-    total: entries.length, pass, rate: Math.round((pass / entries.length) * 1000) / 10,
+    total: entries.length, pass, rate: pct(pass), auto, autoRate: pct(auto), autoWrong: results.filter((r) => r.auto && !r.ok).length,
     misses: results.filter((r) => !r.ok), kcalBad: results.filter((r) => !r.kcalOk),
   };
 }
@@ -185,7 +203,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     process.stdout.write(auditSql(AUDIT, { json: arg === '--json' }));
   } else if (cmd === 'score' && arg) {
     const s = scoreAll(parseRows(readFileSync(arg, 'utf8')));
-    console.log(`통과 ${s.pass}/${s.total} (${s.rate}%) · 목표 ${TARGET_RATE}%`);
+    console.log(`통과 ${s.pass}/${s.total} (${s.rate}%) · 목표 ${TARGET_RATE}% · 자동 ${s.auto}/${s.total} (${s.autoRate}%) · 틀린 자동 ${s.autoWrong}`);
     for (const m of s.misses) {
       const why = [m.nameOk ? '' : '이름', m.makerOk ? '' : '제조사', m.unitOk ? '' : '단위'].filter(Boolean).join('·');
       console.log(`  ✗ [${m.i}] ${m.q} → ${fmtRow(m.row)} (${why || '없는 상품'})`);
