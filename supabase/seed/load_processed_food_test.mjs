@@ -1,7 +1,7 @@
 // node --test supabase/seed/
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { KEEP_LV3, chunkSql, parseAmount, pickProducts, unitOf } from './load_processed_food.mjs';
+import { KEEP_LV3, chunkSizeArg, chunkSql, makerOf, parseAmount, pickProducts, unitOf } from './load_processed_food.mjs';
 
 const row = (o) => ({
   code: 'P1', name: '칙촉', lv3: '과자류·빵류 또는 떡류', lv4: '비스킷/쿠키/크래커', lv6: '과자', per: '100g', kcal: '501',
@@ -87,4 +87,29 @@ test('SQL: 5,000건씩 나눈 upsert(is_product = true, 다시 돌려도 값만 
   assert.match(chunks[0], /'O''Neil'/);
   assert.match(chunks[0], /, true, /);
   assert.match(chunks[0], /on conflict \(food_code\) do update set .*is_product = excluded\.is_product.*unit_label = excluded\.unit_label/s);
+});
+
+test("제조사가 '해당없음'·빈 값이면 수입업체, 그다음 유통업체, 모두 없으면 null", () => {
+  assert.equal(makerOf(row({ mfr: '해당없음', imp: '(주)수입상사', dist: '유통사' })), '(주)수입상사');
+  assert.equal(makerOf(row({ mfr: ' ', imp: '해당없음', dist: '유통사' })), '유통사');
+  assert.equal(makerOf(row({ mfr: '해당없음', imp: '해당없음', dist: '해당없음' })), null);
+  assert.equal(makerOf(row({})), '롯데웰푸드 주식회사');
+  const { products } = pickProducts([
+    row({ code: 'P1', name: '수입 과자', mfr: '해당없음', imp: '수입사A', date: '2024-01-01' }),
+    row({ code: 'P2', name: '수입 과자', mfr: '해당없음', imp: '수입사B', date: '2025-01-01' }),
+  ]);
+  assert.deepEqual(products.map((p) => [p.food_code, p.maker]), [['P1', '수입사A'], ['P2', '수입사B']], '수입사가 다르면 다른 상품');
+});
+
+test('upsert 는 상품 행만 덮어쓴다(같은 코드의 음식 행은 그대로)', () => {
+  const sql = chunkSql(pickProducts([row({})]).products)[0];
+  assert.match(sql, /do update set [\s\S]*updated_at = now\(\)\s+where food_db_cache\.is_product;\s*$/);
+});
+
+test('파일당 행 수: 세 번째 인자(양의 정수), 없으면 5,000', () => {
+  assert.equal(chunkSizeArg(undefined), 5000);
+  assert.equal(chunkSizeArg('2000'), 2000);
+  assert.throws(() => chunkSizeArg('0'));
+  assert.throws(() => chunkSizeArg('abc'));
+  assert.throws(() => chunkSizeArg('1.5'));
 });

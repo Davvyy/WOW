@@ -1,7 +1,7 @@
 // 식약처 「전국통합식품영양성분정보(가공식품)표준데이터」(공공데이터포털 15100066) NDJSON → food_db_cache 상품 행 적재 SQL.
 //
 //   DATA_GO_KR_KEY=<인코딩 키> node supabase/seed/fetch_processed_food.mjs <processed.ndjson>
-//   node supabase/seed/load_processed_food.mjs <processed.ndjson> <출력 폴더>
+//   node supabase/seed/load_processed_food.mjs <processed.ndjson> <출력 폴더> [파일당 행 수, 기본 5000]
 //   for f in <출력 폴더>/processed_food_*.sql; do npx --yes supabase@2 db query --linked -f "$f" || break; done
 //
 // 규칙(docs/02 §10 D63)
@@ -10,7 +10,9 @@
 //  - 1개 = 포장 전체(식품중량이 1회 섭취참고량의 1.5배 이하) → 1회 섭취참고량 → 포장 전체(500 이하) → 기준량(100g·ml).
 //    kcal·탄단지는 기준량당 값 × 1개 양 ÷ 기준량. 라벨은 '1개(40g)' · '1회분(30g)' · '100g'.
 //  - food_code 는 식약처 상품 코드(P…), is_product = true 로 음식(D…) 자동 매칭과 나눈다.
-//  - 5,000건씩 파일을 나눠 쓰고, 같은 food_code 는 값만 갱신한다(다시 돌려도 된다).
+//  - 제조사가 '해당없음'·빈 값이면 수입업체, 그다음 유통업체를 maker 로 쓴다(중복 판단도 이 이름으로).
+//  - 파일당 5,000건(세 번째 인자로 바꿈)씩 나눠 쓰고, 같은 food_code 의 상품 행은 값만 갱신한다
+//    (다시 돌려도 된다. 음식 행은 덮어쓰지 않는다).
 //  - 테스트: node --test supabase/seed/load_processed_food_test.mjs
 import { createReadStream, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -30,6 +32,21 @@ export const WHOLE_PACKAGE_MAX = 500;
 export const WHOLE_PACKAGE_RATIO = 1.5;
 
 export const CHUNK_ROWS = 5000;
+
+/** CLI 세 번째 인자(파일당 행 수). 없으면 CHUNK_ROWS, 양의 정수가 아니면 오류 */
+export function chunkSizeArg(s) {
+  if (s === undefined || s === '') return CHUNK_ROWS;
+  if (!/^[0-9]+$/.test(String(s)) || Number(s) <= 0) throw new Error(`파일당 행 수는 양의 정수여야 해요: ${s}`);
+  return Number(s);
+}
+
+const real = (s) => {
+  const v = String(s ?? '').trim();
+  return v && v !== '해당없음' ? v : null;
+};
+
+/** 표시할 제조사: 제조사 → (해당없음·빈 값이면) 수입업체 → 유통업체, 모두 없으면 null */
+export const makerOf = (r) => real(r.mfr) ?? real(r.imp) ?? real(r.dist);
 
 const r1 = (x) => Math.floor(x * 10 + 0.5) / 10;
 const num = (s) => {
@@ -76,7 +93,7 @@ export function pickProducts(rows) {
   for (const r of rows) {
     if (!KEEP_LV3.has(r.lv3)) { skipped.category++; continue; }
     if (num(r.kcal) === null) { skipped.noKcal++; continue; }
-    const key = `${String(r.name).replace(/\s+/g, '')}\u0000${String(r.mfr ?? '').trim()}`;
+    const key = `${String(r.name).replace(/\s+/g, '')}\u0000${makerOf(r) ?? ''}`;
     const prev = best.get(key);
     if (prev) skipped.duplicate++;
     if (!prev || newer(r, prev)) best.set(key, r);
@@ -94,7 +111,7 @@ export function pickProducts(rows) {
       const u = unitOf(r);
       return {
         food_code: r.code, name_kr: String(r.name).trim(), category: (r.lv4 || '').trim() || r.lv3, serving_g: u.amount, kcal: u.kcal,
-        carb_g: u.carb, protein_g: u.prot, fat_g: u.fat, maker: String(r.mfr ?? '').trim() || null, unit_label: u.label,
+        carb_g: u.carb, protein_g: u.prot, fat_g: u.fat, maker: makerOf(r), unit_label: u.label,
       };
     });
   return { products, skipped };
@@ -120,7 +137,8 @@ export function chunkSql(products, size = CHUNK_ROWS) {
       `insert into food_db_cache (food_code, name_kr, category, serving_g, kcal, carb_g, protein_g, fat_g, is_product, maker, unit_label) values\n${values}\n` +
         `on conflict (food_code) do update set name_kr = excluded.name_kr, category = excluded.category, serving_g = excluded.serving_g,\n` +
         `  kcal = excluded.kcal, carb_g = excluded.carb_g, protein_g = excluded.protein_g, fat_g = excluded.fat_g,\n` +
-        `  is_product = excluded.is_product, maker = excluded.maker, unit_label = excluded.unit_label, updated_at = now();\n`,
+        `  is_product = excluded.is_product, maker = excluded.maker, unit_label = excluded.unit_label, updated_at = now()\n` +
+        `  where food_db_cache.is_product;\n`,
     );
   }
   return out;
@@ -134,15 +152,15 @@ async function readNdjson(path) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [path, outDir] = process.argv.slice(2);
+  const [path, outDir, rowsArg] = process.argv.slice(2);
   if (!path || !outDir) {
-    console.error('사용법: node supabase/seed/load_processed_food.mjs <processed.ndjson> <출력 폴더>');
+    console.error('사용법: node supabase/seed/load_processed_food.mjs <processed.ndjson> <출력 폴더> [파일당 행 수, 기본 5000]');
     process.exit(1);
   }
   const rows = await readNdjson(path);
   const { products, skipped } = pickProducts(rows);
   mkdirSync(outDir, { recursive: true });
-  const chunks = chunkSql(products);
+  const chunks = chunkSql(products, chunkSizeArg(rowsArg));
   chunks.forEach((sql, i) => writeFileSync(join(outDir, `processed_food_${String(i + 1).padStart(3, '0')}.sql`), sql));
   console.error(`읽은 행 ${rows.length} · 상품 ${products.length}건 · 파일 ${chunks.length}개 · 건너뜀 ${JSON.stringify(skipped)}`);
 }
