@@ -50,7 +50,7 @@ class MealItem {
   /// 선택된 후보 인덱스(이름과 kcal이 함께 바뀐다)
   final int cand;
 
-  /// 분량 배수(밥 0.5/1/1.5, 반찬 젓가락 수)
+  /// 먹은 양 배수(개수 항목 밖: 0.1인분 단위, 0.1~3.0)
   final double mult;
   final bool brothOff;
   final int count;

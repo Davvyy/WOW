@@ -12,6 +12,7 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
 import '../../state/past_meals.dart';
+import '../../services/api/meal_wire.dart' show maxPortionTenths, minPortionTenths, portionTenths;
 import '../../services/health/health_source.dart' show newUuidV4;
 import '../../services/share/meal_share.dart';
 import '../widgets/common.dart';
@@ -19,7 +20,7 @@ import '../widgets/meal_share_card.dart';
 import '../../state/session.dart';
 
 
-/// P7 식사 확인·편집. 후보 칩(이름과 kcal이 함께 바뀜) · 분량(반 공기/1공기/곱빼기) · 국물 −40% ·
+/// P7 식사 확인·편집. 후보 칩(이름과 kcal이 함께 바뀜) · 먹은 양(0.1인분 단위) · 국물 −40% ·
 /// 개수 스테퍼 · 먹은 것만 체크 · 실시간 합계. '확정'은 모의 상태를 갱신하고 P5가 엔진으로 다시 계산한다.
 class MealEditScreen extends ConsumerStatefulWidget {
   const MealEditScreen({super.key, required this.slot, this.mealKey, this.searchOnly = false, this.date});
@@ -563,12 +564,12 @@ class _ItemCard extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onRemove;
 
+  /// 1인분(밥은 1공기) 기준 분량. 먹은 양은 아래 스테퍼로 고른다.
   String _assume() {
     final it = item;
     switch (it.kind) {
       case ItemKind.rice:
-        final label = it.mult == 0.5 ? '반 공기' : (it.mult == 1.5 ? '곱빼기' : '1공기');
-        return '$label · 약 ${fmtInt((it.grams ?? 0) * it.mult)} g';
+        return '1공기 · 약 ${fmtInt(it.grams ?? 0)} g';
       case ItemKind.count:
         final unit = it.portion == '조각' ? '조각' : it.portion.replaceFirst(RegExp('^1'), '');
         return '${it.count}$unit${it.grams != null ? ' · 약 ${fmtInt(it.grams! * it.count)} g' : ''}';
@@ -666,20 +667,11 @@ class _ItemCard extends StatelessWidget {
                   ),
                 ]),
               ),
-              if (it.kind == ItemKind.rice)
-                ChSeg<double>(
-                  small: true,
-                  label: '분량',
-                  items: const [(0.5, '반 공기'), (1.0, '1공기'), (1.5, '곱빼기')],
-                  value: it.mult,
-                  onChanged: (v) => onChange((i) => i.copyWith(mult: v)),
-                ),
+              if (it.kind != ItemKind.count) _PortionStepper(item: it, onChange: onChange),
               if (it.kind == ItemKind.soup)
                 row('국물 안 먹음 (−40%)', ChSwitch(value: it.brothOff, onChanged: (v) => onChange((i) => i.copyWith(brothOff: v)), label: '국물 안 먹음')),
               if (it.kind == ItemKind.count)
                 row('개수', stepper('하나 빼기', '하나 더하기', '${it.count}', it.count > 1 ? () => onChange((i) => i.copyWith(count: i.count - 1)) : null, it.count < 9 ? () => onChange((i) => i.copyWith(count: i.count + 1)) : null)),
-              if (it.kind == ItemKind.side)
-                row('반찬 1젓가락 ≈ 10~15 g', stepper('덜 먹음', '더 먹음', it.mult == it.mult.roundToDouble() ? '${it.mult.round()}' : '${it.mult}', it.mult > 0.5 ? () => onChange((i) => i.copyWith(mult: i.mult - 0.5)) : null, it.mult < 3 ? () => onChange((i) => i.copyWith(mult: i.mult + 1 > 3 ? 3 : i.mult + 1)) : null)),
               if (it.confidence == Confidence.manual)
                 Align(alignment: Alignment.centerRight, child: ChLink('항목 삭제', trailing: false, onTap: onRemove)),
             ], gap: 10)),
@@ -687,6 +679,50 @@ class _ItemCard extends StatelessWidget {
         ),
       ], gap: 10)),
     );
+  }
+}
+
+/// 먹은 양(밥·국·반찬·기타 공통, D60): 0.1인분 단위 스테퍼(0.1~3.0) + ½·1·1.5·2 빠른 선택.
+/// 값은 0.1 단위 정수로 더하고 빼서 배수 = 정수 / 10 (부동소수 오차가 쌓이지 않게).
+class _PortionStepper extends StatelessWidget {
+  const _PortionStepper({required this.item, required this.onChange});
+  final MealItem item;
+  final void Function(MealItem Function(MealItem)) onChange;
+
+  static const _quick = [(5, '½'), (10, '1'), (15, '1.5'), (20, '2')];
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final tenths = portionTenths(item.mult);
+    final unit = item.kind == ItemKind.rice ? '공기' : '인분';
+    final text = '${(tenths / 10).toStringAsFixed(1)}$unit';
+    void set(int t) => onChange((i) => i.copyWith(mult: t.clamp(minPortionTenths, maxPortionTenths) / 10));
+    Widget btn(String tip, IconData icon, VoidCallback? onTap) => IconButton(
+          onPressed: onTap,
+          tooltip: tip,
+          icon: Icon(icon, size: 20),
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          padding: EdgeInsets.zero,
+        );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Expanded(child: Txt.cap('먹은 양 · 0.1$unit 단위', color: c.fg2)),
+        Container(
+          decoration: BoxDecoration(border: Border.all(color: c.borderStrong), borderRadius: BorderRadius.circular(999)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            btn('덜 먹음', Icons.remove_rounded, tenths > minPortionTenths ? () => set(tenths - 1) : null),
+            SizedBox(
+              width: 68,
+              child: Center(child: Semantics(liveRegion: true, label: '먹은 양 $text', excludeSemantics: true, child: Txt(text, size: 16, weight: FontWeight.w700))),
+            ),
+            btn('더 먹음', Icons.add_rounded, tenths < maxPortionTenths ? () => set(tenths + 1) : null),
+          ]),
+        ),
+      ]),
+      const SizedBox(height: 8),
+      ChSeg<int>(small: true, label: '먹은 양 빠른 선택', items: _quick, value: tenths, onChanged: set),
+    ]);
   }
 }
 

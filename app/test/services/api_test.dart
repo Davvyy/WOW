@@ -129,7 +129,7 @@ void main() {
 
     for (final m in [0.9, 1.2, 2.0]) {
       for (final it in [side(m), rice(m), soup(m)]) {
-        test('${it.kind.name} ${m}인분: 서버로 보내고 다시 열어도 같은 배수·kcal', () {
+        test('${it.kind.name} $m인분: 서버로 보내고 다시 열어도 같은 배수·kcal', () {
           final w = mealItemToWire(it);
           expect(w['portion_multiplier'], m);
           expect(w['count'], 1);
