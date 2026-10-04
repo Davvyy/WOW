@@ -120,7 +120,7 @@ $$;
 create index if not exists food_db_cache_product_nospace on food_db_cache (regexp_replace(name_kr, '\s+', '', 'g')) where is_product;
 
 create or replace function map_food_pick(p_candidates text[], p_product boolean) returns jsonb
-  language sql stable security definer set search_path = public, extensions as $$
+  language sql stable security definer set search_path = public, extensions set jit = off as $$
   with r as materialized (
     select * from (
       select m.*, c.ord, c.stripped, coalesce(c.brand is not null and m.maker ilike '%' || c.brand || '%', false) as brand_hit
@@ -160,6 +160,8 @@ create or replace function map_food_pick(p_candidates text[], p_product boolean)
 $$;
 revoke execute on function map_food_pick(text[], boolean) from public, anon, authenticated;
 grant execute on function map_food_pick(text[], boolean) to service_role;
+-- 집합 함수 행 수 추정(기본 1000)이 커서 계획 비용이 부풀면 JIT 컴파일(수백 ms)이 붙는다: 실제 크기에 맞춘다
+alter function food_match(text, boolean, boolean) rows 20;
 
 revoke execute on function product_pieces_for(uuid, text[]) from public, anon, authenticated;
 grant execute on function product_pieces_for(uuid, text[]) to service_role;
