@@ -15,16 +15,24 @@ alter table food_db_cache
 create index if not exists food_db_cache_dish_name_trgm on food_db_cache using gin (name_kr gin_trgm_ops) where not is_product;
 
 -- 한 종류(음식 또는 상품)의 이름 검색. 음식: 동의어 → pg_trgm 상위 10(전과 같음). 상품: pg_trgm 상위 20.
-create or replace function food_match(q text, p_product boolean)
+-- 상품의 이름 포함(ilike) 검색은 앱 검색(p_contains)에서만: 3글자 미만 낱말은 trgm 인덱스를 못 써 25만 행을 훑는다(약 0.2초).
+-- 매칭은 유사도(%)만 쓴다 — 포함만 하는 이름은 유사도가 낮아 자동 매칭·후보 칩에 거의 들지 않는다.
+create or replace function food_match(q text, p_product boolean, p_contains boolean default true)
 returns table (food_code text, name_kr text, kcal numeric, serving_g numeric, score real, is_product boolean, maker text, unit_label text)
   language plpgsql stable security definer set search_path = public, extensions as $$
 #variable_conflict use_column
 begin
-  if p_product then
+  if p_product and p_contains then
     return query
       select f.food_code, f.name_kr, f.kcal, f.serving_g, similarity(f.name_kr, q)::real, true, f.maker, f.unit_label
       from food_db_cache f
       where f.is_product and (f.name_kr % q or f.name_kr ilike '%' || q || '%')
+      order by 5 desc, 2, 1 limit 20;
+  elsif p_product then
+    return query
+      select f.food_code, f.name_kr, f.kcal, f.serving_g, similarity(f.name_kr, q)::real, true, f.maker, f.unit_label
+      from food_db_cache f
+      where f.is_product and f.name_kr % q
       order by 5 desc, 2, 1 limit 20;
   else
     return query
@@ -64,26 +72,22 @@ $$;
 -- 04 §4.2 매핑(한 종류): 후보 3개 → 동의어 → trgm. ≥0.45 자동 / 0.25~0.45 후보 칩 / <0.25 미매칭.
 -- 같은 점수면 브랜드가 제조사 이름에 든 상품, 그다음 후보 순서.
 create or replace function map_food_pick(p_candidates text[], p_product boolean) returns jsonb
-  language plpgsql stable security definer set search_path = public, extensions as $$
-declare v_best record; v_chips jsonb;
-begin
-  select x.food_code, x.name_kr, x.kcal, x.score into v_best from (
-    select r.*, c.ord, coalesce(c.brand is not null and r.maker ilike '%' || c.brand || '%', false) as brand_hit
-    from food_name_variants(p_candidates, p_product) c, lateral food_match(c.name, p_product) r) x
-  order by x.score desc, x.brand_hit desc, x.ord, x.food_code limit 1;
-  select coalesce(jsonb_agg(jsonb_build_object('food_code', z.food_code, 'name', z.name_kr, 'kcal', z.kcal, 'score', z.score,
-    'is_product', z.is_product)), '[]')
-  into v_chips from (
-    select distinct on (r.food_code) r.* from food_name_variants(p_candidates, p_product) c, lateral food_match(c.name, p_product) r
-    order by r.food_code, r.score desc) z;
-  return jsonb_build_object(
-    'match', case when v_best.score >= 0.45 then 'auto' when v_best.score >= 0.25 then 'chips' else 'none' end,
-    'food_code', case when v_best.score >= 0.45 then v_best.food_code end,
-    'kcal', case when v_best.score >= 0.45 then v_best.kcal end,
-    'score', v_best.score,
+  language sql stable security definer set search_path = public, extensions as $$
+  with r as materialized (
+    select m.*, c.ord, coalesce(c.brand is not null and m.maker ilike '%' || c.brand || '%', false) as brand_hit
+    from food_name_variants(p_candidates, p_product) c, lateral food_match(c.name, p_product, false) m),
+  best as (select * from r order by score desc, brand_hit desc, ord, food_code limit 1),
+  chips as (select distinct on (food_code) * from r order by food_code, score desc)
+  select jsonb_build_object(
+    'match', case when b.score >= 0.45 then 'auto' when b.score >= 0.25 then 'chips' else 'none' end,
+    'food_code', case when b.score >= 0.45 then b.food_code end,
+    'kcal', case when b.score >= 0.45 then b.kcal end,
+    'score', b.score,
     'is_product', p_product,
-    'chips', (select coalesce(jsonb_agg(e order by (e ->> 'score')::numeric desc), '[]') from jsonb_array_elements(v_chips) e));
-end $$;
+    'chips', (select coalesce(jsonb_agg(jsonb_build_object('food_code', z.food_code, 'name', z.name_kr, 'kcal', z.kcal, 'score', z.score,
+      'is_product', z.is_product) order by z.score desc, z.food_code), '[]') from chips z))
+  from (select 1) one left join best b on true
+$$;
 
 -- AI 항목 매핑(analyze-meal). 포장 상품(p_packaged)은 상품 먼저, 상품이 자동 매칭이 아니면 음식 자동 매칭 → 상품 후보 칩 → 음식 순.
 -- 포장 상품이 아니면 음식만(전과 같음).
@@ -126,8 +130,8 @@ returns table (name text, food_code text, kcal numeric, last_used timestamptz, i
   limit greatest(1, least(coalesce(p_limit, 20), 50))
 $$;
 
-revoke execute on function food_match(text, boolean), food_name_variants(text[], boolean), map_food_pick(text[], boolean)
+revoke execute on function food_match(text, boolean, boolean), food_name_variants(text[], boolean), map_food_pick(text[], boolean)
   from public, anon, authenticated;
-grant execute on function food_match(text, boolean), food_name_variants(text[], boolean), map_food_pick(text[], boolean) to service_role;
+grant execute on function food_match(text, boolean, boolean), food_name_variants(text[], boolean), map_food_pick(text[], boolean) to service_role;
 revoke execute on function food_search(text), map_food_candidates(text[], boolean), recent_foods(int) from public, anon;
 grant execute on function food_search(text), map_food_candidates(text[], boolean), recent_foods(int) to authenticated, service_role;
