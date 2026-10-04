@@ -210,3 +210,45 @@ Deno.test('스키마: 포장 상품 이름의 용량·중량은 떼어 내고, k
   assertThrows(() => parseMealAnalysis(item(['밥 300kcal'])), SchemaError);
   assertThrows(() => parseMealAnalysis(item(['밥 300 칼로리'])), SchemaError);
 });
+
+// '몇 개입'(D64): 끼니 주인이 개입 수를 넣은 상품이면 1개 kcal(piece_kcal) × servings, 없으면 그대로
+const CHIC = 'P101-103000100-5334';
+const chicItem = (servings: number, packaged = true) => ({
+  is_food: true,
+  items: [
+    { name_candidates: ['롯데 칙촉', '칙촉'], count: 1, servings, has_broth: false, confidence: 'high', packaged },
+    { name_candidates: ['흰쌀밥'], count: 1, servings: 1, has_broth: false, confidence: 'high', packaged: false },
+  ],
+});
+
+Deno.test('개입 수가 있는 포장 상품: 1개 kcal × servings', async () => {
+  const asked: string[][] = [];
+  const d: AnalyzeDeps = {
+    ...productDeps(new MockAdapter(chicItem(3)), []),
+    productPieces: (codes) => {
+      asked.push(codes);
+      return Promise.resolve({ [CHIC]: { pieces: 24, piece_g: 7.5, piece_kcal: 37.6 } });
+    },
+  };
+  const out = await analyzeMeal('m1', d);
+  if (out.status !== 'draft') throw new Error('expected draft');
+  const [chic, rice] = out.items;
+  assertEquals([chic.food_code, chic.serving_kcal, chic.portion_multiplier, chic.ai_kcal], [CHIC, 37.6, 3, 112.8]);
+  assertEquals(chic.candidate_kcal, [37.6], '후보 칩 kcal 도 1개 단위');
+  assertEquals([rice.food_code, rice.serving_kcal, rice.ai_kcal], ['D000001', 310, 310], '음식 항목은 그대로');
+  assertEquals(out.ai_kcal, 422.8);
+  assertEquals(asked, [[CHIC]], '포장 상품 항목의 코드만 한 번에 묻는다');
+});
+
+Deno.test('개입 수가 없으면 1회분 그대로, 포장 상품이 없으면 묻지 않는다', async () => {
+  let calls = 0;
+  const pieces = () => { calls++; return Promise.resolve({}); };
+  const out = await analyzeMeal('m1', { ...productDeps(new MockAdapter(chicItem(2)), []), productPieces: pieces });
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals([out.items[0].serving_kcal, out.items[0].ai_kcal, out.ai_kcal], [150.3, 300.6, 610.6]);
+  assertEquals(calls, 1);
+  const dish = await analyzeMeal('m1', { ...productDeps(new MockAdapter(chicItem(2, false)), []), productPieces: pieces });
+  if (dish.status !== 'draft') throw new Error('expected draft');
+  assertEquals(dish.items[0].food_code, null, '포장 상품이 아니면 상품 매칭 없음');
+  assertEquals(calls, 1, '포장 상품 코드가 없으면 조회하지 않음');
+});

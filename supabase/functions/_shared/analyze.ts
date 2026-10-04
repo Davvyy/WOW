@@ -12,6 +12,13 @@ export interface FoodMatch {
   chips: { food_code: string; name: string; kcal: number; score: number }[];
 }
 
+/** 상품 1개(낱개) 단위: 포장 크기 ÷ 개입 수, kcal 은 소수 1자리(서버 product_piece_kcal) */
+export interface ProductPieces {
+  pieces: number;
+  piece_g: number;
+  piece_kcal: number;
+}
+
 export interface DraftItem {
   name_candidates: string[];
   chosen_name: string;
@@ -35,6 +42,8 @@ export interface AnalyzeDeps {
   loadImage(mealId: string): Promise<MealImage>;
   /** 후보 이름 → 식약처 DB. packaged(포장 상품)면 상품 행 먼저, 아니면 음식 행만(D63) */
   mapFood(candidates: string[], packaged?: boolean): Promise<FoodMatch>;
+  /** 끼니 주인이 '몇 개입'을 넣은 상품 코드 → 1개 양·kcal(D64). 없으면 1회분 그대로 */
+  productPieces?(codes: string[]): Promise<Record<string, ProductPieces>>;
   saveDraft(mealId: string, r: { status: 'draft' | 'failed'; engine: string; ai_kcal: number | null; items: DraftItem[]; reason?: string }): Promise<void>;
   notify(mealId: string, kind: 'done' | 'failed'): Promise<void>;
   unmatchedKcal?: number; // 미매칭 임시값(분류 중앙값 [제안]), 기본 200
@@ -72,7 +81,7 @@ export async function callWithRetry(adapter: MealVisionAdapter, image: MealImage
   return { error: lastErr, schema: schemaErr, attempts };
 }
 
-export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<AnalyzeDeps, 'mapFood' | 'unmatchedKcal'>): Promise<DraftItem[]> {
+export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<AnalyzeDeps, 'mapFood' | 'unmatchedKcal' | 'productPieces'>): Promise<DraftItem[]> {
   const out: DraftItem[] = [];
   for (const it of analysis.items) {
     const m = await deps.mapFood(it.name_candidates as string[], it.packaged);
@@ -126,7 +135,29 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
       ai_kcal: round1(serving * mult * it.count),
     });
   }
+  await applyProductPieces(analysis, out, deps);
   return out;
+}
+
+/** 포장 상품 항목이 개입 수를 넣은 상품이면 그 후보의 kcal 을 1개 kcal 로(servings = 본 낱개 수). 음식 항목은 그대로 */
+async function applyProductPieces(analysis: MealAnalysis, items: DraftItem[], deps: Pick<AnalyzeDeps, 'productPieces'>) {
+  if (!deps.productPieces) return;
+  const codes = [...new Set(items.flatMap((d, i) => (analysis.items[i].packaged ? d.candidate_food_codes : []))
+    .filter((c): c is string => !!c))];
+  if (codes.length === 0) return;
+  const pieces = await deps.productPieces(codes);
+  items.forEach((d, i) => {
+    if (!analysis.items[i].packaged) return;
+    d.candidate_food_codes.forEach((c, j) => {
+      const p = c ? pieces[c] : undefined;
+      if (!p) return;
+      d.candidate_kcal[j] = p.piece_kcal;
+      if (j === 0) {
+        d.serving_kcal = p.piece_kcal;
+        d.ai_kcal = round1(p.piece_kcal * d.portion_multiplier * d.count);
+      }
+    });
+  });
 }
 
 export async function analyzeMeal(mealId: string, deps: AnalyzeDeps): Promise<AnalyzeOutcome> {

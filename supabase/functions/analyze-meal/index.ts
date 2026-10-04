@@ -1,7 +1,7 @@
 // POST /functions/v1/analyze-meal {meal_id}
 // POST F:/meals 가 끼니(captured, engine=gemini)를 만든 뒤 호출한다(overseas_ai 동의자만).
 // service_role 전용: Authorization 에 service_role 키 또는 x-internal-secret(INTERNAL_SECRET).
-import { analyzeMeal, type AnalyzeDeps, type FoodMatch } from '../_shared/analyze.ts';
+import { analyzeMeal, type AnalyzeDeps, type FoodMatch, type ProductPieces } from '../_shared/analyze.ts';
 import { selectAdapter } from '../_shared/ai/select.ts';
 import { handle, HttpError, json } from '../_shared/http.ts';
 import { selectPushSender, sendNow } from '../_shared/push.ts';
@@ -38,6 +38,16 @@ Deno.serve((req) =>
         const { data, error } = await db.rpc('map_food_candidates', { p_candidates: candidates, p_packaged: packaged });
         if (error) throw error;
         return data as FoodMatch;
+      },
+      async productPieces(codes) {
+        // 끼니 주인이 '몇 개입'을 넣은 상품이면 1개 kcal 로 초안을 만든다(D64)
+        const { data, error } = await db.rpc('product_pieces_for', { p_user: part.user_id, p_codes: codes });
+        if (error) throw error;
+        const out: Record<string, ProductPieces> = {};
+        for (const r of (data ?? []) as (ProductPieces & { food_code: string })[]) {
+          out[r.food_code] = { pieces: r.pieces, piece_g: Number(r.piece_g), piece_kcal: Number(r.piece_kcal) };
+        }
+        return out;
       },
       async saveDraft(id, r) {
         if (r.items.length) {
