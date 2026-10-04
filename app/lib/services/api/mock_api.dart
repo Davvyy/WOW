@@ -243,6 +243,10 @@ class MockChalloryApi implements ChalloryApi {
     return CreatedMeal(mealId: id, slot: tagged, localDate: '${now.year}-${now.month}-${now.day}', analyze: true);
   }
 
+  /// 분석 초안 항목(테스트용). 넣으면 슬롯 예시 항목 대신 이 항목으로 초안을 만든다(AI 합계는 항목 AI kcal 합).
+  /// 포장 상품·낱개 포장 표시(aiSinglePiece = 서버 ai_single_piece, D67) 초안을 흉내 낼 때 쓴다.
+  List<ServerMealItem>? draftItems;
+
   @override
   Future<ServerMeal?> fetchMeal(String mealId) async {
     calls.add('fetchMeal');
@@ -250,6 +254,11 @@ class MockChalloryApi implements ChalloryApi {
     if (m == null) return null;
     if (_clock().difference(m.createdAt) < analysisDelay) {
       return ServerMeal(id: mealId, status: MealStatus.captured, version: m.version);
+    }
+    final custom = draftItems;
+    if (custom != null) {
+      return ServerMeal(id: mealId, status: MealStatus.draft, version: m.version,
+          aiKcal: round1(custom.fold<double>(0, (a, i) => a + i.aiKcal)), items: List.of(custom));
     }
     final items = mockDraftItems(m.slot);
     return ServerMeal(
@@ -261,7 +270,7 @@ class MockChalloryApi implements ChalloryApi {
         for (final it in items)
           ServerMealItem(candidates: it.candidates, candidateKcal: [for (final k in it.candKcal) k.toDouble()],
               candidateFoodCodes: List.filled(it.candidates.length, null), count: it.count, portionMultiplier: it.mult,
-              hasBroth: false, needsCheck: false, aiKcal: it.rawKcal),
+              hasBroth: false, needsCheck: false, aiKcal: it.rawKcal, aiSinglePiece: it.aiSinglePiece),
       ],
     );
   }

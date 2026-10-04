@@ -44,6 +44,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   late double _aiTotal;
   late MealRecord _origin;
 
+  /// '몇 개입' 안내(D67)를 닫았거나 개입 수 창에서 저장·되돌린 항목 id. 이 화면에서만 기억한다.
+  final _piecesPromptOff = <String>{};
+
   /// 이 화면이 다루는 끼니의 키(새 기록이면 확정할 때 이 키로 더해진다)
   late String _key;
 
@@ -188,6 +191,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   }
 
   /// 상품 항목의 '몇 개입'(D64): 개입 수를 저장하면 그 항목을 1개(약 7.5g) 단위로, 되돌리면 1회분 단위로. 먹은 양은 1부터 다시.
+  /// 단위 정정은 AI 대비 하향 수정이 아니므로(D67) 이 항목의 AI 초안 몫도 같은 단위(1단위 kcal × AI 양)로 다시 계산한다.
+  /// 서버는 확정 때 같은 식으로 맞춘다(rebase_ai_kcal_for_pieces).
   Future<void> _editPieces(int index) async {
     final it = _items[index];
     final p = it.product;
@@ -208,7 +213,18 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       return;
     }
     if (!mounted) return;
-    _update(index, (i) => i.withPieces(pieces));
+    setState(() {
+      _piecesPromptOff.add(it.id);
+      final cur = _items[index];
+      var next = cur.withPieces(pieces);
+      final unit = next.product?.unitKcal, oldAi = cur.aiKcal, units = cur.aiUnits;
+      if (unit != null && oldAi != null && units != null && _aiTotal > 0) {
+        final ai = round1(unit * units);
+        _aiTotal = round1(_aiTotal - oldAi + ai);
+        next = next.copyWith(aiKcal: ai);
+      }
+      _items = [for (var i = 0; i < _items.length; i++) i == index ? next : _items[i]];
+    });
   }
 
   Future<void> _manualEntry() async {
@@ -398,6 +414,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final check = _items.where((i) => i.confidence == Confidence.check).length;
     final unchecked = _items.where((i) => !i.checked).length;
     final searchMode = (widget.searchOnly || _searchFallback) && _items.isEmpty;
+    // '몇 개입' 안내는 확정 전 끼니에서만(확정하면 낱개 표시는 남지 않는다)
+    final piecesPrompts = canEdit && _origin.status != MealStatus.confirmed && _origin.status != MealStatus.corrected;
 
     // 사진이 있으면 잘리지 않게 제 비율(세로 4:5 ~ 가로 16:9)로, 없으면 150 높이 띠
     Widget photoBox() => Container(
@@ -507,7 +525,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           IgnorePointer(
             ignoring: !canEdit,
             child: _ItemCard(item: _items[i], onChange: (f) => _update(i, f), onSearch: () => _openSearch(replaceIndex: i), onRemove: () => setState(() => _items = [..._items]..removeAt(i)),
-                onPieces: () => _editPieces(i)),
+                onPieces: () => _editPieces(i),
+                prompt: piecesPrompts && !_piecesPromptOff.contains(_items[i].id) ? _items[i].piecesPrompt : PiecesPrompt.none,
+                onDismissPrompt: () => setState(() => _piecesPromptOff.add(_items[i].id))),
           ),
         if (canEdit) ...[
           ChButton('항목 추가 — 검색 · 최근 음식 · 직접 입력', kind: BtnKind.secondary, icon: Icons.add_rounded, onPressed: _openSearch),
@@ -642,11 +662,16 @@ class _Tag extends StatelessWidget {
 }
 
 class _ItemCard extends StatelessWidget {
-  const _ItemCard({required this.item, required this.onChange, required this.onSearch, required this.onRemove, required this.onPieces});
+  const _ItemCard({required this.item, required this.onChange, required this.onSearch, required this.onRemove, required this.onPieces,
+      this.prompt = PiecesPrompt.none, this.onDismissPrompt});
   final MealItem item;
 
   /// 상품 항목의 '낱개로 계산'(몇 개입) 창을 연다
   final VoidCallback onPieces;
+
+  /// '몇 개입' 안내(D67): 낱개 포장 한 개로 보이면 배너, 1회분 단위면 조용한 한 줄. 배너는 닫을 수 있다.
+  final PiecesPrompt prompt;
+  final VoidCallback? onDismissPrompt;
   final void Function(MealItem Function(MealItem)) onChange;
   final VoidCallback onSearch;
   final VoidCallback onRemove;
@@ -716,6 +741,18 @@ class _ItemCard extends StatelessWidget {
           ),
           Padding(padding: const EdgeInsets.only(top: 10), child: NumText(fmtInt(it.rawKcal), size: 21, weight: FontWeight.w700, color: off ? c.fg2 : c.fg, unit: 'kcal')),
         ]),
+        // AI 가 낱개 포장 하나로 본 상품: 1회분으로 잡혀 크게 잡히지 않게 몇 개입인지 먼저 묻는다(D67)
+        if (prompt == PiecesPrompt.banner && !off)
+          InfoBanner(
+            tone: Tone.brand,
+            icon: Icons.inventory_2_rounded,
+            onClose: onDismissPrompt,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              boldThen(context, '낱개 포장 한 개로 보여요.', ' 상자에 몇 개 들어 있는지 넣으면 한 개 기준으로 계산해요.'),
+              const SizedBox(height: 8),
+              ChButton('몇 개입인지 넣기', small: true, expand: false, onPressed: onPieces),
+            ]),
+          ),
         Opacity(
           opacity: off ? 0.5 : 1,
           child: IgnorePointer(
@@ -766,7 +803,11 @@ class _ItemCard extends StatelessWidget {
               if (it.kind != ItemKind.count) _PortionStepper(item: it, onChange: onChange),
               // 포장 크기를 아는 상품만: '몇 개입'으로 1개 단위 계산(D64)
               if (it.product case final p? when p.canSplit)
-                Align(alignment: Alignment.centerRight, child: ChLink(p.pieces == null ? '낱개로 계산' : '낱개 ${p.pieces}개 기준 · 바꾸기', trailing: false, onTap: onPieces)),
+                Row(children: [
+                  // 1회분 단위이고 개입 수를 넣은 적이 없으면 같은 줄에 조용한 안내(D67)
+                  Expanded(child: prompt == PiecesPrompt.hint ? Txt.cap('낱개 포장이면 몇 개입인지 넣어 주세요', color: c.fg2) : const SizedBox.shrink()),
+                  ChLink(p.pieces == null ? '낱개로 계산' : '낱개 ${p.pieces}개 기준 · 바꾸기', trailing: false, onTap: onPieces),
+                ]),
               if (it.kind == ItemKind.soup)
                 row('국물 안 먹음 (−40%)', ChSwitch(value: it.brothOff, onChanged: (v) => onChange((i) => i.copyWith(brothOff: v)), label: '국물 안 먹음')),
               if (it.kind == ItemKind.count)

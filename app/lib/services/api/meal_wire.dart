@@ -41,7 +41,7 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
   // 상품 단위 정보: 저장된 1단위 kcal 이 낱개(몇 개입의 1개) kcal 이면 그 단위로 연다(D64)
   final serving = s.chosen < s.candidateKcal.length ? s.candidateKcal[s.chosen] : 0;
   final base = product != null && s.unitKcal != null && s.servingG != null
-      ? ProductUnit(unitLabel: product, kcal: s.unitKcal!, servingG: s.servingG!, packageG: s.packageG)
+      ? ProductUnit(unitLabel: product, kcal: s.unitKcal!, servingG: s.servingG!, packageG: s.packageG, savedPieces: s.pieces)
       : null;
   final unit = base?.withPieces(base.piecesOf(serving, saved: s.pieces));
   final split = unit?.pieces != null;
@@ -75,6 +75,10 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
     cand: s.chosen,
     checked: s.eaten,
     brothOff: kind == ItemKind.soup && s.brothOff,
+    aiSinglePiece: s.aiSinglePiece,
+    // AI 초안 몫과 그때의 양: '몇 개입'으로 단위를 바꾸면 같은 단위로 다시 계산한다(확정한 항목은 AI kcal 이 없어 null)
+    aiKcal: s.aiKcal > 0 ? s.aiKcal : null,
+    aiUnits: s.aiKcal > 0 ? s.count * s.portionMultiplier : null,
   );
 }
 

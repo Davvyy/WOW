@@ -31,9 +31,29 @@ class MealItem {
     this.fromSearch = false,
     this.unitLabels = const [],
     this.products = const [],
+    this.aiSinglePiece = false,
+    this.aiKcal,
+    this.aiUnits,
   });
 
   final String id;
+
+  /// AI 가 이 포장 상품을 여러 개입 상자의 낱개 포장 하나로 봤는지(서버 meal_items.ai_single_piece, D67) → '몇 개입' 배너
+  final bool aiSinglePiece;
+
+  /// 이 항목의 AI 초안 kcal(끼니 AI 합계 중 이 항목 몫)과 그때의 양(AI 개수 × 배수). 서버 AI 초안 항목만, 그 밖은 null.
+  /// '몇 개입'으로 단위를 바꾸면 이 몫을 같은 단위로 다시 계산한다(단위 정정은 AI 대비 하향 수정이 아니다).
+  final double? aiKcal;
+  final double? aiUnits;
+
+  /// '몇 개입' 안내(D67): 포장 크기를 아는 상품을 1회분·기준량 단위(포장 전체 1개가 아님)로 계산 중이고 개입 수를 넣은 적이 없을 때.
+  /// AI 가 낱개 포장 하나로 봤으면 배너, 아니면 1회분 단위일 때만 조용한 한 줄. 음식 항목은 없음.
+  PiecesPrompt get piecesPrompt {
+    final p = product;
+    if (p == null || !p.canSplit || p.pieces != null || p.savedPieces != null || p.unitLabel.startsWith('1개')) return PiecesPrompt.none;
+    if (aiSinglePiece) return PiecesPrompt.banner;
+    return p.unitLabel.startsWith('1회분') ? PiecesPrompt.hint : PiecesPrompt.none;
+  }
 
   /// 후보별 식약처 food_code(서버 초안·검색 결과). 없으면 serving kcal 만 보낸다.
   final List<String?> foodCodes;
@@ -99,7 +119,7 @@ class MealItem {
   double get kcal => checked ? rawKcal : 0;
 
   MealItem copyWith({bool? checked, int? cand, double? mult, bool? brothOff, int? count, List<num>? candKcal, List<String?>? unitLabels,
-          List<ProductUnit?>? products, ItemKind? kind}) =>
+          List<ProductUnit?>? products, ItemKind? kind, double? aiKcal}) =>
       MealItem(
         id: id,
         candidates: candidates,
@@ -118,8 +138,14 @@ class MealItem {
         fromSearch: fromSearch,
         unitLabels: unitLabels ?? this.unitLabels,
         products: products ?? this.products,
+        aiSinglePiece: aiSinglePiece,
+        aiKcal: aiKcal ?? this.aiKcal,
+        aiUnits: aiUnits,
       );
 }
+
+/// P7 항목의 '몇 개입' 안내([MealItem.piecesPrompt])
+enum PiecesPrompt { none, banner, hint }
 
 /// 오늘의 끼니 1건. status 는 05 meals.status 와 같은 [MealStatus].
 /// captured 는 "분석 중"(noAnalysis=false) 또는 "분석 없이 저장"(noAnalysis=true).
@@ -500,12 +526,15 @@ String pieceLabel(num packageG, int pieces, {String unit = 'g'}) {
 /// [kcal]·[servingG] 는 1회분(또는 1개) 값, [packageG] 는 포장 전체 양(모르면 낱개로 나눌 수 없다),
 /// [pieces] 는 지금 낱개로 계산 중이면 개입 수(1회분 단위면 null).
 class ProductUnit {
-  const ProductUnit({required this.unitLabel, required this.kcal, required this.servingG, this.packageG, this.pieces});
+  const ProductUnit({required this.unitLabel, required this.kcal, required this.servingG, this.packageG, this.pieces, this.savedPieces});
   final String unitLabel;
   final num kcal;
   final num servingG;
   final num? packageG;
   final int? pieces;
+
+  /// 내가 이 상품에 넣어 둔 개입 수(서버 user_product_pieces). 이 항목이 1회분 단위여도 있으면 '몇 개입'을 다시 묻지 않는다.
+  final int? savedPieces;
 
   /// 포장 크기를 알아 낱개로 나눌 수 있는지
   bool get canSplit => (packageG ?? 0) > 0 && servingG > 0;
@@ -521,7 +550,7 @@ class ProductUnit {
   /// 이 단위 1개의 kcal
   num get unitKcal => _split ? pieceKcal(kcal, servingG, packageG!, pieces!) : kcal;
 
-  ProductUnit withPieces(int? p) => ProductUnit(unitLabel: unitLabel, kcal: kcal, servingG: servingG, packageG: packageG, pieces: p);
+  ProductUnit withPieces(int? p) => ProductUnit(unitLabel: unitLabel, kcal: kcal, servingG: servingG, packageG: packageG, pieces: p, savedPieces: savedPieces);
 
   /// 서버에 저장된 1단위 kcal([serving])이 몇 개입의 1개인지. 내 개입 수([saved])의 1개 kcal 과 같으면 그 수,
   /// 1회분 kcal 이면 null, 그 밖이면 kcal 로 되짚은 개입 수(예전 개입 수로 만든 초안). 맞는 수가 없으면 null.
