@@ -118,6 +118,7 @@ class IntakeResult {
     required this.pendingSlots,
     required this.skipsToday,
     required this.skipOver,
+    this.substituteValues = const {},
   });
   final double iD;
   final double mP;
@@ -128,6 +129,23 @@ class IntakeResult {
   final List<MealSlot> pendingSlots;
   final int skipsToday;
   final bool skipOver;
+
+  /// 대체값을 더한 칸(빈 칸·분석 중 칸·한도 초과 건너뜀) → 쓴 값 max(M_p, 전날 같은 칸 kcal)(D61)
+  final Map<MealSlot, double> substituteValues;
+
+  /// [slot] 에 쓰는 대체값. 대체값이 없던 칸이면 M_p.
+  double substituteFor(MealSlot slot) => substituteValues[slot] ?? mP;
+}
+
+/// 전날 장부 끼니 → 칸별 등록 kcal(확정·자동·정정만, 간식 칸 제외). 다음 날 대체값의 입력(D61).
+Map<MealSlot, double> prevSlotKcal(Iterable<MealInput> meals) {
+  final out = <MealSlot, double>{};
+  for (final m in meals) {
+    if (m.slot == MealSlot.snack) continue;
+    if (m.status != MealStatus.confirmed && m.status != MealStatus.auto && m.status != MealStatus.corrected) continue;
+    out[m.slot] = (out[m.slot] ?? 0) + m.kcal;
+  }
+  return out;
 }
 
 class ScoreResult {
@@ -161,6 +179,7 @@ class SimulateInput {
     this.floors = 0,
     this.meals = const [],
     this.skipsUsedThisWeek = 0,
+    this.prevSlots = const {},
   }) : assert(profile != null || (bmr != null && weightKg != null));
   final Profile? profile;
 
@@ -172,6 +191,9 @@ class SimulateInput {
   final int floors;
   final List<MealInput> meals;
   final int skipsUsedThisWeek;
+
+  /// 전날 칸별 등록 kcal([prevSlotKcal]). 비우면 대체값은 M_p.
+  final Map<MealSlot, double> prevSlots;
 }
 
 class ChalloryEngine {
@@ -252,7 +274,8 @@ class ChalloryEngine {
   static bool _isConfirmed(MealStatus s) => s == MealStatus.confirmed || s == MealStatus.auto || s == MealStatus.corrected;
 
   /// I_d. [provisional]=true면 draft 끼니를 max(M, 1.3×AI)로 잠정 산입(확정 배치의 자동 확정값과 같음).
-  IntakeResult intake({required int bmr, required List<MealInput> meals, int skipsUsedThisWeek = 0}) {
+  /// [prevSlots] 는 전날 칸별 등록 kcal: 빈 칸·분석 중 칸·한도 초과 건너뜀의 대체값은 max(M_p, 전날 같은 칸)(D61).
+  IntakeResult intake({required int bmr, required List<MealInput> meals, int skipsUsedThisWeek = 0, Map<MealSlot, double> prevSlots = const {}}) {
     final mP = m(bmr);
     var i = 0.0;
     var mainCount = 0;
@@ -262,6 +285,7 @@ class ChalloryEngine {
     final substituted = <MealSlot>[];
     final drafts = <DraftSlot>[];
     final pending = <MealSlot>[];
+    final subValues = <MealSlot, double>{};
 
     for (final slot in mainSlots) {
       final inSlot = meals.where((x) => x.slot == slot).toList();
@@ -290,18 +314,21 @@ class ChalloryEngine {
         }
       }
       if (satisfied) continue;
+      final sub = math.max(mP, prevSlots[slot] ?? 0);
       if (hasSkip) {
         // 건너뜀 한도: 1일 1회 · 주 3회, 초과분은 대체값
         if (skipsToday < rules.skipPerDay && skipsUsedThisWeek + skipsToday < rules.skipPerWeek) {
           skipsToday++;
           continue;
         }
-        i += mP;
+        i += sub;
+        subValues[slot] = sub;
         substituted.add(slot);
         skipOver = true;
         continue;
       }
-      i += mP;
+      i += sub;
+      subValues[slot] = sub;
       if (hasPending) {
         pending.add(slot);
       } else {
@@ -322,6 +349,7 @@ class ChalloryEngine {
       pendingSlots: pending,
       skipsToday: skipsToday,
       skipOver: skipOver,
+      substituteValues: subValues,
     );
   }
 
@@ -343,7 +371,7 @@ class ChalloryEngine {
     final BmrResult b = input.profile != null ? bmr(input.profile!) : BmrResult(double.nan, input.bmr!);
     final weight = input.profile?.weightKg ?? input.weightKg!;
     final act = activity(weightKg: weight, stepsTotal: input.stepsTotal, sessions: input.sessions, floors: input.floors);
-    final inn = intake(bmr: b.bmr, meals: input.meals, skipsUsedThisWeek: input.skipsUsedThisWeek);
+    final inn = intake(bmr: b.bmr, meals: input.meals, skipsUsedThisWeek: input.skipsUsedThisWeek, prevSlots: input.prevSlots);
     final sc = score(bmr: b.bmr, aD: act.aD, iD: inn.iD, mainMealCount: inn.mainMealCount);
     return SimulateResult(bmr: b.bmr, bmrRaw: input.profile != null ? b.raw : null, activity: act, intake: inn, score: sc);
   }
