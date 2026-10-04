@@ -52,7 +52,7 @@ SimulateInput simulateInputFromJson(Map<String, dynamic> j) {
     // 전날 칸별 등록 kcal(D61). 서버 입력과 같은 {"lunch": 900} 형식, 모르는 칸 이름은 버린다.
     prevSlots: {
       for (final e in (j['prev_slots'] as Map? ?? const {}).entries)
-        if (MealSlot.values.asNameMap()[e.key] case final slot?) slot: (e.value as num).toDouble(),
+        ?MealSlot.values.asNameMap()[e.key]: (e.value as num).toDouble(),
     },
   );
 }
