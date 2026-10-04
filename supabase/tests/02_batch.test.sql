@@ -182,7 +182,10 @@ begin
   perform tests.ok(not (r ->> 'over_limit')::boolean, '첫 건너뜀 허용');
   r := skip_meal(uid, ji, '2026-10-13', 'lunch');
   perform tests.ok((r ->> 'over_limit')::boolean, '같은 날 두 번째 건너뜀 → 초과');
-  perform tests.eq((select s_d from daily_scores where participant_id = ji and local_date = '2026-10-13'), 120.3::numeric(5,1), '건너뜀 초과 골든 120.3');
+  -- 골든 SKIP(전날 없음)은 120.3. 여기서는 전날(10.12) 점심 780 > M_p 742.5 라 한도 초과 점심 대체값이 780(D61) → 37.5 kcal 더 먹은 셈
+  perform tests.eq((select (breakdown #>> '{intake,substitute_values,lunch}')::numeric from daily_scores where participant_id = ji and local_date = '2026-10-13'),
+    780::numeric, '건너뜀 초과 점심 = 전날 점심 780');
+  perform tests.eq((select s_d from daily_scores where participant_id = ji and local_date = '2026-10-13'), 112.8::numeric(5,1), '건너뜀 초과 골든 120.3 − 37.5/500×100 = 112.8');
   -- 09:00 확정: 초안 → max(M, 1.3×AI) 자동 확정, skip_abuse 플래그
   update meals set status = 'draft', ai_kcal = 850, confirmed_kcal = null where participant_id = ji and local_date = '2026-10-13' and slot = 'dinner';
   perform run_finalize('2026-10-14 09:00+09');
