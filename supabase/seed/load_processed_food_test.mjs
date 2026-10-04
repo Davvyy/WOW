@@ -9,7 +9,7 @@ const row = (o) => ({
   date: '2024-12-31', ...o,
 });
 
-test('1개 규칙: 큰 포장은 1회분, 1회분의 1.5배 이하 포장은 통째', () => {
+test('1개 규칙: 큰 포장은 1회분, 1회분의 2배 이하 포장은 통째', () => {
   // 칙촉 180g, 1회분 30g, 501/100g → 1회분 30g = 150.3 kcal
   assert.deepEqual(unitOf(row({})), { amount: 30, label: '1회분(30g)', kcal: 150.3, carb: 18.3, prot: 2, fat: 7.7 });
   // 칙촉 브라우니 40g(1회분 30g) → 1개 40g = 190 kcal
@@ -129,4 +129,10 @@ test('upsert 는 package_g 도 넣고 갱신한다(다시 돌리면 포장 양�
   assert.match(sql, /do update set [\s\S]*package_g = excluded\.package_g[\s\S]*where food_db_cache\.is_product;\s*$/);
   const none = chunkSql(pickProducts([row({ size: '' })]).products)[0];
   assert.match(none, /'1회분\(30g\)', null\)/);
+});
+
+test('1개 규칙: 포장이 1회분의 2배 이하면 통째(46g/30g → 1개), 넘으면 1회분(61g/30g)', () => {
+  assert.deepEqual(pick(unitOf(row({ name: '홈런볼딸기', kcal: '543', serv: '30g', size: '46g' }))), [46, '1개(46g)', 249.8]);
+  assert.deepEqual(pick(unitOf(row({ name: '홈런볼', kcal: '543', serv: '30g', size: '60g' }))), [60, '1개(60g)', 325.8]);
+  assert.deepEqual(pick(unitOf(row({ name: '홈런볼', kcal: '543', serv: '30g', size: '61g' }))), [30, '1회분(30g)', 162.9]);
 });
