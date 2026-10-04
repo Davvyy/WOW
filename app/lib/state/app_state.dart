@@ -530,10 +530,10 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     }
   }
 
-  /// 건너뜀: 기록이 하나도 없는 끼니 슬롯에만 건너뜀 끼니를 더한다. 간식은 건너뛸 수 없다.
+  /// 건너뜀: 끼니를 채운 기록이 없는 슬롯(비었거나 간식 수준 기록뿐)에 건너뜀 끼니를 더한다. 간식은 건너뛸 수 없다.
   Future<String?> skip(MealSlot slot) async {
     if (slot == MealSlot.snack) return '간식은 건너뛸 수 없어요';
-    if (inSlot(slot).isNotEmpty) return '이미 기록이 있는 끼니는 건너뛸 수 없어요';
+    if (!canSkipSlot(state, slot, snackKcal: engine.rules.snackKcal)) return '이미 기록이 있는 끼니는 건너뛸 수 없어요';
     final rec = MealRecord(slot: slot, status: MealStatus.skipped, localKey: _newKey());
     _add(rec);
     try {

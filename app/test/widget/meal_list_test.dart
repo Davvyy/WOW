@@ -33,6 +33,7 @@ Finder _rowsOf(MealSlot s) => find.byWidgetPredicate((w) => w is MealRow && w.me
 void main() {
   _unknownKey();
   _checkboxes();
+  _skipSnackLevel();
   testWidgets('홈 아침 카드: 끼니 2개면 2줄 · 머리글은 반영 kcal 합계 · 두 번째를 누르면 그 끼니의 P7', (tester) async {
     await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
     expect(_rowsOf(MealSlot.breakfast), findsNWidgets(2));
@@ -108,7 +109,7 @@ void main() {
     expect(find.byTooltip('기록 지우기'), findsNothing);
   });
 
-  testWidgets('끼니가 있는 슬롯의 P7 은 건너뜀을 끈다(건너뜀은 빈 슬롯에서만)', (tester) async {
+  testWidgets('끼니를 채운 기록이 있는 슬롯의 P7 은 건너뜀을 끈다', (tester) async {
     await pumpApp(tester, location: R.meal(MealSlot.breakfast, meal: 'm-b2'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
     final skip = tester.widget<ChButton>(find.byWidgetPredicate((w) => w is ChButton && w.label.startsWith('건너뜀')));
     expect(skip.onPressed, isNull);
@@ -195,6 +196,56 @@ void _checkboxes() {
       await tester.pumpAndSettle();
       expect(api.sent, isNull);
       expect(find.text('아침 확인'), findsOneWidget, reason: '화면에 그대로 남는다');
+    });
+  });
+}
+
+/// 기본 시드 + 저녁에 커피만(확정 11 kcal, 간식 수준)
+List<MealRecord> _coffeeDinner() => [
+      for (final m in buildTodayMeals()) if (m.slot != MealSlot.dinner) m,
+      const MealRecord(
+        slot: MealSlot.dinner,
+        status: MealStatus.confirmed,
+        kcal: 11,
+        title: '아메리카노',
+        time: '09:14',
+        serverId: 'm-coffee',
+        version: 2,
+        items: [MealItem(id: 'k', candidates: ['아메리카노'], candKcal: [11], portion: '1잔', kind: ItemKind.side)],
+      ),
+    ];
+
+void _skipSnackLevel() {
+  group('간식 수준 기록만 있는 끼니의 건너뜀', () {
+    test('건너뜀 가능 규칙: 비었거나 간식 수준(150 kcal 미만) 확정 기록만 있을 때', () {
+      MealRecord r(MealStatus s, double kcal) => MealRecord(slot: MealSlot.dinner, status: s, kcal: kcal, serverId: 'x$kcal${s.name}');
+      bool can(List<MealRecord> l, [MealSlot slot = MealSlot.dinner]) => canSkipSlot(l, slot, snackKcal: 150);
+      expect(can([]), isTrue);
+      expect(can([r(MealStatus.confirmed, 11)]), isTrue, reason: '커피만');
+      expect(can([r(MealStatus.auto, 120), r(MealStatus.corrected, 20)]), isTrue);
+      expect(can([r(MealStatus.confirmed, 11), r(MealStatus.confirmed, 651)]), isFalse, reason: '끼니를 채운 기록이 있음');
+      expect(can([r(MealStatus.draft, 0)]), isFalse, reason: '분석 초안은 끼니로 계산됨');
+      expect(can([r(MealStatus.captured, 0)]), isFalse, reason: '분석 중');
+      expect(can([r(MealStatus.skipped, 0)]), isFalse, reason: '이미 건너뜀');
+      expect(can([], MealSlot.snack), isFalse, reason: '간식은 건너뛸 수 없음');
+    });
+
+    testWidgets('저녁에 커피만 있으면 P7 건너뜀이 켜지고, 누르면 커피는 남기고 건너뜀이 더해진다', (tester) async {
+      final api = MockChalloryApi();
+      final c = await pumpApp(tester, location: R.meal(MealSlot.dinner, meal: 'm-coffee'), overrides: [
+        apiProvider.overrideWithValue(api),
+        mealsProvider.overrideWith(() => MealsNotifier(_coffeeDinner())),
+      ]);
+      expect(find.textContaining('150 kcal 미만은 간식이에요'), findsOneWidget);
+      expect(find.textContaining('먹지 않았다면 건너뜀을 눌러 주세요'), findsOneWidget);
+      final skip = find.byWidgetPredicate((w) => w is ChButton && w.label.startsWith('건너뜀'));
+      expect(tester.widget<ChButton>(skip).onPressed, isNotNull);
+      await tester.tap(skip);
+      await tester.pumpAndSettle();
+      final dinner = mealsIn(c.read(mealsProvider), MealSlot.dinner);
+      expect([for (final m in dinner) m.status], containsAll([MealStatus.confirmed, MealStatus.skipped]));
+      expect(dinner, hasLength(2));
+      expect(api.calls, contains('meal-skip'));
     });
   });
 }
