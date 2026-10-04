@@ -54,6 +54,7 @@ void main() {
     expect(find.textContaining('AI 초안 약 187'), findsOneWidget);
     expect(_cta('확정 · 약 187 kcal'), findsOneWidget);
     expect(find.text('1.2배'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('계란후라이 228 kcal')), findsOneWidget, reason: '후보 칩도 95 × 2 × 1.2');
   });
 
   testWidgets("개수 스테퍼 아래 '1개 크기' 스테퍼: + → 1.3배, '1' 칩 → 1.0배, 확정은 count 2 · portion_multiplier 1.0", (tester) async {

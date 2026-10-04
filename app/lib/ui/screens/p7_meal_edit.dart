@@ -605,7 +605,8 @@ class _ItemCard extends StatelessWidget {
         );
     Widget row(String text, Widget trailing) => Row(children: [Expanded(child: Txt.cap(text, color: c.fg2)), trailing]);
 
-    final candMult = it.kind == ItemKind.count ? it.count : 1;
+    // 후보 칩 kcal: 개수 항목은 이 카드와 같게 개수 × 1개 크기까지 곱한다
+    final candMult = it.kind == ItemKind.count ? it.count * it.mult : 1.0;
     return ChCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -639,7 +640,7 @@ class _ItemCard extends StatelessWidget {
                       inMutuallyExclusiveGroup: true,
                       checked: ci == it.cand,
                       button: true,
-                      label: '${it.candidates[ci]} ${it.candKcal[ci] * candMult} kcal',
+                      label: '${it.candidates[ci]} ${fmtInt(it.candKcal[ci] * candMult)} kcal',
                       excludeSemantics: true,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(999),
@@ -655,7 +656,7 @@ class _ItemCard extends StatelessWidget {
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
                             Txt(it.candidates[ci], size: 12, weight: ci == it.cand ? FontWeight.w600 : FontWeight.w400, color: ci == it.cand ? c.brand : c.fg),
                             const SizedBox(width: 4),
-                            NumText('${it.candKcal[ci] * candMult}', size: 13, color: c.fg2),
+                            NumText(fmtInt(it.candKcal[ci] * candMult), size: 13, color: c.fg2),
                           ]),
                         ),
                       ),
