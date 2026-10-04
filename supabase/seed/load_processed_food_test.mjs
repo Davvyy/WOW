@@ -1,7 +1,9 @@
 // node --test supabase/seed/
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { KEEP_LV3, chunkSizeArg, chunkSql, cleanName, makerOf, parseAmount, pickProducts, unitOf } from './load_processed_food.mjs';
+import {
+  KEEP_LV3, READY_SAUCE_NAME, chunkSizeArg, chunkSql, cleanName, keepCategory, makerOf, onlyLv3Arg, parseAmount, pickProducts, unitOf,
+} from './load_processed_food.mjs';
 
 const row = (o) => ({
   code: 'P1', name: '칙촉', lv3: '과자류·빵류 또는 떡류', lv4: '비스킷/쿠키/크래커', lv6: '과자', per: '100g', kcal: '501',
@@ -191,4 +193,81 @@ test('이름의 중량·용량 표기는 떼고 저장·중복 판단(지우면 
   ]);
   assert.deepEqual(products.map((p) => [p.food_code, p.name_kr]), [['P2', '새우깡'], ['P3', '로즈봉봉']]);
   assert.equal(skipped.duplicate, 1);
+});
+
+const PICKLE = '절임류 또는 조림류';
+const SEASONING = '조미식품';
+const codes = (rows, opt) => pickProducts(rows, opt).products.map((p) => p.food_code);
+
+test('절임류 또는 조림류(D66): 김치·단무지/피클·장아찌·기타 조림·절임식품만, 김칫속·과·채당절임은 뺀다', () => {
+  const kept = ['배추김치', '기타김치', '물김치', '단무지/피클', '장아찌', '기타 조림', '절임식품'];
+  const dropped = ['김칫속', '과·채당절임'];
+  const rows = [...kept, ...dropped].map((lv4, i) => row({ code: `P${i}`, name: `반찬${i}`, lv3: PICKLE, lv4, serv: '40g', size: '400g' }));
+  assert.deepEqual(codes(rows), kept.map((_, i) => `P${i}`));
+  for (const [i, lv4] of kept.entries()) assert.ok(keepCategory(rows[i]), lv4);
+  for (const lv4 of dropped) assert.equal(keepCategory(row({ lv3: PICKLE, lv4 })), false, lv4);
+  // 소분류 이름은 다른 대분류의 같은 이름으로 새지 않는다
+  assert.equal(keepCategory(row({ lv3: '장류', lv4: '배추김치' })), false);
+});
+
+test('조미식품(D66): 카레 전부, 기타 소스류는 짜장·카레·하이라이스·덮밥 소스 이름만, 나머지 소분류는 이름과 무관하게 뺀다', () => {
+  const rows = [
+    row({ code: 'P1', name: '3분카레-A약간매운맛', lv3: SEASONING, lv4: '카레', serv: '', size: '200g', kcal: '85' }),
+    row({ code: 'P2', name: '바몬드카레 고형', lv3: SEASONING, lv4: '카레' }),
+    row({ code: 'P3', name: '3분짜장', lv3: SEASONING, lv4: '기타 소스류', serv: '', size: '200g', kcal: '108' }),
+    row({ code: 'P4', name: '제육 덮밥소스', lv3: SEASONING, lv4: '기타 소스류' }),
+    row({ code: 'P5', name: '데리야끼 소스', lv3: SEASONING, lv4: '기타 소스류' }),
+    row({ code: 'P6', name: '카레가루', lv3: SEASONING, lv4: '향신료' }),
+    row({ code: 'P7', name: '짜장 분말스프', lv3: SEASONING, lv4: '분말스프' }),
+    ...['식초', '드레싱', '마요네즈', '토마토케첩', '고춧가루', '소금', '복합조미식품'].map((lv4, i) =>
+      row({ code: `Q${i}`, name: `조미${i}`, lv3: SEASONING, lv4 })),
+  ];
+  assert.deepEqual(codes(rows), ['P1', 'P2', 'P3', 'P4']);
+  // 다른 규칙도 그대로: 1회분 표기를 읽을 수 없으면 500 이하 포장 통째(3분카레 200g → 1개 170 kcal)
+  const curry = pickProducts([rows[0]]).products[0];
+  assert.deepEqual([curry.unit_label, curry.kcal, curry.category], ['1개(200g)', 170, '카레']);
+});
+
+test('덮밥 소스 이름(READY_SAUCE_NAME): 짜장·카레·하이라이스·덮밥 소스', () => {
+  for (const n of ['3분짜장', '간짜장', '짜장 소스', '쇠고기카레', '하이라이스', '제육덮밥소스', '마파두부 덮밥 소스', '춘천식 닭갈비덮밥소스(순한맛)'])
+    assert.match(n, READY_SAUCE_NAME, n);
+  for (const n of ['데리야끼 소스', '스테이크소스', '간장 덮밥용 양념', '굴소스', '덮밥', '불고기 양념'])
+    assert.doesNotMatch(n, READY_SAUCE_NAME, n);
+});
+
+test('다시 넣은 소분류에도 기존 규칙: 대용량·0 kcal·중량 표기·중복', () => {
+  const { products, skipped } = pickProducts([
+    row({ code: 'P1', name: '포기김치 10kg', lv3: PICKLE, lv4: '배추김치', size: '10kg', serv: '40g' }),
+    row({ code: 'P2', name: '백김치(500g)', lv3: PICKLE, lv4: '배추김치', size: '500g', serv: '40g', kcal: '15', date: '2024-01-01' }),
+    row({ code: 'P3', name: '백김치', lv3: PICKLE, lv4: '배추김치', size: '500g', serv: '40g', kcal: '15', date: '2025-01-01' }),
+    row({ code: 'P4', name: '단무지', lv3: PICKLE, lv4: '단무지/피클', kcal: '0' }),
+  ]);
+  assert.deepEqual(products.map((p) => [p.food_code, p.name_kr, p.unit_label, p.kcal]), [['P3', '백김치', '1회분(40g)', 6]]);
+  assert.deepEqual([skipped.bulk, skipped.duplicate, skipped.zero], [1, 1, 1]);
+});
+
+test('같은 상품이 원래 대분류에도 있으면 원래 행을 남긴다(더 최근이어도 다시 넣은 행이 밀어내지 않음)', () => {
+  const rows = [
+    row({ code: 'P123-1', name: '볶음김치', lv3: '즉석식품류', lv4: '반찬', mfr: '다림식품', date: '2020-01-01' }),
+    row({ code: 'P114-1', name: '볶음김치', lv3: PICKLE, lv4: '배추김치', mfr: '다림식품', date: '2025-01-01' }),
+  ];
+  assert.deepEqual(codes(rows), ['P123-1']);
+});
+
+test('--only-lv3: 전체와 같게 고른 뒤 그 대분류 상품만(전체 = 원래 대분류 + 추가분)', () => {
+  const rows = [
+    row({ code: 'P1' }),
+    row({ code: 'P2', name: '비비고 포기 배추김치', lv3: PICKLE, lv4: '배추김치' }),
+    row({ code: 'P3', name: '3분카레', lv3: SEASONING, lv4: '카레' }),
+    row({ code: 'P4', name: '볶음김치', lv3: '즉석식품류', lv4: '반찬', mfr: '다림식품', date: '2020-01-01' }),
+    row({ code: 'P5', name: '볶음김치', lv3: PICKLE, lv4: '배추김치', mfr: '다림식품', date: '2025-01-01' }),
+    row({ code: 'P6', name: '간장소스', lv3: SEASONING, lv4: '기타 소스류' }),
+  ];
+  const only = onlyLv3Arg(['a.ndjson', 'out', '2000', `--only-lv3=${PICKLE},${SEASONING}`]);
+  assert.deepEqual([...only], [PICKLE, SEASONING]);
+  assert.deepEqual(codes(rows, { onlyLv3: only }), ['P2', 'P3']);
+  assert.deepEqual(codes(rows), ['P1', 'P2', 'P3', 'P4']);
+  assert.equal(onlyLv3Arg(['a', 'b']), null);
+  assert.throws(() => onlyLv3Arg(['--only-lv3=장류']));
+  assert.throws(() => onlyLv3Arg(['--only-lv3=']));
 });

@@ -1,11 +1,13 @@
 // 식약처 「전국통합식품영양성분정보(가공식품)표준데이터」(공공데이터포털 15100066) NDJSON → food_db_cache 상품 행 적재 SQL.
 //
 //   DATA_GO_KR_KEY=<인코딩 키> node supabase/seed/fetch_processed_food.mjs <processed.ndjson>
-//   node supabase/seed/load_processed_food.mjs <processed.ndjson> <출력 폴더> [파일당 행 수, 기본 5000]
+//   node supabase/seed/load_processed_food.mjs <processed.ndjson> <출력 폴더> [파일당 행 수, 기본 5000] [--only-lv3=대분류,…]
 //   for f in <출력 폴더>/processed_food_*.sql; do npx --yes supabase@2 db query --linked -f "$f" || break; done
 //
 // 규칙(docs/02 §10 D63)
-//  - 끼니로 먹는 대분류(KEEP_LV3)만 넣는다. 조미식품·식용유지류·장류·절임류·주류 등은 뺀다. kcal 이 없는 행도 뺀다.
+//  - 끼니로 먹는 대분류(KEEP_LV3)만 넣는다. 식용유지류·장류·주류 등은 뺀다. kcal 이 없는 행도 뺀다.
+//    절임류·조미식품은 소분류만 골라 넣는다(D66, KEEP_LV4): 김치·단무지/피클·장아찌·기타 조림·절임식품(김칫속·과·채당절임 빼고),
+//    카레 전부, 기타 소스류 중 이름이 짜장·카레·하이라이스·덮밥 소스인 것(READY_SAUCE). 나머지 소스·식초·드레싱·향신료 등은 뺀다.
 //  - 같은 상품(공백을 뺀 이름 + 제조사)은 데이터생성일자가 가장 최근인 행 하나만.
 //  - 포장이 5,000(g·ml, kg·L 은 1,000배)을 넘는 업소용·대용량은 뺀다. kcal 0 은 음료·차·커피·생수·탄산과 제로·무설탕 이름만 남긴다.
 //  - 이름의 중량·용량 표기('(70g)' · ' 2kg' · '-450g')는 떼고 저장·중복 판단한다.
@@ -15,6 +17,7 @@
 //  - food_code 는 식약처 상품 코드(P…), is_product = true 로 음식(D…) 자동 매칭과 나눈다.
 //  - package_g = 포장 전체 양(식품중량의 g·ml 숫자, 읽을 수 없으면 null). 앱의 '몇 개입' 낱개 계산(D64)에 쓴다.
 //  - 제조사가 '해당없음'·빈 값이면 수입업체, 그다음 유통업체를 maker 로 쓴다(중복 판단도 이 이름으로).
+//  - --only-lv3=절임류 또는 조림류,조미식품 이면 그 대분류에서 나온 상품만 쓴다(전체와 같은 규칙·중복 제거 뒤 거름, 추가 적재용).
 //  - 파일당 5,000건(세 번째 인자로 바꿈)씩 나눠 쓰고, 같은 food_code 의 상품 행은 값만 갱신한다
 //    (다시 돌려도 된다. 음식 행은 덮어쓰지 않는다).
 //  - 테스트: node --test supabase/seed/load_processed_food_test.mjs
@@ -28,6 +31,25 @@ export const KEEP_LV3 = new Set([
   '과자류·빵류 또는 떡류', '즉석식품류', '음료류', '식육가공품 및 포장육', '수산가공식품류', '코코아가공품류 또는 초콜릿류', '면류',
   '유가공품류', '빙과류', '두부류 또는 묵류', '알가공품류', '당류', '농산가공식품류', '특수영양식품',
 ]);
+
+/** 대분류 전체가 아니라 소분류만 넣는 대분류(D66): 반찬으로 먹는 김치·절임·조림, 데워 먹는 카레 */
+export const KEEP_LV4 = new Map([
+  ['절임류 또는 조림류', new Set(['배추김치', '기타김치', '물김치', '단무지/피클', '장아찌', '기타 조림', '절임식품'])],
+  ['조미식품', new Set(['카레'])],
+]);
+
+/** 조미식품/기타 소스류 중 바로 먹는 덮밥 소스(3분짜장 등)만: 이름으로 고른다 */
+export const READY_SAUCE_LV3 = '조미식품';
+export const READY_SAUCE_LV4 = '기타 소스류';
+export const READY_SAUCE_NAME = /짜장|카레|하이라이스|덮밥\s*소스|짜장\s*소스/;
+
+/** 넣을 분류인가: KEEP_LV3 전체, 또는 KEEP_LV4 의 소분류, 또는 이름이 맞는 기타 소스류 */
+export function keepCategory(r) {
+  if (KEEP_LV3.has(r.lv3)) return true;
+  const lv4 = String(r.lv4 ?? '').trim();
+  if (KEEP_LV4.get(r.lv3)?.has(lv4)) return true;
+  return r.lv3 === READY_SAUCE_LV3 && lv4 === READY_SAUCE_LV4 && READY_SAUCE_NAME.test(String(r.name ?? ''));
+}
 
 /** 1회 섭취참고량이 없을 때 포장 전체를 1개로 보는 최대 양(g·ml)과 포장 전체 최대 kcal */
 export const WHOLE_PACKAGE_MAX = 500;
@@ -111,12 +133,13 @@ export function unitOf(r) {
   return { amount, label, kcal: scale(num(r.kcal)), carb: scale(num(r.carb)), prot: scale(num(r.prot)), fat: scale(num(r.fat)) };
 }
 
-/** NDJSON 행 → 상품 목록(분류·kcal 거르기, 이름+제조사 중복 제거, food_code 순) */
-export function pickProducts(rows) {
+/** NDJSON 행 → 상품 목록(분류·kcal 거르기, 이름+제조사 중복 제거, food_code 순).
+ *  onlyLv3(대분류 집합)를 주면 전체와 똑같이 고른 뒤 그 대분류에서 나온 상품만 돌려준다(추가 적재용) */
+export function pickProducts(rows, { onlyLv3 = null } = {}) {
   const skipped = { category: 0, noKcal: 0, bulk: 0, zero: 0, duplicate: 0 };
   const best = new Map();
   for (const r of rows) {
-    if (!KEEP_LV3.has(r.lv3)) { skipped.category++; continue; }
+    if (!keepCategory(r)) { skipped.category++; continue; }
     if (num(r.kcal) === null) { skipped.noKcal++; continue; }
     if ((parseAmount(r.size)?.value ?? 0) > BULK_MAX) { skipped.bulk++; continue; }
     if (num(r.kcal) === 0 && !zeroOk(r)) { skipped.zero++; continue; }
@@ -133,6 +156,7 @@ export function pickProducts(rows) {
     if (!prev || newer(r, prev)) byCode.set(r.code, r);
   }
   const products = [...byCode.values()]
+    .filter((r) => !onlyLv3 || onlyLv3.has(r.lv3))
     .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0))
     .map((r) => {
       const u = unitOf(r);
@@ -145,8 +169,11 @@ export function pickProducts(rows) {
   return { products, skipped };
 }
 
-/** 데이터생성일자가 더 최근(같으면 코드가 큰 행) */
+/** 남길 행: 원래 대분류(KEEP_LV3) 행이 다시 넣은 소분류(D66) 행보다 먼저, 그다음 데이터생성일자가 더 최근(같으면 코드가 큰 행).
+ *  다시 넣은 행이 이미 적재된 같은 상품(이름+제조사)을 밀어내지 않아야 추가 적재(--only-lv3)가 전체 적재와 같다 */
 function newer(a, b) {
+  const ka = KEEP_LV3.has(a.lv3), kb = KEEP_LV3.has(b.lv3);
+  if (ka !== kb) return ka;
   const da = a.date ?? '', db = b.date ?? '';
   if (da !== db) return da > db;
   return String(a.code) > String(b.code);
@@ -180,14 +207,27 @@ async function readNdjson(path) {
   return rows;
 }
 
+/** CLI 의 --only-lv3=a,b 값 → 대분류 집합(없으면 null). 모르는 대분류면 오류 */
+export function onlyLv3Arg(args) {
+  const a = args.find((x) => x.startsWith('--only-lv3='));
+  if (!a) return null;
+  const names = a.slice('--only-lv3='.length).split(',').map((x) => x.trim()).filter(Boolean);
+  const known = new Set([...KEEP_LV3, ...KEEP_LV4.keys(), READY_SAUCE_LV3]);
+  const bad = names.filter((x) => !known.has(x));
+  if (!names.length || bad.length) throw new Error(`--only-lv3 에 넣는 대분류가 아니에요: ${bad.join(', ') || '(빈 값)'}`);
+  return new Set(names);
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [path, outDir, rowsArg] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const [path, outDir, rowsArg] = args.filter((x) => !x.startsWith('--'));
   if (!path || !outDir) {
-    console.error('사용법: node supabase/seed/load_processed_food.mjs <processed.ndjson> <출력 폴더> [파일당 행 수, 기본 5000]');
+    console.error('사용법: node supabase/seed/load_processed_food.mjs <processed.ndjson> <출력 폴더> [파일당 행 수, 기본 5000] [--only-lv3=대분류,…]');
     process.exit(1);
   }
+  const onlyLv3 = onlyLv3Arg(args);
   const rows = await readNdjson(path);
-  const { products, skipped } = pickProducts(rows);
+  const { products, skipped } = pickProducts(rows, { onlyLv3 });
   mkdirSync(outDir, { recursive: true });
   const chunks = chunkSql(products, chunkSizeArg(rowsArg));
   chunks.forEach((sql, i) => writeFileSync(join(outDir, `processed_food_${String(i + 1).padStart(3, '0')}.sql`), sql));
