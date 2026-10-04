@@ -198,3 +198,15 @@ Deno.test('스키마·프롬프트: 항목별 packaged(포장 상품), 없으면
   const parsed = parseMealAnalysis({ is_food: true, items: [{ ...base, packaged: true }, base, { ...base, packaged: 'yes' }] });
   assertEquals(parsed.items.map((i) => i.packaged), [true, false, false]);
 });
+
+Deno.test('스키마: 포장 상품 이름의 용량·중량은 떼어 내고, kcal 숫자는 거부', () => {
+  const item = (names: string[]) => ({ is_food: true, items: [{ name_candidates: names, count: 1, servings: 1, has_broth: false, confidence: 'high' }] });
+  assertEquals(parseMealAnalysis(item(['새우깡 90g', '농심 새우깡(90g)'])).items[0].name_candidates, ['새우깡', '농심 새우깡']);
+  assertEquals(parseMealAnalysis(item(['콜라 1.5L'])).items[0].name_candidates, ['콜라']);
+  assertEquals(parseMealAnalysis(item(['새우깡 90g', '새우깡'])).items[0].name_candidates, ['새우깡'], '떼고 같아진 이름은 하나로');
+  assertEquals(parseMealAnalysis(item(['1등급 한우', '2인분 피자'])).items[0].name_candidates, ['1등급 한우', '2인분 피자'], '단위 아닌 숫자는 그대로');
+  assertEquals(parseMealAnalysis(item(['3겹살 구이', '홍삼 진액 10ml 스틱'])).items[0].name_candidates, ['3겹살 구이', '홍삼 진액 스틱']);
+  assertThrows(() => parseMealAnalysis(item(['90g'])), SchemaError);
+  assertThrows(() => parseMealAnalysis(item(['밥 300kcal'])), SchemaError);
+  assertThrows(() => parseMealAnalysis(item(['밥 300 칼로리'])), SchemaError);
+});

@@ -80,7 +80,9 @@ export const MEAL_SCHEMA = {
 
 export class SchemaError extends Error {}
 
-const NUMBER_WITH_UNIT = /\d+\s*(kcal|칼로리|g|그램)/i;
+const KCAL_NUMBER = /\d+\s*(kcal|칼로리)/i;
+// 포장 상품 이름의 용량·중량('새우깡 90g', '콜라(500ml)', '1.5L')은 거부하지 않고 떼어 낸다(D63)
+const AMOUNT_TOKEN = /[(\[]?\s*\d+(?:[.,]\d+)?\s*(?:kg|mg|g|그램|ml|㎖|l|ℓ|리터)(?![a-z가-힣])\s*[)\]]?/gi;
 
 /** 원시 응답을 04 §4.1 스키마로 검증·정규화. 위반 시 SchemaError. */
 export function parseMealAnalysis(raw: unknown): MealAnalysis {
@@ -92,11 +94,10 @@ export function parseMealAnalysis(raw: unknown): MealAnalysis {
   if (!o.is_food) return { is_food: false, items: [] };
   const items = o.items.slice(0, 8).map((it, i): MealItemDraft => {
     const x = it as Record<string, unknown>;
-    const names = Array.isArray(x.name_candidates)
-      ? x.name_candidates.filter((n): n is string => typeof n === 'string' && n.trim() !== '').map((n) => n.trim())
-      : [];
+    const rawNames = Array.isArray(x.name_candidates) ? x.name_candidates.filter((n): n is string => typeof n === 'string') : [];
+    if (rawNames.some((n) => KCAL_NUMBER.test(n))) throw new SchemaError(`items[${i}] contains kcal numbers`);
+    const names = [...new Set(rawNames.map((n) => n.replace(AMOUNT_TOKEN, ' ').replace(/\s+/g, ' ').trim()).filter((n) => n !== ''))];
     if (names.length === 0) throw new SchemaError(`items[${i}].name_candidates empty`);
-    if (names.some((n) => NUMBER_WITH_UNIT.test(n))) throw new SchemaError(`items[${i}] contains kcal/g numbers`);
     const count = Number.isInteger(x.count) && (x.count as number) >= 1 ? (x.count as number) : 1;
     // 먹은 양: servings(0.1 단위, 범위 밖은 끝값). 없으면 옛 분량 구간으로
     const legacy = ['half', 'one', 'large'].includes(x.portion_bucket as string) ? x.portion_bucket as PortionBucket : 'one';
