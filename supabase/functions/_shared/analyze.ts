@@ -103,7 +103,7 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
       serving = deps.unmatchedKcal ?? 200; // 미매칭 → 임시값 + 확인 필요
       needsCheck = true;
     }
-    const mult = it.servings; // AI 가 사진으로 본 인분(0.1 단위, 포장 상품은 상품 단위 수) — P7 먹은 양 기본값
+    const mult = it.servings; // AI 가 사진으로 본 인분(0.1 단위, 포장 상품은 한 포장당 양) — P7 먹은 양 기본값
     // 후보 칩: 선택 이름을 맨 앞에, 나머지 LLM 후보는 각자 DB 매칭 kcal(실패 시 선택 항목 값)
     const candidates = [chosen];
     const candidate_kcal = [serving];
@@ -139,24 +139,27 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
   return out;
 }
 
-/** 포장 상품 항목이 개입 수를 넣은 상품이면 그 후보의 kcal 을 1개 kcal 로(servings = 본 낱개 수). 음식 항목은 그대로 */
+/** 포장 상품 항목의 고른 후보(후보 0)가 개입 수를 넣은 상품이면 그 kcal 을 1개 kcal 로. 다른 후보·음식 항목은 그대로.
+ * 앱은 고른 후보만 낱개 단위로 열기 때문에 다른 후보 칩은 1회분 kcal 로 둔다. 조회가 안 되면 1회분 초안 그대로(분석은 계속). */
 async function applyProductPieces(analysis: MealAnalysis, items: DraftItem[], deps: Pick<AnalyzeDeps, 'productPieces'>) {
   if (!deps.productPieces) return;
-  const codes = [...new Set(items.flatMap((d, i) => (analysis.items[i].packaged ? d.candidate_food_codes : []))
-    .filter((c): c is string => !!c))];
+  const chosen = (d: DraftItem, i: number) => (analysis.items[i].packaged ? d.candidate_food_codes[0] : null);
+  const codes = [...new Set(items.map(chosen).filter((c): c is string => !!c))];
   if (codes.length === 0) return;
-  const pieces = await deps.productPieces(codes);
+  let pieces: Record<string, ProductPieces>;
+  try {
+    pieces = await deps.productPieces(codes);
+  } catch (e) {
+    console.error('product_pieces_for', e);
+    return;
+  }
   items.forEach((d, i) => {
-    if (!analysis.items[i].packaged) return;
-    d.candidate_food_codes.forEach((c, j) => {
-      const p = c ? pieces[c] : undefined;
-      if (!p) return;
-      d.candidate_kcal[j] = p.piece_kcal;
-      if (j === 0) {
-        d.serving_kcal = p.piece_kcal;
-        d.ai_kcal = round1(p.piece_kcal * d.portion_multiplier * d.count);
-      }
-    });
+    const c = chosen(d, i);
+    const p = c ? pieces[c] : undefined;
+    if (!p) return;
+    d.candidate_kcal[0] = p.piece_kcal;
+    d.serving_kcal = p.piece_kcal;
+    d.ai_kcal = round1(p.piece_kcal * d.portion_multiplier * d.count);
   });
 }
 

@@ -258,3 +258,32 @@ Deno.test('프롬프트: 포장 상품 이름은 포장에 적힌 맛·종류까
   assertEquals(MEAL_PROMPT.includes('"홈런볼 초코"'), true);
   assertEquals(MEAL_PROMPT.includes('"칙촉 오리지널"'), true);
 });
+
+Deno.test('개입 수 조회가 안 되면 1회분 초안 그대로(분석은 계속)', async () => {
+  const d: AnalyzeDeps = {
+    ...productDeps(new MockAdapter(chicItem(2)), []),
+    productPieces: () => Promise.reject(new Error('db down')),
+  };
+  const out = await analyzeMeal('m1', d);
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals([out.items[0].serving_kcal, out.items[0].ai_kcal, out.items[0].candidate_kcal], [150.3, 300.6, [150.3]]);
+});
+
+Deno.test('개입 수는 고른 후보에만: 다른 상품 후보의 칩 kcal 은 1회분 그대로', async () => {
+  const OTHER = 'P900-000000000-0002';
+  const d: AnalyzeDeps = {
+    ...deps(new MockAdapter({
+      is_food: true,
+      items: [{ name_candidates: ['칙촉', '칙촉 브라우니'], count: 1, servings: 1, has_broth: false, confidence: 'high', packaged: true }],
+    })),
+    mapFood: (cands: string[]): Promise<FoodMatch> => {
+      const [code, kcal, name] = cands[0] === '칙촉 브라우니' ? [OTHER, 190, '칙촉 브라우니'] : [CHIC, 150.3, '칙촉'];
+      return Promise.resolve({ match: 'auto', food_code: code, kcal, score: 1, chips: [{ food_code: code, name, kcal, score: 1 }] });
+    },
+    productPieces: () => Promise.resolve({ [CHIC]: { pieces: 24, piece_g: 7.5, piece_kcal: 37.6 }, [OTHER]: { pieces: 10, piece_g: 4, piece_kcal: 19 } }),
+  };
+  const out = await analyzeMeal('m1', d);
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals(out.items[0].candidate_food_codes, [CHIC, OTHER]);
+  assertEquals([out.items[0].serving_kcal, out.items[0].candidate_kcal], [37.6, [37.6, 190]]);
+});
