@@ -9,7 +9,6 @@ import 'package:challory/state/app_state.dart';
 import 'package:challory/ui/screens/p6_camera.dart';
 import 'package:challory/ui/widgets/common.dart';
 import 'package:challory/ui/widgets/meal_slot_card.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'screens_test.dart' show pumpApp;
@@ -35,7 +34,6 @@ void main() {
   _unknownKey();
   _checkboxes();
   _skipSnackLevel();
-  _smallMealToSnack();
   testWidgets('홈 아침 카드: 끼니 2개면 2줄 · 머리글은 반영 kcal 합계 · 두 번째를 누르면 그 끼니의 P7', (tester) async {
     await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
     expect(_rowsOf(MealSlot.breakfast), findsNWidgets(2));
@@ -248,51 +246,6 @@ void _skipSnackLevel() {
       expect([for (final m in dinner) m.status], containsAll([MealStatus.confirmed, MealStatus.skipped]));
       expect(dinner, hasLength(2));
       expect(api.calls, contains('meal-skip'));
-    });
-  });
-}
-
-void _smallMealToSnack() {
-  group('간식 수준 확정은 간식 칸으로(D59)', () {
-    MealRecord coffeeDraft() => const MealRecord(
-          slot: MealSlot.dinner,
-          status: MealStatus.draft,
-          aiKcal: 11,
-          title: '아메리카노',
-          time: '19:00',
-          serverId: 'm-cd',
-          version: 1,
-          items: [MealItem(id: 'k', candidates: ['아메리카노'], candKcal: [11], portion: '1잔', kind: ItemKind.side)],
-        );
-
-    testWidgets('저녁 칸 커피(11 kcal)를 확정하면 간식 칸으로 옮기고 저녁 칸은 비운다', (tester) async {
-      final api = MockChalloryApi()..seedMeal('m-cd', MealSlot.dinner);
-      final c = await pumpApp(tester, location: R.meal(MealSlot.dinner, meal: 'm-cd'), overrides: [
-        apiProvider.overrideWithValue(api),
-        mealsProvider.overrideWith(() => MealsNotifier([for (final m in buildTodayMeals()) if (m.slot != MealSlot.dinner) m, coffeeDraft()])),
-      ]);
-      expect(find.textContaining('확정하면 간식 칸으로 옮겨요'), findsOneWidget);
-      await tester.tap(_confirmButton());
-      await tester.pumpAndSettle();
-      expect(find.text('150 kcal 미만이라 간식으로 옮겼어요'), findsOneWidget);
-      final meals = c.read(mealsProvider);
-      expect(mealsIn(meals, MealSlot.dinner), isEmpty);
-      expect(mealsIn(meals, MealSlot.snack).map((m) => m.title), contains('아메리카노'));
-      expect(canSkipSlot(meals, MealSlot.dinner, snackKcal: 150), isTrue);
-    });
-
-    test('서버가 돌려준 칸으로 옮긴다(간식 → 원래 끼니 칸)', () async {
-      final api = MockChalloryApi()..seedMeal('m-s', MealSlot.snack, mainSlot: MealSlot.dinner);
-      final c = ProviderContainer(overrides: [
-        apiProvider.overrideWithValue(api),
-        mealsProvider.overrideWith(() => MealsNotifier(const [
-              MealRecord(slot: MealSlot.snack, status: MealStatus.confirmed, kcal: 11, serverId: 'm-s', version: 1, title: '아메리카노'),
-            ])),
-      ]);
-      addTearDown(c.dispose);
-      const big = MealItem(id: 'b', candidates: ['비빔밥'], candKcal: [600], portion: '1인분', kind: ItemKind.side);
-      expect(await c.read(mealsProvider.notifier).confirm(MealSlot.snack, const [big], 600, key: 'm-s'), isNull);
-      expect(c.read(mealsProvider).single.slot, MealSlot.dinner);
     });
   });
 }

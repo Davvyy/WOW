@@ -499,7 +499,6 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
     final wasConfirmed = isCountedStatus(prev.status);
     final names = items.where((i) => i.checked).map((i) => i.name).take(2).join(' · ');
     final next = prev.copyWith(
-      slot: slotAfterConfirm(prev.slot, total, snackKcal: engine.rules.snackKcal),
       status: wasConfirmed ? MealStatus.corrected : MealStatus.confirmed,
       kcal: total,
       aiKcal: aiKcal ?? prev.aiKcal,
@@ -522,7 +521,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
       }
       if (!ref.mounted) return null;
       final cur = byKey(local);
-      if (cur != null) _put(cur.copyWith(serverId: r.mealId, version: r.version, kcal: r.confirmedKcal, slot: r.slot));
+      if (cur != null) _put(cur.copyWith(serverId: r.mealId, version: r.version, kcal: r.confirmedKcal));
       if (api.isRemote) ref.invalidate(ledgerProvider); // 서버가 잠정 점수를 다시 계산함
       return null;
     } catch (e) {

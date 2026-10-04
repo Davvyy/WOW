@@ -178,11 +178,6 @@ bool isCountedStatus(MealStatus s) => s == MealStatus.confirmed || s == MealStat
 List<MealRecord> mealsIn(List<MealRecord> meals, MealSlot slot) =>
     [for (final m in meals) if (m.slot == slot && m.status != MealStatus.empty) m];
 
-/// 확정 kcal 로 정해지는 칸(D59): 끼니 칸 기록이 간식 수준([snackKcal] 미만)이면 간식 칸. 서버 confirm_meal 과 같다.
-/// 간식 칸에서 원래 끼니 칸으로 되돌리는 것은 원래 칸을 아는 서버 응답(ConfirmResult.slot)으로 한다.
-MealSlot slotAfterConfirm(MealSlot slot, double total, {required double snackKcal}) =>
-    slot != MealSlot.snack && total < snackKcal ? MealSlot.snack : slot;
-
 /// [slot] 을 건너뛸 수 있는지: 끼니 슬롯이고, 기록이 없거나 간식 수준([snackKcal] 미만) 확정 기록만 있을 때.
 /// 간식 수준 기록은 슬롯을 채우지 않으므로(커피만 마신 저녁 등) 건너뜀으로 대체값을 피할 수 있다. 엔진·서버 규칙과 같다.
 bool canSkipSlot(List<MealRecord> meals, MealSlot slot, {required double snackKcal}) =>

@@ -258,14 +258,10 @@ class MockChalloryApi implements ChalloryApi {
   @override
   Future<ConfirmResult> confirmMeal(String mealId, int version, List<Map<String, dynamic>> items, {required String idempotencyKey}) async {
     _maybeFail('meal-confirm');
-    final known = _meals.containsKey(mealId);
     final m = _meals.putIfAbsent(mealId, () => _MockMeal(MealSlot.lunch, _clock()));
     if (m.version != version) throw const ApiException(412, 'version mismatch');
     m.version++;
-    final total = wireTotal(items);
-    if (!known) return ConfirmResult(mealId: mealId, confirmedKcal: total, version: m.version); // 칸을 모르는 끼니: 칸은 앱 그대로
-    _moveBySize(m, total);
-    return ConfirmResult(mealId: mealId, confirmedKcal: total, version: m.version, slot: m.slot);
+    return ConfirmResult(mealId: mealId, confirmedKcal: wireTotal(items), version: m.version);
   }
 
   @override
@@ -273,23 +269,6 @@ class MockChalloryApi implements ChalloryApi {
     _maybeFail('meal-skip');
     return const SkipResult(remainingWeek: 1, overLimit: false);
   }
-
-  /// 서버 confirm_meal 의 칸 옮기기(D59): 간식 수준이면 간식 칸, 다시 끼니 수준이면 원래 칸
-  void _moveBySize(_MockMeal m, double total) {
-    if (m.slot != MealSlot.snack && total < EngineRules.defaults.snackKcal) {
-      m.mainSlot = m.slot;
-      m.slot = MealSlot.snack;
-    } else if (m.slot == MealSlot.snack && m.mainSlot != null && total >= EngineRules.defaults.snackKcal) {
-      m.slot = m.mainSlot!;
-      m.mainSlot = null;
-    }
-  }
-
-  /// 서버에 있는 끼니로 둔다(테스트용). [mainSlot] 은 간식 칸으로 옮겨지기 전의 칸.
-  void seedMeal(String id, MealSlot slot, {MealSlot? mainSlot, int version = 1}) =>
-      _meals[id] = _MockMeal(slot, _clock())
-        ..mainSlot = mainSlot
-        ..version = version;
 
   /// 지운 끼니 id(테스트가 확인한다)
   final deletedMeals = <String>[];
@@ -305,10 +284,8 @@ class MockChalloryApi implements ChalloryApi {
   Future<ConfirmResult> createManualMeal(MealSlot slot, List<Map<String, dynamic>> items, {String? localDate, required String idempotencyKey}) async {
     _maybeFail('meal-manual');
     final id = 'meal-${++_seq}';
-    final m = _meals[id] = _MockMeal(slot, _clock())..version = 2;
-    final total = wireTotal(items);
-    _moveBySize(m, total);
-    return ConfirmResult(mealId: id, confirmedKcal: total, version: 2, slot: m.slot);
+    _meals[id] = _MockMeal(slot, _clock())..version = 2;
+    return ConfirmResult(mealId: id, confirmedKcal: wireTotal(items), version: 2);
   }
 
   @override
@@ -346,8 +323,7 @@ class MockChalloryApi implements ChalloryApi {
 
 class _MockMeal {
   _MockMeal(this.slot, this.createdAt);
-  MealSlot slot;
-  MealSlot? mainSlot;
+  final MealSlot slot;
   final DateTime createdAt;
   int version = 1;
 }
