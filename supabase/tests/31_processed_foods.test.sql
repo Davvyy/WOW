@@ -5,6 +5,12 @@ insert into food_db_cache (food_code, name_kr, category, serving_g, kcal, carb_g
   ('P900-000000000-0000', '칙촉', '비스킷/쿠키/크래커', 30, 140, 18, 2, 7, true, '다른제과(주)', '1회분(30g)'),
   ('P900-000000000-0002', '칙촉 브라우니', '초콜릿과자', 40, 190, 22, 3, 10, true, '롯데제과(주)', '1개(40g)'),
   ('P900-000000000-0003', '바나나우유', '가공유', 240, 208, null, null, null, true, '빙그레', '1개(240ml)'),
+  ('P900-000000000-0010', '콜라', '탄산음료', 250, 108, null, null, null, true, '음료회사B', '1개(250ml)'),
+  ('P900-000000000-0011', '제로 콜라', '탄산음료', 250, 0, null, null, null, true, '음료회사A', '1개(250ml)'),
+  ('P900-000000000-0012', '우유', '우유', 200, 130, null, null, null, true, '목장C', '1개(200ml)'),
+  ('P900-000000000-0013', '제로', '홍삼음료', 100, 40, null, null, null, true, '홍삼D', '1개(100ml)'),
+  ('P900-000000000-0014', '초코 우유', '가공유', 200, 170, null, null, null, true, '우유회사E', '1개(200ml)'),
+  ('P900-000000000-0015', '코카콜라 제로', '탄산음료', 250, 0, null, null, null, true, '코카콜라음료(주)', '1개(250ml)'),
   ('D900001', '초코칩쿠키', '과자류', 70, 308, null, null, null, false, null, null),
   ('D900002', '바나나우유', '음료류', 200, 150, null, null, null, false, null, null);
 
@@ -30,6 +36,14 @@ begin
   perform tests.eq((r ->> 'is_product')::boolean, true, '상품 매칭: is_product 표시');
   r := map_food_candidates(array['칙촉'], true);
   perform tests.ok(r ->> 'food_code' like 'P900-000000000-000%', '상품 매칭: 브랜드 없이도 상품');
+  -- 첫 단어를 뗀 이름은 그 단어가 제조사에 들 때만(브랜드일 때만) 쓴다
+  r := map_food_candidates(array['제로 콜라'], true);
+  perform tests.eq(r ->> 'food_code', 'P900-000000000-0011', '상품 매칭: 제로 콜라는 일반 콜라가 아니라 제로 콜라');
+  perform tests.eq((r ->> 'kcal')::numeric, 0::numeric, '상품 매칭: 제로 콜라 0 kcal');
+  r := map_food_candidates(array['초코 우유'], true);
+  perform tests.eq(r ->> 'food_code', 'P900-000000000-0014', '상품 매칭: 초코 우유는 흰 우유가 아니라 초코 우유');
+  r := map_food_candidates(array['코카콜라 제로'], true);
+  perform tests.eq(r ->> 'food_code', 'P900-000000000-0015', '상품 매칭: 코카콜라 제로는 홍삼 음료 제로가 아님');
   -- 상품이 없으면 음식으로
   r := map_food_candidates(array['초코칩쿠키'], true);
   perform tests.eq(r ->> 'food_code', 'D900001', '상품 매칭: 상품이 없으면 음식으로');

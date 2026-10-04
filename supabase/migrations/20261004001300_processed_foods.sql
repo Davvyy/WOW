@@ -56,27 +56,31 @@ returns table (food_code text, name_kr text, kcal numeric, serving_g numeric, sc
   order by x.score desc, x.is_product, x.name_kr, x.food_code limit 20
 $$;
 
--- AI 후보 이름 → 찾을 이름. 상품이면 여러 단어 이름의 첫 단어를 브랜드로 보고 뗀 이름도 찾는다('롯데 칙촉' → '칙촉', 브랜드 '롯데').
+-- AI 후보 이름 → 찾을 이름. 상품이면 여러 단어 이름의 첫 단어를 브랜드 후보로 보고 뗀 이름(stripped)도 찾는다
+-- ('롯데 칙촉' → '칙촉', 브랜드 '롯데'). 뗀 이름은 그 단어가 찾은 상품의 제조사에 들 때만 쓴다(map_food_pick).
 create or replace function food_name_variants(p_candidates text[], p_product boolean)
-returns table (name text, ord bigint, brand text)
+returns table (name text, ord bigint, brand text, stripped boolean)
   language sql immutable set search_path = public, extensions as $$
   with c as (
     select btrim(n) as name, ord, case when p_product then (regexp_match(btrim(n), '^(\S+)\s+\S'))[1] end as brand
     from unnest(p_candidates) with ordinality u(n, ord) where btrim(coalesce(n, '')) <> ''
   )
-  select name, ord, brand from c
+  select name, ord, brand, false from c
   union all
-  select regexp_replace(name, '^\S+\s+', ''), ord, brand from c where brand is not null
+  select regexp_replace(name, '^\S+\s+', ''), ord, brand, true from c where brand is not null
 $$;
 
 -- 04 §4.2 매핑(한 종류): 후보 3개 → 동의어 → trgm. ≥0.45 자동 / 0.25~0.45 후보 칩 / <0.25 미매칭.
--- 같은 점수면 브랜드가 제조사 이름에 든 상품, 그다음 후보 순서.
+-- 첫 단어를 뗀 이름은 그 단어가 제조사에 든 상품만('제로 콜라'가 일반 콜라로, '코카콜라 제로'가 다른 회사 '제로'로 가지 않게).
+-- 같은 점수면 브랜드가 제조사 이름에 든 상품, 원래 이름, 후보 순서.
 create or replace function map_food_pick(p_candidates text[], p_product boolean) returns jsonb
   language sql stable security definer set search_path = public, extensions as $$
   with r as materialized (
-    select m.*, c.ord, coalesce(c.brand is not null and m.maker ilike '%' || c.brand || '%', false) as brand_hit
-    from food_name_variants(p_candidates, p_product) c, lateral food_match(c.name, p_product, false) m),
-  best as (select * from r order by score desc, brand_hit desc, ord, food_code limit 1),
+    select * from (
+      select m.*, c.ord, c.stripped, coalesce(c.brand is not null and m.maker ilike '%' || c.brand || '%', false) as brand_hit
+      from food_name_variants(p_candidates, p_product) c, lateral food_match(c.name, p_product, false) m) v
+    where not v.stripped or v.brand_hit),
+  best as (select * from r order by score desc, brand_hit desc, stripped, ord, food_code limit 1),
   chips as (select distinct on (food_code) * from r order by food_code, score desc)
   select jsonb_build_object(
     'match', case when b.score >= 0.45 then 'auto' when b.score >= 0.25 then 'chips' else 'none' end,
