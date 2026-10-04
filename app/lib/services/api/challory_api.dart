@@ -345,8 +345,11 @@ class ServerMeal {
 
 class ConfirmResult {
   const ConfirmResult({required this.mealId, required this.confirmedKcal, required this.version, this.status = 'confirmed',
-      this.flags = const [], this.sD, this.unchanged = false});
+      this.flags = const [], this.sD, this.unchanged = false, this.slot});
   final String mealId;
+
+  /// 확정 후 끼니 칸. 간식 수준이면 서버가 간식 칸으로, 다시 끼니 수준이면 원래 칸으로 옮긴다(D59).
+  final MealSlot? slot;
   final double confirmedKcal;
   final int version;
   final String status;
@@ -362,6 +365,7 @@ class ConfirmResult {
         flags: [for (final f in (j['flags'] as List? ?? const [])) f as String],
         sD: (j['s_d'] as num?)?.toDouble(),
         unchanged: j['unchanged'] as bool? ?? false,
+        slot: MealSlot.values.where((s) => s.name == j['slot']).firstOrNull,
       );
 }
 

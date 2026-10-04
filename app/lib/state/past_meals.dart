@@ -89,6 +89,7 @@ class PastMealsNotifier extends AsyncNotifier<List<MealRecord>> {
     final corrected = finalDay || isCountedStatus(prev.status);
     final names = items.where((i) => i.checked).map((i) => i.name).take(2).join(' · ');
     _put(prev.copyWith(
+      slot: slotAfterConfirm(prev.slot, total, snackKcal: engine.rules.snackKcal),
       status: corrected ? MealStatus.corrected : MealStatus.confirmed,
       kcal: total,
       aiKcal: aiKcal ?? prev.aiKcal,
@@ -102,7 +103,7 @@ class PastMealsNotifier extends AsyncNotifier<List<MealRecord>> {
       final r = await ref.read(apiProvider).confirmMeal(id, prev.version, [for (final it in items) mealItemToWire(it)], idempotencyKey: newUuidV4());
       if (!ref.mounted) return null;
       final cur = byKey(key);
-      if (cur != null) _put(cur.copyWith(version: r.version, kcal: r.confirmedKcal));
+      if (cur != null) _put(cur.copyWith(version: r.version, kcal: r.confirmedKcal, slot: r.slot));
       ref.invalidate(ledgerProvider); // 서버가 그날 점수를 다시 계산함
       unawaited(_reload());
       return null;

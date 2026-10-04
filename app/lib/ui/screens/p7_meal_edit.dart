@@ -240,7 +240,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     // 화면은 바로 홈으로(낙관적 반영), 서버 확정(meal-confirm / meal-manual)이 안 되면 되돌리고 알린다
     _goHome();
     if (snack) {
-      messenger.showSnackBar(const SnackBar(content: Text('150 kcal 미만은 간식으로 기록돼요 · 끼니 슬롯은 채우지 않아요')));
+      messenger.showSnackBar(const SnackBar(content: Text('150 kcal 미만이라 간식으로 옮겼어요')));
     }
     final err = await pending;
     if (err != null) {
@@ -465,7 +465,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           InfoBanner(
             tone: Tone.neutral,
             icon: Icons.cookie_rounded,
-            child: boldThen(context, '150 kcal 미만은 간식이에요.', ' 섭취에는 더해지지만 끼니 슬롯은 채우지 않아요.${!isPast && canSkip && !skipLimit ? ' 이 끼니를 먹지 않았다면 건너뜀을 눌러 주세요.' : ''}', color: c.fg2),
+            child: boldThen(context, '150 kcal 미만은 간식이에요.', '${slot == MealSlot.snack ? ' 섭취에 더해져요.' : ' 확정하면 간식 칸으로 옮겨요(섭취에는 더해져요).'}${!isPast && canSkip && !skipLimit ? ' 이 끼니를 먹지 않았다면 건너뜀을 눌러 주세요.' : ''}', color: c.fg2),
           ),
         for (var i = 0; i < _items.length; i++)
           // 보기만 하는 지난 날 끼니는 항목을 바꿀 수 없다
