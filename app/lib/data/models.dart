@@ -93,7 +93,7 @@ class MealItem {
   /// 고른 후보의 상품 단위 정보(음식이면 null)
   ProductUnit? get product => cand < products.length ? products[cand] : null;
 
-  /// 고른 상품 후보를 낱개([pieces]개입의 1개) 단위로, null 이면 1회분 단위로 바꾼다. 먹은 양은 1(1개·1회분)부터 다시.
+  /// 고른 상품 후보를 낱개([pieces]개입의 1개) 단위로, null 이면 1회분 단위로 바꾼다. 개수(AI 가 본 봉지 수)는 그대로, 1개 크기·먹은 양은 1부터 다시.
   MealItem withPieces(int? pieces) {
     final p = product;
     if (p == null) return this;
@@ -102,9 +102,14 @@ class MealItem {
     final kcal = <num>[...candKcal]..[cand] = next.pieces != null ? next.unitKcal : next.kcal.round();
     final labels = padded(unitLabels)..[cand] = next.label;
     final prods = padded(products)..[cand] = next;
-    // 낱개는 개수 항목(개수 스테퍼로 6개·10개도), 1회분으로 되돌리면 먹은 양 항목
-    return copyWith(candKcal: kcal, unitLabels: labels, products: prods, mult: 1, count: 1,
-        kind: next.pieces != null ? ItemKind.count : (kind == ItemKind.soup ? kind : ItemKind.side));
+    // 낱개는 개수 항목(개수 스테퍼로 6개·10개도), 1회분으로 되돌리면 개수가 2 이상일 때만 개수 항목, 아니면 먹은 양 항목(서버 항목을 열 때와 같음)
+    final ItemKind k;
+    if (next.pieces != null || count > 1) {
+      k = ItemKind.count;
+    } else {
+      k = kind == ItemKind.soup ? kind : ItemKind.side;
+    }
+    return copyWith(candKcal: kcal, unitLabels: labels, products: prods, mult: 1, count: count, kind: k);
   }
 
   /// 체크 여부와 무관하게 현재 선택의 kcal

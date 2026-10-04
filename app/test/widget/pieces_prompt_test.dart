@@ -122,18 +122,39 @@ void main() {
     expect([w['food_code'], w['serving_kcal'], w['count'], w['portion_multiplier']], [_chic, 37.6, 1, 1.0]);
   });
 
-  testWidgets('AI 가 3봉지로 본 항목은 1개 단위 AI 초안도 3개(112.8): 1개만 확정하면 하향 확인은 그대로', (tester) async {
+  testWidgets('AI 가 3봉지로 본 항목: 24개입 → 개수 3 그대로 3 × 37.6 = 112.8, 1개로 줄이면 하향 확인은 그대로', (tester) async {
     final api = await _open(tester, [_chicItem(count: 3)]);
+    expect(find.text('가정 분량 · 1회분(30g) × 3'), findsOneWidget);
     await tester.tap(find.text(_bannerAction));
     await tester.pumpAndSettle();
     await _savePieces(tester, '24');
-    expect(find.textContaining('AI 초안 약 113'), findsOneWidget, reason: '37.6 × 3 = 112.8');
+    expect(find.text('가정 분량 · 1개(약 7.5g) × 3'), findsOneWidget, reason: 'AI 개수를 지킨다');
+    expect(find.text('1.0배'), findsOneWidget);
+    expect(_cta('확정 · 약 113 kcal'), findsOneWidget, reason: '37.6 × 3 = 112.8');
+    expect(find.textContaining('AI 초안 약 113'), findsOneWidget, reason: 'AI 초안도 37.6 × 3');
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byTooltip('하나 빼기'));
+      await tester.pumpAndSettle();
+    }
     await tester.tap(_cta('확정 · 약 38 kcal'));
     await tester.pumpAndSettle();
     expect(find.text(_downward), findsOneWidget, reason: '37.6 / 112.8 → AI 보다 50% 넘게 낮음');
     await tester.tap(find.text('다시 볼게요'));
     await tester.pumpAndSettle();
     expect(api.sent, isNull);
+  });
+
+  testWidgets('AI 개수 3 → 24개입 → 확정은 count 3 × 37.6(하향 확인 없음)', (tester) async {
+    final api = await _open(tester, [_chicItem(count: 3)]);
+    await tester.tap(find.text(_bannerAction));
+    await tester.pumpAndSettle();
+    await _savePieces(tester, '24');
+    await tester.tap(_cta('확정 · 약 113 kcal'));
+    await tester.pumpAndSettle();
+    expect(find.text(_downward), findsNothing);
+    final w = api.sent!.single;
+    expect([w['serving_kcal'], w['count'], w['portion_multiplier']], [37.6, 3, 1.0]);
+    expect(wireTotal(api.sent!), closeTo(112.8, 1e-9));
   });
 
   testWidgets('배너 닫기 → 이 화면에서 다시 보이지 않고 낱개로 계산 링크는 그대로', (tester) async {
@@ -147,7 +168,7 @@ void main() {
     expect(_cta('확정 · 약 150 kcal'), findsOneWidget);
   });
 
-  testWidgets("표시 없는 1회분 상품 → 조용한 한 줄 + '낱개로 계산', 저장하면 사라진다", (tester) async {
+  testWidgets("표시 없는 1회분 상품 → 조용한 한 줄 + '낱개로 계산', 저장하면 사라지고 AI 초안은 그대로(하향 확인)", (tester) async {
     final api = await _open(tester, [_chicItem(single: false)]);
     expect(find.text(_hint), findsOneWidget);
     expect(_banner(), findsNothing);
@@ -156,10 +177,13 @@ void main() {
     await _savePieces(tester, '24');
     expect(find.text(_hint), findsNothing);
     expect(find.text('낱개 24개 기준 · 바꾸기'), findsOneWidget);
+    expect(find.textContaining('AI 초안 약 150'), findsOneWidget, reason: 'AI 가 낱개로 보지 않았으면 기준을 낮추지 않는다');
     await tester.tap(_cta('확정 · 약 38 kcal'));
     await tester.pumpAndSettle();
-    expect(find.text(_downward), findsNothing);
-    expect(api.sent, isNotNull);
+    expect(find.text(_downward), findsOneWidget, reason: '37.6 / 150.3 → 예전처럼 확인');
+    await tester.tap(find.text('그대로 확정'));
+    await tester.pumpAndSettle();
+    expect(api.sent!.single['serving_kcal'], 37.6, reason: '1개 단위 확정은 그대로 된다');
   });
 
   testWidgets('개입 수를 넣어 둔 상품·음식 항목에는 안내가 없다', (tester) async {

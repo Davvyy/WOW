@@ -191,8 +191,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   }
 
   /// 상품 항목의 '몇 개입'(D64): 개입 수를 저장하면 그 항목을 1개(약 7.5g) 단위로, 되돌리면 1회분 단위로. 먹은 양은 1부터 다시.
-  /// 단위 정정은 AI 대비 하향 수정이 아니므로(D67) 이 항목의 AI 초안 몫도 같은 단위(1단위 kcal × AI 양)로 다시 계산한다.
-  /// 서버는 확정 때 같은 식으로 맞춘다(rebase_ai_kcal_for_pieces).
+  /// AI 가 낱개 포장 하나로 본 항목(aiSinglePiece)이면 단위 정정이라 AI 대비 하향 수정이 아니므로(D67) 이 항목의 AI 초안 몫도
+  /// 같은 단위(1단위 kcal × AI 양)로 다시 계산한다. 서버도 확정 때 같은 항목만 같은 식으로 맞춘다(rebase_ai_kcal_for_pieces).
+  /// 그 밖의 항목은 사용자가 넣은 개입 수만으로 검토 기준을 낮추지 않는다(AI 초안 그대로).
   Future<void> _editPieces(int index) async {
     final it = _items[index];
     final p = it.product;
@@ -218,7 +219,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       final cur = _items[index];
       var next = cur.withPieces(pieces);
       final unit = next.product?.unitKcal, oldAi = cur.aiKcal, units = cur.aiUnits;
-      if (unit != null && oldAi != null && units != null && _aiTotal > 0) {
+      if (cur.aiSinglePiece && unit != null && oldAi != null && units != null && _aiTotal > 0) {
         final ai = round1(unit * units);
         _aiTotal = round1(_aiTotal - oldAi + ai);
         next = next.copyWith(aiKcal: ai);

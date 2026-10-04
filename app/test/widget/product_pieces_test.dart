@@ -186,6 +186,20 @@ void main() {
     await expectLater(api.setProductPieces(_chic, 201), throwsA(isA<ApiException>().having((e) => e.status, 'status', 422)));
   });
 
+  test('개입 수를 넣거나 되돌려도 개수(AI 가 본 봉지 수)는 그대로, 1개 크기·먹은 양만 1.0 으로(D67)', () {
+    final three = mealItemFromServer(ServerMealItem(candidates: const ['칙촉'], candidateKcal: const [150.3], candidateFoodCodes: const [_chic],
+        count: 3, portionMultiplier: 1.2, hasBroth: false, needsCheck: false, aiKcal: 541.1, unitLabel: '1회분(30g)', unitKcal: 150.3,
+        servingG: 30, packageG: 180), 0);
+    expect([three.kind, three.count, three.mult], [ItemKind.count, 3, 1.2]);
+    final piece = three.withPieces(24);
+    expect([piece.kind, piece.count, piece.mult, piece.unitLabel], [ItemKind.count, 3, 1.0, '1개(약 7.5g)']);
+    expect(piece.rawKcal, closeTo(112.8, 1e-9), reason: '3 × 37.6');
+    final back = piece.withPieces(null);
+    expect([back.kind, back.count, back.mult, back.unitLabel], [ItemKind.count, 3, 1.0, '1회분(30g)'], reason: '되돌려도 3개');
+    final one = mealItemFromServer(_chicItem(), 0).copyWith(mult: 2);
+    expect([one.withPieces(24).count, one.withPieces(24).mult], [1, 1.0], reason: '1개 항목은 1개');
+  });
+
   test('확정 형식: 낱개 항목은 serving_kcal = 1개 kcal(소수 1자리)', () {
     final it = mealItemFromServer(_chicItem(serving: 37.6, pieces: 24), 0).copyWith(mult: 3);
     expect([mealItemToWire(it)['serving_kcal'], mealItemToWire(it)['portion_multiplier'], it.rawKcal], [37.6, 3.0, closeTo(112.8, 1e-9)]);
