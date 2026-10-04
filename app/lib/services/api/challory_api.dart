@@ -262,7 +262,7 @@ class CreatedMeal {
 class ServerMealItem {
   const ServerMealItem({required this.candidates, required this.candidateKcal, required this.candidateFoodCodes, required this.count,
       required this.portionMultiplier, required this.hasBroth, required this.needsCheck, required this.aiKcal,
-      this.chosen = 0, this.eaten = true, this.brothOff = false});
+      this.chosen = 0, this.eaten = true, this.brothOff = false, this.unitLabel});
   final List<String> candidates;
   final List<double> candidateKcal;
   final List<String?> candidateFoodCodes;
@@ -278,6 +278,9 @@ class ServerMealItem {
   /// 먹음 체크(확정 때 저장된 eaten)
   final bool eaten;
   final bool brothOff;
+
+  /// 고른 음식이 가공식품(상품)이면 1개 단위 라벨(food_db_cache.unit_label, D63)
+  final String? unitLabel;
 
   factory ServerMealItem.fromJson(Map<String, dynamic> j) {
     final ai = (j['ai_kcal'] as num?)?.toDouble() ?? 0;
@@ -311,6 +314,7 @@ class ServerMealItem {
       chosen: cands.indexOf(chosen).clamp(0, cands.length - 1),
       eaten: j['eaten'] as bool? ?? true,
       brothOff: brothOff,
+      unitLabel: (j['food_db_cache'] as Map?)?['unit_label'] as String?,
     );
   }
 }

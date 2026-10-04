@@ -6,6 +6,7 @@ import 'package:challory/data/models.dart';
 import 'package:challory/services/api/challory_api.dart';
 import 'package:challory/services/api/meal_wire.dart';
 import 'package:challory/services/api/mock_api.dart';
+import 'package:challory/services/api/server_mapping.dart';
 import 'package:challory/services/photo/meal_uploader.dart';
 import 'package:challory/services/photo/photo_prep.dart';
 import 'package:challory/state/app_state.dart';
@@ -219,6 +220,39 @@ void main() {
       final w = mealItemToWire(back);
       expect([w['count'], w['portion_multiplier']], [3, 1.5]);
       expect(wireTotal([w]), 1350);
+    });
+  });
+
+  group('가공식품 상품 항목(D63)', () {
+    test('food_search 상품 행 → 제조사·단위 라벨, 음식 행은 상품 아님', () {
+      final p = foodHitFromServer({
+        'food_code': 'P101-103000100-5334', 'name_kr': '칙촉', 'kcal': 150.3, 'is_product': true, 'maker': '롯데웰푸드 주식회사', 'unit_label': '1회분(30g)',
+      });
+      expect([p.name, p.kcal, p.isProduct, p.maker, p.unitLabel, p.makerLabel], ['칙촉', 150, true, '롯데웰푸드 주식회사', '1회분(30g)', '롯데웰푸드']);
+      expect(foodHitFromServer({'food_code': 'D000001', 'name_kr': '흰쌀밥', 'kcal': 310, 'is_product': false}).isProduct, isFalse);
+      expect(shortMaker('(주)서주'), '서주');
+      expect(shortMaker('농업회사법인 ㈜ 우리밀'), '우리밀');
+    });
+
+    test('AI 초안 상품 2개: 단위 라벨로 열고(인분 아님) kcal = 1개 kcal × 2, 다른 후보로 바꾸면 라벨 없음', () {
+      final s = ServerMealItem.fromJson({
+        'chosen_name': '칙촉 브라우니', 'name_candidates': ['칙촉 브라우니', '브라우니'], 'candidate_kcal': [190, 300],
+        'candidate_food_codes': ['P103-102020500-3561', 'D000099'], 'food_code': 'P103-102020500-3561', 'count': 1, 'portion_multiplier': 2,
+        'has_broth': false, 'needs_check': false, 'ai_kcal': 380, 'food_db_cache': {'unit_label': '1개(40g)'},
+      });
+      final it = mealItemFromServer(s, 0);
+      expect([it.kind, it.unitLabel, it.portion, it.mult, it.rawKcal], [ItemKind.side, '1개(40g)', '1개(40g)', 2.0, 380.0]);
+      expect(it.copyWith(cand: 1).unitLabel, isNull);
+      final w = mealItemToWire(it);
+      expect([w['food_code'], w['serving_kcal'], w['count'], w['portion_multiplier']], ['P103-102020500-3561', 190, 1, 2.0]);
+    });
+
+    test('이름이 밥으로 끝나는 상품도 밥(공기)이 아니라 상품 단위로', () {
+      final s = ServerMealItem.fromJson({
+        'chosen_name': '햇반 흰밥', 'name_candidates': ['햇반 흰밥'], 'candidate_kcal': [315], 'candidate_food_codes': ['P1'], 'food_code': 'P1',
+        'count': 1, 'portion_multiplier': 1, 'has_broth': false, 'ai_kcal': 315, 'food_db_cache': {'unit_label': '1개(210g)'},
+      });
+      expect(mealItemFromServer(s, 0).kind, ItemKind.side);
     });
   });
 

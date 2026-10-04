@@ -165,13 +165,16 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       return;
     }
     final hit = picked as FoodHit;
+    // 가공식품(상품, D63)은 1개 kcal 에 먹은 양 스테퍼(단위 라벨의 '개'·'회분'), 음식은 1인분 × 개수
+    final unit = hit.unitLabel;
     MealItem item(String id) => MealItem(
           id: id,
           candidates: [hit.name],
           candKcal: [hit.kcal],
           foodCodes: [hit.foodCode],
-          portion: '1인분',
-          kind: ItemKind.count,
+          unitLabels: [unit],
+          portion: unit ?? '1인분',
+          kind: unit != null ? ItemKind.side : ItemKind.count,
           confidence: Confidence.sure,
           fromSearch: true,
         );
@@ -569,9 +572,17 @@ class _ItemCard extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onRemove;
 
-  /// 1인분(밥은 1공기) 기준 분량. 먹은 양은 아래 스테퍼로 고른다.
+  /// 1인분(밥은 1공기, 상품은 단위 라벨) 기준 분량. 먹은 양은 아래 스테퍼로 고른다.
   String _assume() {
     final it = item;
+    final unit = it.unitLabel;
+    if (unit != null) {
+      return switch (it.kind) {
+        ItemKind.count => '$unit × ${it.count}',
+        ItemKind.soup => '$unit${it.brothOff ? ' · 국물 안 먹음 −40%' : ''}',
+        _ => unit,
+      };
+    }
     switch (it.kind) {
       case ItemKind.rice:
         return '1공기 · 약 ${fmtInt(it.grams ?? 0)} g';
@@ -691,7 +702,7 @@ class _ItemCard extends StatelessWidget {
 }
 
 /// 먹은 양(밥·국·반찬·기타 공통, D60): 0.1인분 단위 스테퍼(0.1~3.0) + ½·1·1.5·2 빠른 선택.
-/// 개수 항목은 같은 스테퍼로 '1개 크기'(0.1배 단위)를 고른다.
+/// 개수 항목은 같은 스테퍼로 '1개 크기'(0.1배 단위)를 고른다. 가공식품(상품)은 단위 라벨의 '개'·'회분' 단위(D63).
 /// 값은 0.1 단위 정수로 더하고 빼서 배수 = 정수 / 10 (부동소수 오차가 쌓이지 않게).
 class _PortionStepper extends StatelessWidget {
   const _PortionStepper({required this.item, required this.onChange});
@@ -705,7 +716,8 @@ class _PortionStepper extends StatelessWidget {
     final c = context.c;
     final tenths = portionTenths(item.mult);
     final isCount = item.kind == ItemKind.count;
-    final unit = isCount ? '배' : (item.kind == ItemKind.rice ? '공기' : '인분');
+    final product = item.unitLabel;
+    final unit = isCount ? '배' : (product != null ? productStepUnit(product) : (item.kind == ItemKind.rice ? '공기' : '인분'));
     final label = isCount ? '1개 크기' : '먹은 양';
     final text = '${(tenths / 10).toStringAsFixed(1)}$unit';
     void set(int t) => onChange((i) => i.copyWith(mult: t.clamp(minPortionTenths, maxPortionTenths) / 10));
@@ -821,15 +833,16 @@ class _FoodSearchSheetState extends ConsumerState<_FoodSearchSheet> {
               alignment: Alignment.center,
               decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(999), border: Border.all(color: c.border)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(h.recent ? Icons.history_rounded : Icons.restaurant_rounded, size: 14, color: c.fg2),
+                Icon(h.recent ? Icons.history_rounded : (h.isProduct ? Icons.inventory_2_rounded : Icons.restaurant_rounded), size: 14, color: c.fg2),
                 const SizedBox(width: 4),
-                Txt('${h.name} ', size: 13),
+                // 상품: '칙촉 · 롯데웰푸드 · 1회분(30g) 150' (kcal 은 그 단위 1개 값)
+                Flexible(child: Txt('${[h.name, ?h.makerLabel, ?h.unitLabel].join(' · ')} ', size: 13)),
                 NumText('${h.kcal}', size: 14, color: c.fg2),
               ]),
             ),
           ),
       ]),
-      const Txt.cap('kcal 은 1인분 추정치예요. 고른 뒤 분량·개수를 바꿀 수 있어요.'),
+      const Txt.cap('kcal 은 1인분 추정치예요(상품은 표시한 1개·1회분 값). 고른 뒤 분량·개수를 바꿀 수 있어요.'),
       ChButton('직접 입력 (이름·kcal)', kind: BtnKind.secondary, icon: Icons.edit_rounded, onPressed: () => Navigator.of(context).pop(_FoodSearchSheet.manual)),
     ], gap: 12));
   }

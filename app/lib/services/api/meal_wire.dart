@@ -36,7 +36,9 @@ Map<String, dynamic> mealItemToWire(MealItem it) {
 /// 서버 초안 항목 → P7 편집 항목. 개수와 배수를 모두 살려 서버와 같은 kcal 로 연다.
 MealItem mealItemFromServer(ServerMealItem s, int index) {
   final name = s.candidates[s.chosen];
-  final riceOrSoup = s.hasBroth || name.endsWith('밥');
+  // 가공식품(상품, D63)은 이름이 밥으로 끝나도 밥(공기)이 아니라 상품 단위로 연다
+  final product = s.unitLabel;
+  final riceOrSoup = s.hasBroth || (product == null && name.endsWith('밥'));
   // 밥·국이 개수 2 이상이면 개수를 먹은 양 배수로 접는다(2 × 1.5 → 3.0공기).
   // 3.0 을 넘어 줄이면 kcal 이 바뀌는 행과 그 밖의 개수 2 이상 행(옛 반찬 젓가락 수 포함)은 개수 항목.
   final foldedTenths = (s.portionMultiplier * s.count * 10).round();
@@ -53,7 +55,8 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
     candidates: s.candidates,
     candKcal: [for (final k in s.candidateKcal) k.round()],
     foodCodes: s.candidateFoodCodes,
-    portion: kind == ItemKind.rice ? '1공기' : (kind == ItemKind.count ? '개' : '1인분'),
+    portion: product ?? (kind == ItemKind.rice ? '1공기' : (kind == ItemKind.count ? '개' : '1인분')),
+    unitLabels: [for (var i = 0; i < s.candidates.length; i++) i == s.chosen ? product : null],
     kind: kind,
     baseCount: count,
     count: count,

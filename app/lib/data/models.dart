@@ -29,6 +29,7 @@ class MealItem {
     this.count = 1,
     this.foodCodes = const [],
     this.fromSearch = false,
+    this.unitLabels = const [],
   });
 
   final String id;
@@ -38,6 +39,10 @@ class MealItem {
 
   /// 검색으로 추가한 항목(input_type=search)
   final bool fromSearch;
+
+  /// 후보별 가공식품(상품) 1개 단위 라벨('1회분(30g)' · '1개(40g)' · '100g', D63). 음식·직접 입력 후보는 null
+  final List<String?> unitLabels;
+
   final List<String> candidates;
   final List<int> candKcal;
   final String portion;
@@ -56,6 +61,9 @@ class MealItem {
   final int count;
 
   String get name => candidates[cand];
+
+  /// 고른 후보가 상품이면 그 단위 라벨, 아니면 null
+  String? get unitLabel => cand < unitLabels.length ? unitLabels[cand] : null;
 
   /// 체크 여부와 무관하게 현재 선택의 kcal
   double get rawKcal {
@@ -84,6 +92,7 @@ class MealItem {
         count: count ?? this.count,
         foodCodes: foodCodes,
         fromSearch: fromSearch,
+        unitLabels: unitLabels,
       );
 }
 
@@ -420,13 +429,31 @@ MyReview? openReviewOn(List<MyReview>? reviews, DateTime day) {
 }
 
 /// 음식 검색·최근 음식 한 건(1인분 kcal). 서버: food_search(식약처 DB, pg_trgm) / recent_foods(30일 확정)
+/// 가공식품(상품) 행(D63)은 1개(포장 전체·1회분·100g) kcal 과 제조사·단위 라벨을 함께 준다.
 class FoodHit {
-  const FoodHit({required this.name, required this.kcal, this.foodCode, this.recent = false});
+  const FoodHit({required this.name, required this.kcal, this.foodCode, this.recent = false, this.isProduct = false, this.maker, this.unitLabel});
   final String name;
   final int kcal;
   final String? foodCode;
   final bool recent;
+  final bool isProduct;
+  final String? maker;
+
+  /// 상품 1개 단위 라벨('1회분(30g)' 등). 음식은 null
+  final String? unitLabel;
+
+  /// 화면용 제조사 이름(회사 형태 표기를 뺀다)
+  String? get makerLabel => switch (maker) { final m? => shortMaker(m), null => null };
 }
+
+/// 제조사 이름에서 회사 형태 표기를 뺀다: '롯데웰푸드 주식회사' → '롯데웰푸드', '(주)서주' → '서주'
+String shortMaker(String maker) {
+  final s = maker.replaceAll(RegExp(r'농업회사법인|영농조합법인|유한회사|주식회사|\(주\)|\(유\)|㈜'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  return s.isEmpty ? maker.trim() : s;
+}
+
+/// 상품 단위 라벨 → 먹은 양 스테퍼 단위: '1회분(30g)' → '회분', 그 밖('1개(40g)' · '100g')은 '개'
+String productStepUnit(String unitLabel) => unitLabel.startsWith('1회분') ? '회분' : '개';
 
 /// 순위 통계(서버 participant_rank_stats, D49): 순위 점수 = 일평균 × (1 + 참여율). 최소 참여일 전이면 순위 대기.
 class RankStats {
