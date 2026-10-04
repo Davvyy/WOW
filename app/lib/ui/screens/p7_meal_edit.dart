@@ -355,8 +355,11 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final isSnackLevel = total > 0 && total < engine.rules.snackKcal;
     final auto = _origin.status == MealStatus.auto;
     final m = fmtM(meM);
-    // 이 칸의 대체값: 오늘은 max(M_p, 전날 같은 끼니)(D61), 지난 날은 M_p
-    final sub = fmtM(isPast ? meM : ref.watch(todayResultProvider).intake.substituteFor(slot));
+    // 이 칸의 대체값(D61): 오늘은 오늘 엔진 결과 max(M_p, 전날 같은 끼니),
+    // 지난 날은 그 날짜 장부 행에서 서버가 쓴 값(행이나 그 칸 값이 없으면 M_p)
+    final sub = fmtM(isPast
+        ? ref.watch(ledgerProvider).value?.where((r) => r.localDate == date).firstOrNull?.substituteValues[slot] ?? meM
+        : ref.watch(todayResultProvider).intake.substituteFor(slot));
     // 간식은 대체값이 없어 1.3×AI 그대로 자동 확정(D55). 끼니는 max(M_p, 1.3×AI).
     final isSnackSlot = slot == MealSlot.snack;
     final autoVal = isSnackSlot ? engine.rules.autoConfirm * _aiTotal : engine.autoConfirmValue(curMe.bmr, _aiTotal);
