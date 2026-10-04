@@ -113,6 +113,39 @@ returns table (name text, food_code text, kcal numeric, last_used timestamptz, i
   limit greatest(1, least(coalesce(p_limit, 20), 50))
 $$;
 
+-- 상품 매칭: 띄어쓰기만 다른 같은 이름('홈런볼 초코' = '홈런볼초코')은 점수 1 로 부분 유사도('홈런볼 초코&딸기 2MIX')보다 먼저.
+-- trgm 은 띄어쓰기로 낱말을 나눠 붙여 쓴 이름의 유사도가 낮고 상위 20에도 못 들 수 있어 공백 뺀 이름으로 따로 찾는다.
+-- 원래 이름과 브랜드를 뗀 이름 모두에 쓰고, 뗀 이름은 전과 같이 그 단어가 제조사에 들 때만(I1).
+create index if not exists food_db_cache_product_nospace on food_db_cache (regexp_replace(name_kr, '\s+', '', 'g')) where is_product;
+
+create or replace function map_food_pick(p_candidates text[], p_product boolean) returns jsonb
+  language sql stable security definer set search_path = public, extensions as $$
+  with r as materialized (
+    select * from (
+      select m.*, c.ord, c.stripped, coalesce(c.brand is not null and m.maker ilike '%' || c.brand || '%', false) as brand_hit
+      from food_name_variants(p_candidates, p_product) c, lateral (
+        select * from food_match(c.name, p_product, false)
+        union all
+        select f.food_code, f.name_kr, f.kcal, f.serving_g, 1::real, true, f.maker, f.unit_label
+        from food_db_cache f
+        where p_product and f.is_product and regexp_replace(f.name_kr, '\s+', '', 'g') = regexp_replace(c.name, '\s+', '', 'g')
+      ) m) v
+    where not v.stripped or v.brand_hit),
+  best as (select * from r order by score desc, brand_hit desc, stripped, ord, food_code limit 1),
+  chips as (select distinct on (food_code) * from r order by food_code, score desc)
+  select jsonb_build_object(
+    'match', case when b.score >= 0.45 then 'auto' when b.score >= 0.25 then 'chips' else 'none' end,
+    'food_code', case when b.score >= 0.45 then b.food_code end,
+    'kcal', case when b.score >= 0.45 then b.kcal end,
+    'score', b.score,
+    'is_product', p_product,
+    'chips', (select coalesce(jsonb_agg(jsonb_build_object('food_code', z.food_code, 'name', z.name_kr, 'kcal', z.kcal, 'score', z.score,
+      'is_product', z.is_product) order by z.score desc, z.food_code), '[]') from chips z))
+  from (select 1) one left join best b on true
+$$;
+revoke execute on function map_food_pick(text[], boolean) from public, anon, authenticated;
+grant execute on function map_food_pick(text[], boolean) to service_role;
+
 revoke execute on function product_pieces_for(uuid, text[]) from public, anon, authenticated;
 grant execute on function product_pieces_for(uuid, text[]) to service_role;
 revoke execute on function set_product_pieces(text, int), food_search(text), recent_foods(int) from public, anon;

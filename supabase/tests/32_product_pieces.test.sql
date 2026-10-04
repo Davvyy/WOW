@@ -124,4 +124,24 @@ begin
   perform tests.eq(array[s.kcal, s.serving_g, s.package_g, s.pieces]::numeric[], array[150.3, 30, 180, 24]::numeric[], '최근 음식: 1회분 kcal·양·포장·개입 수');
 end $$;
 reset role;
+
+-- ---------------- 상품 매칭: 띄어쓰기만 다른 같은 이름이 부분 유사도보다 먼저(브랜드를 뗀 이름은 제조사에 그 브랜드가 있을 때만)
+insert into food_db_cache (food_code, name_kr, category, serving_g, kcal, is_product, maker, unit_label, package_g) values
+  ('P900-000000000-0201', '홈런볼초코', '비스킷/쿠키/크래커', 46, 174, true, '해태제과식품(주)', '1개(46g)', 46),
+  ('P900-000000000-0202', '홈런볼 초코&딸기 2MIX', '비스킷/쿠키/크래커', 30, 160, true, '해태제과식품(주)', '1회분(30g)', 300);
+do $$
+declare r jsonb;
+begin
+  r := map_food_candidates(array['홈런볼 초코'], true);
+  perform tests.eq(r ->> 'food_code', 'P900-000000000-0201', '상품 매칭: 홈런볼 초코 → 홈런볼초코(띄어쓰기 무시 같은 이름)');
+  perform tests.eq((r ->> 'kcal')::numeric, 174::numeric, '상품 매칭: 홈런볼초코 174 kcal');
+  perform tests.eq(r ->> 'match', 'auto', '상품 매칭: 같은 이름은 자동');
+  r := map_food_candidates(array['해태 홈런볼 초코'], true);
+  perform tests.eq(r ->> 'food_code', 'P900-000000000-0201', '상품 매칭: 해태 홈런볼 초코 → 브랜드 뗀 이름이 홈런볼초코(제조사 해태)');
+  r := map_food_candidates(array['홈런볼 초코&딸기 2MIX'], true);
+  perform tests.eq(r ->> 'food_code', 'P900-000000000-0202', '상품 매칭: 2MIX 는 그대로');
+  r := map_food_candidates(array['오리온 홈런볼 초코'], true);
+  perform tests.ok(not exists (select 1 from jsonb_array_elements(r -> 'chips') e where (e ->> 'score')::numeric = 1),
+    '상품 매칭: 제조사에 없는 브랜드를 뗀 이름은 같은 이름으로 치지 않음');
+end $$;
 rollback;
