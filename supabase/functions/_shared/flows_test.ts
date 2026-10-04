@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from '@std/assert';
-import { createMealFlow, deleteAccountFlow, deleteMealFlow, mealIdOf } from './flows.ts';
+import { confirmMealFlow, createMealFlow, deleteAccountFlow, deleteMealFlow, mealIdOf } from './flows.ts';
 import { HttpError } from './http.ts';
 import { imageSize, sha256Bytes } from './image.ts';
 
@@ -126,4 +126,24 @@ Deno.test('끼니 삭제: Storage 삭제가 실패하면 파기 표시를 되돌
     assertEquals(await deleteMealFlow(deps, 'm1'), { ...row, photo_retry: true });
     assertEquals(unmarked, [['c/p/y.jpg']]);
   }
+});
+
+// 확정(D67): 낱개 단위 정정의 AI kcal 맞춤을 먼저 부르고, 그게 안 돼도 확정은 그대로
+Deno.test('확정: AI kcal 맞춤 → confirm_meal 순서, 맞춤 오류는 확정을 막지 않는다', async () => {
+  const calls: string[] = [];
+  const logged: unknown[] = [];
+  const args = { meal_id: 'm1', items: [{ food_code: 'P1', serving_kcal: 37.6 }], version: 3 };
+  const deps = (fail: boolean) => ({
+    rebase: (a: typeof args) => { calls.push(`rebase ${a.meal_id} v${a.version}`); return fail ? Promise.reject(new Error('db')) : Promise.resolve(); },
+    confirm: (a: typeof args) => { calls.push(`confirm ${a.meal_id} v${a.version}`); return Promise.resolve({ confirmed_kcal: 37.6 }); },
+    log: (e: unknown) => { logged.push(e); },
+  });
+  assertEquals(await confirmMealFlow(deps(false), args), { confirmed_kcal: 37.6 });
+  assertEquals(calls, ['rebase m1 v3', 'confirm m1 v3']);
+  assertEquals(logged.length, 0);
+  calls.length = 0;
+  assertEquals(await confirmMealFlow(deps(true), args), { confirmed_kcal: 37.6 });
+  assertEquals(calls, ['rebase m1 v3', 'confirm m1 v3'], '맞춤이 실패해도 확정');
+  assertEquals(logged.length, 1, '맞춤 오류는 기록만');
+  await assertRejects(() => confirmMealFlow({ ...deps(false), confirm: () => Promise.reject(new HttpError(412, 'version mismatch')) }, args), HttpError);
 });

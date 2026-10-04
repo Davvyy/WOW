@@ -84,3 +84,28 @@ export async function deleteMealFlow(deps: DeleteMealDeps, mealId: string): Prom
   await deps.unmarkPurged(failed).catch((e) => console.error('meal-delete unmark failed', failed, e instanceof Error ? e.message : e));
   return { ...body, photo_retry: true };
 }
+
+// ---------------------------------------------------------------- POST meal-confirm
+export interface ConfirmMealArgs {
+  meal_id: string;
+  items: unknown[];
+  version: number;
+}
+
+export interface ConfirmMealDeps<R> {
+  /** AI 가 낱개 포장 하나로 본 항목의 1개 단위 정정에 맞춰 AI 초안 kcal 을 다시 쓴다(rebase_ai_kcal_for_pieces, D67) */
+  rebase(a: ConfirmMealArgs): Promise<void>;
+  /** confirm_meal: kcal 계산·하향 수정 판정·정정 창·잠정 재계산 */
+  confirm(a: ConfirmMealArgs): Promise<R>;
+  log(e: unknown): void;
+}
+
+/** 확정: AI kcal 맞춤을 먼저, 그다음 confirm_meal. 맞춤이 안 되면 기록만 하고 확정은 그대로(그때는 예전처럼 판정). */
+export async function confirmMealFlow<R>(deps: ConfirmMealDeps<R>, a: ConfirmMealArgs): Promise<R> {
+  try {
+    await deps.rebase(a);
+  } catch (e) {
+    deps.log(e);
+  }
+  return await deps.confirm(a);
+}

@@ -17,7 +17,7 @@ end $$;
 -- 지수의 간식 초안: 칙촉 낱개 봉지(1회분 150.3, ai_single_piece) [+ 흰쌀밥 310 → AI 460.3]
 create temp table t_meal (k text primary key, id uuid);
 grant all on t_meal to public;
-create or replace function pg_temp.draft(p_key text, p_shot text, p_rice boolean default true) returns uuid language plpgsql as $$
+create or replace function pg_temp.draft(p_key text, p_shot text, p_rice boolean default true, p_single boolean default true) returns uuid language plpgsql as $$
 declare uid uuid := tests.uid('지수'); r jsonb; ph uuid; m uuid;
 begin
   r := create_photo(uid, repeat(p_shot, 32), 400000, 1568, 1176, '2026-10-14 12:30+09', '2026-10-14 12:30+09'); ph := (r ->> 'photo_id')::uuid;
@@ -25,7 +25,7 @@ begin
   r := create_meal(uid, ph, false, '2026-10-14 12:30+09', p_slot => 'snack'); m := (r ->> 'meal_id')::uuid;
   insert into meal_items (meal_id, name_candidates, chosen_name, food_code, input_type, count, portion_multiplier, ai_kcal, serving_kcal,
     candidate_kcal, candidate_food_codes, ai_single_piece) values
-    (m, '{칙촉}', '칙촉', 'P900-000000000-3601', 'ai', 1, 1.0, 150.3, 150.3, '{150.3}', '{P900-000000000-3601}', true);
+    (m, '{칙촉}', '칙촉', 'P900-000000000-3601', 'ai', 1, 1.0, 150.3, 150.3, '{150.3}', '{P900-000000000-3601}', p_single);
   if p_rice then
     insert into meal_items (meal_id, name_candidates, chosen_name, food_code, input_type, count, portion_multiplier, ai_kcal, serving_kcal)
       values (m, '{흰쌀밥}', '흰쌀밥', 'D900361', 'ai', 1, 1.0, 310, 310);
@@ -89,6 +89,17 @@ declare uid uuid := tests.uid('지수'); m uuid := pg_temp.draft('d', 'a5', fals
 begin
   v := (select version from meals where id = m);
   perform tests.eq(rebase_ai_kcal_for_pieces(uid, m, pg_temp.items(37.6, 1, false), v), 37.6, '칙촉만: 끼니 AI 37.6');
+  -- 감사 기록: 바꾼 항목마다 한 줄(끼니·항목·AI kcal 전후·개입 수), 끼니 AI kcal 전후
+  perform tests.eq((select count(*)::int from audit_logs where action = 'ai_kcal_rebased_pieces' and target ->> 'meal_id' = m::text), 1, '감사: 한 줄');
+  perform tests.eq((select array[actor_id::text, actor_role, challenge_id::text, target ->> 'item', target ->> 'food_code',
+      target ->> 'old_ai_kcal', target ->> 'new_ai_kcal', target ->> 'pieces', before ->> 'meal_ai_kcal', after ->> 'meal_ai_kcal']
+    from audit_logs where action = 'ai_kcal_rebased_pieces' and target ->> 'meal_id' = m::text),
+    array[uid::text, 'participant', (select p.challenge_id::text from meals x join participants p on p.id = x.participant_id where x.id = m),
+      (select id::text from meal_items where meal_id = m), 'P900-000000000-3601', '150.3', '37.6', '24', '150.3', '37.6'],
+    '감사: 누가·어느 챌린지·항목·150.3 → 37.6·24개입·끼니 150.3 → 37.6');
+  perform rebase_ai_kcal_for_pieces(uid, m, pg_temp.items(37.6, 1, false), v);
+  perform tests.eq((select count(*)::int from audit_logs where action = 'ai_kcal_rebased_pieces' and target ->> 'meal_id' = m::text), 1,
+    '감사: 다시 불러 바뀐 것이 없으면 더 쓰지 않음');
   r := confirm_meal(uid, m, pg_temp.items(37.6, 1, false), v, '2026-10-14 12:40+09');
   perform tests.eq((r ->> 'confirmed_kcal')::numeric, 37.6, '확정 37.6');
   perform tests.eq((r ->> 'delta_ratio')::numeric, 1::numeric, 'AI 대비 1.0');
@@ -97,6 +108,20 @@ begin
   perform tests.eq((select bool_or(ai_single_piece) from meal_items where meal_id = m), false, '확정한 항목은 낱개 표시를 남기지 않음');
   -- 확정한 끼니는 맞추지 않는다
   perform tests.ok(rebase_ai_kcal_for_pieces(uid, m, pg_temp.items(37.6, 1, false), v + 1) is null, '확정한 끼니: 맞추지 않음');
+end $$;
+
+-- AI 가 낱개 포장으로 보지 않은 항목은 개입 수로 1개 단위를 써도 원래 AI kcal 로 하향 판정(사용자가 넣은 개입 수만으로 기준을 낮추지 않는다)
+do $$
+declare uid uuid := tests.uid('지수'); m uuid := pg_temp.draft('e', 'a6', false, false); r jsonb; v int;
+begin
+  v := (select version from meals where id = m);
+  perform tests.eq(rebase_ai_kcal_for_pieces(uid, m, pg_temp.items(37.6, 1, false), v), 150.3, '낱개 표시 없음: AI 그대로');
+  perform tests.eq((select ai_kcal from meal_items where meal_id = m), 150.3, '낱개 표시 없음: 항목 AI 그대로');
+  perform tests.eq((select count(*)::int from audit_logs where action = 'ai_kcal_rebased_pieces' and target ->> 'meal_id' = m::text), 0,
+    '낱개 표시 없음: 감사 기록 없음');
+  r := confirm_meal(uid, m, pg_temp.items(37.6, 1, false), v, '2026-10-14 12:50+09');
+  perform tests.eq((r ->> 'confirmed_kcal')::numeric, 37.6, '낱개 표시 없음: 1개 단위 확정은 그대로 된다');
+  perform tests.ok(r -> 'flags' ? 'downward_edit', '낱개 표시 없음: 150.3 → 37.6 은 예전처럼 하향 수정 표시');
 end $$;
 
 -- 1개 단위로 바꿨어도 개수를 AI 보다 크게 줄이면(칙촉 3봉지 → 1개) 하향 수정은 그대로 본다
