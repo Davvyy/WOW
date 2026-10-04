@@ -67,6 +67,18 @@ void main() {
       final none = engine.simulate(simulateInputFromJson({'bmr': bmr, 'weight_kg': 70}));
       expect(none.intake.iD, closeTo(2227.5, 1e-9));
     });
+
+    test('JSON prev_slots 의 null 값은 0(→ M_p)으로 읽는다', () {
+      final input = simulateInputFromJson({
+        'bmr': bmr,
+        'weight_kg': 70,
+        'prev_slots': {'lunch': null, 'dinner': 900},
+      });
+      expect(input.prevSlots, {MealSlot.lunch: 0.0, MealSlot.dinner: 900.0});
+      final s = engine.simulate(input);
+      expect(s.intake.substituteValues[MealSlot.lunch], mP);
+      expect(s.intake.iD, closeTo(mP * 2 + 900, 1e-9));
+    });
   });
 
   group('전날 장부 행 → 칸별 kcal', () {

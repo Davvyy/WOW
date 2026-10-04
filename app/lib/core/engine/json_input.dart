@@ -49,10 +49,10 @@ SimulateInput simulateInputFromJson(Map<String, dynamic> j) {
           aiKcal: (m['ai_kcal'] as num?)?.toDouble(),
         ),
     ],
-    // 전날 칸별 등록 kcal(D61). 서버 입력과 같은 {"lunch": 900} 형식, 모르는 칸 이름은 버린다.
+    // 전날 칸별 등록 kcal(D61). 서버 입력과 같은 {"lunch": 900} 형식, 모르는 칸 이름은 버리고 null 은 0.
     prevSlots: {
       for (final e in (j['prev_slots'] as Map? ?? const {}).entries)
-        ?MealSlot.values.asNameMap()[e.key]: (e.value as num).toDouble(),
+        ?MealSlot.values.asNameMap()[e.key]: (e.value as num?)?.toDouble() ?? 0,
     },
   );
 }
