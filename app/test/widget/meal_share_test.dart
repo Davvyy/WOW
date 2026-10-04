@@ -21,7 +21,10 @@ class _FakeSharer implements MealSharer {
   Future<void> shareImage(Uint8List png, {required String fileName, required String text}) async => calls.add((png, fileName, text));
 }
 
-Uint8List _png() => Uint8List.fromList(img.encodePng(img.Image(width: 4, height: 4)));
+Uint8List _png({int width = 4, int height = 4}) => Uint8List.fromList(img.encodePng(img.Image(width: width, height: height)));
+
+Size _photoSize(WidgetTester tester) =>
+    tester.getSize(find.byWidgetPredicate((w) => w is Image && w.image is MemoryImage));
 
 const _data = MealShareData(
   title: '10.5 점심',
@@ -41,13 +44,29 @@ void main() {
       expect(find.textContaining('점수'), findsNothing);
       expect(find.textContaining('순위'), findsNothing);
       expect(find.byType(Image).evaluate().where((e) => (e.widget as Image).image is MemoryImage), isEmpty);
-      expect(tester.getSize(find.byType(MealShareCard)), MealShareCard.size);
+      expect(tester.getSize(find.byType(MealShareCard)).width, MealShareCard.width);
     });
 
     testWidgets('사진이 있으면 사진을 보여 준다', (tester) async {
       final withPhoto = MealShareData(title: _data.title, lines: _data.lines, moreCount: 0, total: 680, photo: _png());
       await pumpWidgetScreen(tester, Scaffold(body: Center(child: MealShareCard(data: withPhoto))));
       expect(find.byType(Image).evaluate().where((e) => (e.widget as Image).image is MemoryImage), hasLength(1));
+    });
+
+    test('사진 비율: 가로·세로 크기에서 계산, 사진이 아니면 null', () {
+      expect(photoAspectOf(_png(width: 400, height: 300)), closeTo(4 / 3, 1e-9));
+      expect(photoAspectOf(_png(width: 300, height: 400)), closeTo(3 / 4, 1e-9));
+      expect(photoAspectOf(Uint8List.fromList([1, 2, 3])), isNull);
+    });
+
+    testWidgets('사진은 잘리지 않게 제 비율로: 4:3 가로 사진은 360×270, 세로 사진은 4:5(360×450)까지', (tester) async {
+      MealShareData withPhoto(Uint8List p) => MealShareData(title: _data.title, lines: _data.lines, moreCount: 0, total: 680, photo: p);
+      await pumpWidgetScreen(tester, Scaffold(body: SingleChildScrollView(child: MealShareCard(data: withPhoto(_png(width: 400, height: 300))))));
+      expect(_photoSize(tester), const Size(360, 270));
+      await pumpWidgetScreen(tester, Scaffold(body: SingleChildScrollView(child: MealShareCard(data: withPhoto(_png(width: 300, height: 400))))));
+      expect(_photoSize(tester), const Size(360, 450));
+      await pumpWidgetScreen(tester, Scaffold(body: SingleChildScrollView(child: MealShareCard(data: withPhoto(_png(width: 1600, height: 900))))));
+      expect(_photoSize(tester).height, closeTo(202.5, 0.01));
     });
   });
 

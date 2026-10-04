@@ -11,13 +11,13 @@ import '../../services/share/meal_share.dart';
 import '../../state/app_state.dart';
 import 'common.dart';
 
-/// 식사 공유 카드(4:5). 밖으로 나가는 이미지라 앱 테마(다크 모드)와 무관하게 밝은 색으로 고정한다.
-/// [size] × [pixelRatio] = 1080×1350 px.
+/// 식사 공유 카드. 밖으로 나가는 이미지라 앱 테마(다크 모드)와 무관하게 밝은 색으로 고정한다.
+/// 너비 [width] × [pixelRatio] = 1080 px. 사진은 잘리지 않게 제 비율([photoBoxAspect])로 넣고, 높이는 내용에 맞춘다.
 class MealShareCard extends StatelessWidget {
   const MealShareCard({super.key, required this.data});
   final MealShareData data;
 
-  static const size = Size(360, 450);
+  static const width = 360.0;
   static const pixelRatio = 3.0;
 
   @override
@@ -36,13 +36,13 @@ class MealShareCard extends StatelessWidget {
           ]),
         );
 
-    return SizedBox.fromSize(
-      size: size,
+    return SizedBox(
+      width: width,
       child: ColoredBox(
         color: c.bg,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (photo != null)
-            SizedBox(height: 190, child: Image.memory(photo, fit: BoxFit.cover, gaplessPlayback: true))
+            AspectRatio(aspectRatio: photoBoxAspect(photo), child: Image.memory(photo, fit: BoxFit.cover, gaplessPlayback: true))
           else
             Container(
               height: 76,
@@ -50,15 +50,14 @@ class MealShareCard extends StatelessWidget {
               color: c.brandSoft,
               child: Row(children: [Icon(Icons.restaurant_rounded, color: c.brand, size: 30)]),
             ),
-          Expanded(
-            child: Padding(
+          Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Text(data.title, style: T.body(c, size: 17, w: FontWeight.w600)),
                 const SizedBox(height: 6),
                 ...data.lines.map(line),
                 if (data.moreCount > 0) Text('외 ${data.moreCount}개', style: T.body(c, size: 13, color: c.fg2)),
-                const Spacer(),
+                const SizedBox(height: 12),
                 Divider(height: 14, color: c.border),
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Text('합계', style: T.body(c, size: 15, w: FontWeight.w600)),
@@ -71,7 +70,6 @@ class MealShareCard extends StatelessWidget {
                 ]),
               ]),
             ),
-          ),
           Container(
             height: 48,
             color: c.brand,
@@ -154,17 +152,15 @@ class _MealShareSheetState extends ConsumerState<_MealShareSheet> {
       const SizedBox(height: 12),
       Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: MealShareCard.size.width),
-          child: AspectRatio(
-            aspectRatio: MealShareCard.size.width / MealShareCard.size.height,
-            child: FittedBox(
+          constraints: const BoxConstraints(maxWidth: MealShareCard.width),
+          // 좁은 화면이면 카드 전체를 비율 그대로 줄여 보여 준다(공유 이미지는 늘 1080 px 너비)
+          child: FittedBox(
             child: data == null
-                ? SizedBox.fromSize(size: MealShareCard.size, child: const Center(child: CircularProgressIndicator()))
+                ? const SizedBox(width: MealShareCard.width, height: 450, child: Center(child: CircularProgressIndicator()))
                 : ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: RepaintBoundary(key: _boundary, child: MealShareCard(data: data)),
                   ),
-            ),
           ),
         ),
       ),

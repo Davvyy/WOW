@@ -60,6 +60,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   /// 이 폰에 보관된 사진(공유용 7일 보관본). 없으면 색 배경
   Uint8List? _photo;
 
+  /// 사진 칸 비율([photoBoxAspect])
+  double _photoAspect = 4 / 3;
+
   @override
   void initState() {
     super.initState();
@@ -104,7 +107,12 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final id = _origin.serverId;
     if (id == null) return;
     final bytes = await ref.read(sharePhotoStoreProvider).get(id);
-    if (mounted && bytes != null) setState(() => _photo = bytes);
+    if (mounted && bytes != null) {
+      setState(() {
+        _photo = bytes;
+        _photoAspect = photoBoxAspect(bytes);
+      });
+    }
   }
 
   void _setDraft(MealRecord m) {
@@ -340,8 +348,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final skipsToday = meals.where((m) => m.status == MealStatus.skipped && m.slot != slot).length;
     final remaining = engine.rules.skipPerWeek - skipsUsed - skipsToday;
     final skipLimit = remaining <= 0 || skipsToday >= engine.rules.skipPerDay;
-    // 건너뜀은 기록이 하나도 없는 끼니 슬롯에서만(이미 기록이 있는 슬롯이면 버튼을 끈다)
-    final canSkip = slot != MealSlot.snack && mealsIn(meals, slot).isEmpty;
+    // 건너뜀은 끼니를 채운 기록이 없을 때만(비었거나 간식 수준 기록뿐인 슬롯)
+    final canSkip = canSkipSlot(meals, slot, snackKcal: engine.rules.snackKcal);
     final total = _total;
     final isSnackLevel = total > 0 && total < engine.rules.snackKcal;
     final auto = _origin.status == MealStatus.auto;
@@ -356,8 +364,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final unchecked = _items.where((i) => !i.checked).length;
     final searchMode = (widget.searchOnly || _searchFallback) && _items.isEmpty;
 
-    Widget photo() => Container(
-          height: 150,
+    // 사진이 있으면 잘리지 않게 제 비율(세로 4:5 ~ 가로 16:9)로, 없으면 150 높이 띠
+    Widget photoBox() => Container(
+          height: _photo == null ? 150 : null,
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
           alignment: Alignment.bottomLeft,
           decoration: BoxDecoration(
@@ -376,6 +385,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
             ]),
           ),
         );
+    // 사진이 있으면 잘리지 않게 제 비율(세로 4:5 ~ 가로 16:9)로, 없으면 150 높이 띠
+    Widget photo() => _photo == null ? photoBox() : AspectRatio(aspectRatio: _photoAspect, child: photoBox());
 
     // 없는 끼니: 첫 프레임 뒤 홈으로 돌아가므로 빈 화면만(확정 버튼 없음)
     if (_missing) return ChScaffold(title: '$label 확인', backFallback: R.home, children: const []);
@@ -454,7 +465,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           InfoBanner(
             tone: Tone.neutral,
             icon: Icons.cookie_rounded,
-            child: boldThen(context, '150 kcal 미만은 간식이에요.', ' 섭취에는 더해지지만 끼니 슬롯은 채우지 않아요.', color: c.fg2),
+            child: boldThen(context, '150 kcal 미만은 간식이에요.', ' 섭취에는 더해지지만 끼니 슬롯은 채우지 않아요.${!isPast && canSkip && !skipLimit ? ' 이 끼니를 먹지 않았다면 건너뜀을 눌러 주세요.' : ''}', color: c.fg2),
           ),
         for (var i = 0; i < _items.length; i++)
           // 보기만 하는 지난 날 끼니는 항목을 바꿀 수 없다

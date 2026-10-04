@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:image/image.dart' as img;
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/engine/engine.dart';
@@ -45,6 +46,20 @@ class MealShareData {
   /// 공유 창에 함께 넘기는 문구
   String get caption => '$title · 약 ${fmtInt(total)} kcal #챌로리';
 }
+
+/// 사진의 가로÷세로 비율. 헤더만 읽어 빠르다(전체 디코딩 없음). 사진이 아니면 null.
+double? photoAspectOf(Uint8List bytes) {
+  try {
+    final info = img.findDecoderForData(bytes)?.startDecode(bytes);
+    if (info == null || info.width <= 0 || info.height <= 0) return null;
+    return info.width / info.height;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// 사진을 보여 주는 칸의 비율: 사진 제 비율로 두되 세로 사진은 4:5, 가로 사진은 16:9 까지(너무 길거나 납작하지 않게)
+double photoBoxAspect(Uint8List? bytes) => ((bytes == null ? null : photoAspectOf(bytes)) ?? 4 / 3).clamp(4 / 5, 16 / 9);
 
 /// kcal 이 정해진 끼니(확정·자동 확정·정정)만 공유한다. AI 초안은 숫자가 바뀔 수 있어 제외.
 bool canShareMeal(MealRecord m) =>
