@@ -50,7 +50,7 @@ class MealItem {
   /// 선택된 후보 인덱스(이름과 kcal이 함께 바뀐다)
   final int cand;
 
-  /// 먹은 양 배수(개수 항목 밖: 0.1인분 단위, 0.1~3.0)
+  /// 먹은 양 배수(0.1 단위, 0.1~3.0). 개수 항목은 1개 크기 배수(달걀 2개 × 1.2배)
   final double mult;
   final bool brothOff;
   final int count;
@@ -60,7 +60,7 @@ class MealItem {
   /// 체크 여부와 무관하게 현재 선택의 kcal
   double get rawKcal {
     var k = candKcal[cand].toDouble();
-    k = kind == ItemKind.count ? k * count : k * mult;
+    k = kind == ItemKind.count ? k * count * mult : k * mult; // 개수 항목: 개수 × 1개 크기 배수
     if (kind == ItemKind.soup && brothOff) k *= EngineRules.defaults.brothFactor; // 국물 −40%
     return k;
   }

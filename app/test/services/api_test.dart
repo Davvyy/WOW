@@ -161,10 +161,64 @@ void main() {
       final back = reopen(old);
       expect(back.kind, ItemKind.count);
       expect(back.count, 3);
+      expect(back.mult, 1.0);
       expect(back.rawKcal, 60);
       final w = mealItemToWire(back);
       expect([w['count'], w['portion_multiplier']], [3, 1.0]);
       expect(wireTotal([w]), 60);
+    });
+  });
+
+  group('개수 항목도 1개 크기 배수를 지킨다 · 다시 연 밥·국은 개수를 배수로', () {
+    MealItem reopen(Map<String, dynamic> w) => mealItemFromServer(ServerMealItem.fromJson(_storedByConfirm(w)), 0);
+    Map<String, dynamic> row(String name, int serving, int count, double mult, {bool broth = false}) => {
+          'chosen_name': name, 'name_candidates': [name], 'candidate_kcal': [serving], 'serving_kcal': serving,
+          'count': count, 'portion_multiplier': mult, 'has_broth': broth, 'eaten': true,
+        };
+
+    test('달걀 2개 × 1.2배: kcal = 78 × 2 × 1.2, 보내고 다시 열어도 개수·배수 그대로', () {
+      const egg = MealItem(id: 'e', candidates: ['삶은 달걀'], candKcal: [78], portion: '개', kind: ItemKind.count, count: 2, mult: 1.2);
+      expect(egg.rawKcal, closeTo(187.2, 1e-9));
+      final w = mealItemToWire(egg);
+      expect([w['count'], w['portion_multiplier']], [2, 1.2]);
+      expect(wireTotal([w]), 187.2);
+      final back = reopen(w);
+      expect(back.kind, ItemKind.count);
+      expect([back.count, back.mult], [2, 1.2]);
+      expect(back.rawKcal, closeTo(187.2, 1e-9));
+      expect(wireTotal([mealItemToWire(back)]), 187.2);
+    });
+
+    test('개수 항목 배수도 0.1 단위로 보낸다', () {
+      const egg = MealItem(id: 'e', candidates: ['삶은 달걀'], candKcal: [78], portion: '개', kind: ItemKind.count, count: 2, mult: 0.1 + 0.2);
+      expect(mealItemToWire(egg)['portion_multiplier'], 0.3);
+    });
+
+    test('밥 2개 × 1.5: 밥으로 다시 열고 3.0공기, 같은 kcal', () {
+      final back = reopen(row('흰쌀밥', 300, 2, 1.5));
+      expect(back.kind, ItemKind.rice);
+      expect([back.count, back.mult], [1, 3.0]);
+      expect(back.rawKcal, 900);
+      final w = mealItemToWire(back);
+      expect([w['count'], w['portion_multiplier']], [1, 3.0]);
+      expect(wireTotal([w]), 900);
+    });
+
+    test('국 2개 × 0.8: 국으로 다시 열고 1.6인분, 국물 토글 그대로', () {
+      final back = reopen({...row('된장국', 100, 2, 0.8, broth: true), 'broth_off': true});
+      expect(back.kind, ItemKind.soup);
+      expect([back.count, back.mult, back.brothOff], [1, 1.6, true]);
+      expect(back.rawKcal, closeTo(96, 1e-9));
+    });
+
+    test('밥 3개 × 1.5(4.5 > 3.0): 줄이면 kcal 이 바뀌므로 개수 항목으로, 같은 kcal', () {
+      final back = reopen(row('흰쌀밥', 300, 3, 1.5));
+      expect(back.kind, ItemKind.count);
+      expect([back.count, back.mult], [3, 1.5]);
+      expect(back.rawKcal, 1350);
+      final w = mealItemToWire(back);
+      expect([w['count'], w['portion_multiplier']], [3, 1.5]);
+      expect(wireTotal([w]), 1350);
     });
   });
 
