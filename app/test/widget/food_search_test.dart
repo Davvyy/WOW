@@ -31,6 +31,7 @@ class _SearchSpy extends MockChalloryApi {
 
 void main() {
   _productTests();
+  _piecesSearchTests();
 
   test('food_search 행 → 검색 결과', () {
     final h = foodHitFromServer({'food_code': 'D000001', 'name_kr': '흰쌀밥', 'kcal': 310.4});
@@ -134,5 +135,65 @@ void _productTests() {
     final item = api.confirmedWire!.single;
     expect([item['chosen_name'], item['food_code'], item['serving_kcal'], item['count'], item['portion_multiplier'], item['input_type']],
         ['칙촉', 'P101-103000100-5334', 150, 1, 2.0, 'search']);
+  });
+}
+
+/// 내가 24개입을 넣은 칙촉(food_search 가 package_g·pieces 를 함께 준다, D64)
+class _PiecesSearchSpy extends _SearchSpy {
+  @override
+  Future<List<FoodHit>> searchFoods(String q) async {
+    calls.add('food_search:$q');
+    return [
+      foodHitFromServer({'food_code': 'P101-103000100-5334', 'name_kr': '칙촉', 'kcal': 150.3, 'serving_g': 30, 'score': 1.0,
+        'is_product': true, 'maker': '롯데제과(주)', 'unit_label': '1회분(30g)', 'package_g': 180, 'pieces': 24}),
+      foodHitFromServer({'food_code': 'P101-103000100-9999', 'name_kr': '칙촉 말차', 'kcal': 148, 'serving_g': 30, 'score': 0.5,
+        'is_product': true, 'maker': '롯데제과(주)', 'unit_label': '1회분(30g)', 'package_g': null, 'pieces': null}),
+    ];
+  }
+}
+
+void _piecesSearchTests() {
+  test('food_search 행: 개입 수가 있으면 1개(약 7.5g) 37.6 kcal', () {
+    final h = foodHitFromServer({'food_code': 'P1', 'name_kr': '칙촉', 'kcal': 150.3, 'serving_g': 30, 'is_product': true,
+      'maker': '롯데제과(주)', 'unit_label': '1회분(30g)', 'package_g': 180, 'pieces': 24});
+    expect([h.kcal, h.unitLabel, h.product?.pieces, h.product?.kcal], [37.6, '1개(약 7.5g)', 24, 150.3]);
+    final none = foodHitFromServer({'food_code': 'P1', 'name_kr': '칙촉', 'kcal': 150.3, 'serving_g': 30, 'is_product': true,
+      'unit_label': '1회분(30g)', 'package_g': 180});
+    expect([none.kcal, none.unitLabel, none.product?.canSplit], [150, '1회분(30g)', true]);
+  });
+
+  testWidgets('검색 시트: 개입 수가 있는 상품은 1개 단위로 보이고 그대로 항목이 된다', (tester) async {
+    tester.view.physicalSize = const Size(420, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final api = _PiecesSearchSpy();
+    final router = buildRouter(initialLocation: R.meal(MealSlot.snack, search: true));
+    addTearDown(router.dispose);
+    final container = ProviderContainer(overrides: [apiProvider.overrideWithValue(api)]);
+    addTearDown(container.dispose);
+    container.read(mealsProvider.notifier).reset([for (final s in MealSlot.values) MealRecord(slot: s)]);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp.router(theme: buildTheme(Brightness.light), routerConfig: router),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('음식 이름 검색 · 최근 음식'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, '음식 이름 검색 (식약처 DB)'), '칙촉');
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    expect(find.text('칙촉 · 롯데제과 · 1개(약 7.5g) '), findsOneWidget);
+    expect(find.text('37.6'), findsOneWidget);
+    expect(find.text('칙촉 말차 · 롯데제과 · 1회분(30g) '), findsOneWidget, reason: '포장 크기 없는 상품은 1회분 그대로');
+
+    await tester.tap(find.text('칙촉 · 롯데제과 · 1개(약 7.5g) '));
+    await tester.pumpAndSettle();
+    expect(find.text('가정 분량 · 1개(약 7.5g)'), findsOneWidget);
+    expect(find.text('1.0개'), findsOneWidget);
+    expect(find.text('낱개 24개 기준 · 바꾸기'), findsOneWidget);
+    await tester.tap(find.text('확정 · 약 38 kcal'));
+    await tester.pumpAndSettle();
+    final item = api.confirmedWire!.single;
+    expect([item['food_code'], item['serving_kcal'], item['portion_multiplier']], ['P101-103000100-5334', 37.6, 1.0]);
   });
 }

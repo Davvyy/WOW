@@ -30,6 +30,7 @@ class MealItem {
     this.foodCodes = const [],
     this.fromSearch = false,
     this.unitLabels = const [],
+    this.products = const [],
   });
 
   final String id;
@@ -43,8 +44,12 @@ class MealItem {
   /// 후보별 가공식품(상품) 1개 단위 라벨('1회분(30g)' · '1개(40g)' · '100g', D63). 음식·직접 입력 후보는 null
   final List<String?> unitLabels;
 
+  /// 후보별 가공식품(상품) 단위 정보(1회분 kcal·양·포장 크기·낱개 개입 수, D64). 음식·직접 입력 후보는 null
+  final List<ProductUnit?> products;
+
   final List<String> candidates;
-  final List<int> candKcal;
+  /// 후보별 1단위 kcal. 음식·1회분은 정수, 상품 낱개(1개)는 소수 1자리(37.6)
+  final List<num> candKcal;
   final String portion;
   final ItemKind kind;
   final int? grams;
@@ -65,6 +70,21 @@ class MealItem {
   /// 고른 후보가 상품이면 그 단위 라벨, 아니면 null
   String? get unitLabel => cand < unitLabels.length ? unitLabels[cand] : null;
 
+  /// 고른 후보의 상품 단위 정보(음식이면 null)
+  ProductUnit? get product => cand < products.length ? products[cand] : null;
+
+  /// 고른 상품 후보를 낱개([pieces]개입의 1개) 단위로, null 이면 1회분 단위로 바꾼다. 먹은 양은 1(1개·1회분)부터 다시.
+  MealItem withPieces(int? pieces) {
+    final p = product;
+    if (p == null) return this;
+    final next = p.withPieces(pieces);
+    List<T?> padded<T>(List<T?> l) => [for (var i = 0; i < candidates.length; i++) i < l.length ? l[i] : null];
+    final kcal = <num>[...candKcal]..[cand] = next.pieces != null ? next.unitKcal : next.kcal.round();
+    final labels = padded(unitLabels)..[cand] = next.label;
+    final prods = padded(products)..[cand] = next;
+    return copyWith(candKcal: kcal, unitLabels: labels, products: prods, mult: 1);
+  }
+
   /// 체크 여부와 무관하게 현재 선택의 kcal
   double get rawKcal {
     var k = candKcal[cand].toDouble();
@@ -76,10 +96,12 @@ class MealItem {
   /// 합계에 들어가는 kcal(먹은 것만)
   double get kcal => checked ? rawKcal : 0;
 
-  MealItem copyWith({bool? checked, int? cand, double? mult, bool? brothOff, int? count}) => MealItem(
+  MealItem copyWith({bool? checked, int? cand, double? mult, bool? brothOff, int? count, List<num>? candKcal, List<String?>? unitLabels,
+          List<ProductUnit?>? products}) =>
+      MealItem(
         id: id,
         candidates: candidates,
-        candKcal: candKcal,
+        candKcal: candKcal ?? this.candKcal,
         portion: portion,
         kind: kind,
         grams: grams,
@@ -92,7 +114,8 @@ class MealItem {
         count: count ?? this.count,
         foodCodes: foodCodes,
         fromSearch: fromSearch,
-        unitLabels: unitLabels,
+        unitLabels: unitLabels ?? this.unitLabels,
+        products: products ?? this.products,
       );
 }
 
@@ -431,16 +454,22 @@ MyReview? openReviewOn(List<MyReview>? reviews, DateTime day) {
 /// 음식 검색·최근 음식 한 건(1인분 kcal). 서버: food_search(식약처 DB, pg_trgm) / recent_foods(30일 확정)
 /// 가공식품(상품) 행(D63)은 1개(포장 전체·1회분·100g) kcal 과 제조사·단위 라벨을 함께 준다.
 class FoodHit {
-  const FoodHit({required this.name, required this.kcal, this.foodCode, this.recent = false, this.isProduct = false, this.maker, this.unitLabel});
+  const FoodHit({required this.name, required this.kcal, this.foodCode, this.recent = false, this.isProduct = false, this.maker, this.unitLabel,
+      this.product});
   final String name;
-  final int kcal;
+
+  /// 1인분(상품은 1단위) kcal. 정수, 상품 낱개(내 개입 수)면 1개 kcal(소수 1자리)
+  final num kcal;
   final String? foodCode;
   final bool recent;
   final bool isProduct;
   final String? maker;
 
-  /// 상품 1개 단위 라벨('1회분(30g)' 등). 음식은 null
+  /// 상품 1개 단위 라벨('1회분(30g)' 등, 낱개면 '1개(약 7.5g)'). 음식은 null
   final String? unitLabel;
+
+  /// 상품 단위 정보(1회분 kcal·양·포장 크기·내 개입 수). 음식이거나 서버가 양을 주지 않으면 null
+  final ProductUnit? product;
 
   /// 화면용 제조사 이름(회사 형태 표기를 뺀다)
   String? get makerLabel => switch (maker) { final m? => shortMaker(m), null => null };
@@ -450,6 +479,56 @@ class FoodHit {
 String shortMaker(String maker) {
   final s = maker.replaceAll(RegExp(r'농업회사법인|영농조합법인|유한회사|주식회사|\(주\)|\(유\)|㈜'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
   return s.isEmpty ? maker.trim() : s;
+}
+
+/// 낱개 개입 수 범위(서버 user_product_pieces.pieces, D64)
+const minPieces = 2;
+const maxPieces = 200;
+
+/// 1개 kcal = 1회분 kcal ÷ 1회분 양 × (포장 양 ÷ 개입 수), 소수 1자리(서버 product_piece_kcal 과 같은 식)
+double pieceKcal(num kcal, num servingG, num packageG, int pieces) => round1(kcal / servingG * (packageG / pieces));
+
+/// 낱개 라벨: 180g ÷ 24 → '1개(약 7.5g)', 168g ÷ 24 → '1개(약 7g)'
+String pieceLabel(num packageG, int pieces) {
+  final g = round1(packageG / pieces);
+  return '1개(약 ${g == g.roundToDouble() ? g.toInt() : g}g)';
+}
+
+/// 가공식품(상품) 1단위(D63)와 '몇 개입' 낱개 단위(D64).
+/// [kcal]·[servingG] 는 1회분(또는 1개) 값, [packageG] 는 포장 전체 양(모르면 낱개로 나눌 수 없다),
+/// [pieces] 는 지금 낱개로 계산 중이면 개입 수(1회분 단위면 null).
+class ProductUnit {
+  const ProductUnit({required this.unitLabel, required this.kcal, required this.servingG, this.packageG, this.pieces});
+  final String unitLabel;
+  final num kcal;
+  final num servingG;
+  final num? packageG;
+  final int? pieces;
+
+  /// 포장 크기를 알아 낱개로 나눌 수 있는지
+  bool get canSplit => (packageG ?? 0) > 0 && servingG > 0;
+
+  bool get _split => pieces != null && canSplit;
+
+  /// 이 단위의 라벨: 낱개 '1개(약 7.5g)', 아니면 1회분 라벨
+  String get label => _split ? pieceLabel(packageG!, pieces!) : unitLabel;
+
+  /// 이 단위 1개의 kcal
+  num get unitKcal => _split ? pieceKcal(kcal, servingG, packageG!, pieces!) : kcal;
+
+  ProductUnit withPieces(int? p) => ProductUnit(unitLabel: unitLabel, kcal: kcal, servingG: servingG, packageG: packageG, pieces: p);
+
+  /// 서버에 저장된 1단위 kcal([serving])이 몇 개입의 1개인지. 내 개입 수([saved])의 1개 kcal 과 같으면 그 수,
+  /// 1회분 kcal 이면 null, 그 밖이면 kcal 로 되짚은 개입 수(예전 개입 수로 만든 초안). 맞는 수가 없으면 null.
+  int? piecesOf(num serving, {int? saved}) {
+    if (!canSplit || serving <= 0) return null;
+    bool near(num a, num b) => (a - b).abs() < 0.051;
+    if (saved != null && saved >= minPieces && saved <= maxPieces && near(pieceKcal(kcal, servingG, packageG!, saved), serving)) return saved;
+    if (near(kcal, serving)) return null;
+    final n = (packageG! * kcal / (serving * servingG)).round();
+    if (n < minPieces || n > maxPieces) return null;
+    return near(pieceKcal(kcal, servingG, packageG!, n), serving) ? n : null;
+  }
 }
 
 /// 상품 단위 라벨 → 먹은 양 스테퍼 단위: '1회분(30g)' → '회분', 그 밖('1개(40g)' · '100g')은 '개'

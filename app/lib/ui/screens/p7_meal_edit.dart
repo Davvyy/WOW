@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -173,6 +174,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           candKcal: [hit.kcal],
           foodCodes: [hit.foodCode],
           unitLabels: [unit],
+          products: [hit.product],
           portion: '1인분', // 상품이면 카드가 unitLabels 의 라벨을 보인다
           kind: unit != null ? ItemKind.side : ItemKind.count,
           confidence: Confidence.sure,
@@ -183,6 +185,30 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     } else {
       setState(() => _items = [..._items, item('s${_items.length}_${hit.name}')]);
     }
+  }
+
+  /// 상품 항목의 '몇 개입'(D64): 개입 수를 저장하면 그 항목을 1개(약 7.5g) 단위로, 되돌리면 1회분 단위로. 먹은 양은 1부터 다시.
+  Future<void> _editPieces(int index) async {
+    final it = _items[index];
+    final p = it.product;
+    final code = it.cand < it.foodCodes.length ? it.foodCodes[it.cand] : null;
+    if (p == null || !p.canSplit || code == null) return;
+    final picked = await showChDialog<Object>(
+      context,
+      title: '상자(포장)에 몇 개 들어 있나요?',
+      body: _PiecesForm(initial: p.pieces),
+      actions: const [],
+    );
+    if (picked == null || !mounted) return;
+    final pieces = identical(picked, _PiecesForm.reset) ? null : picked as int;
+    try {
+      await ref.read(apiProvider).setProductPieces(code, pieces);
+    } catch (e) {
+      if (mounted) showToast(context, apiErrorText(e));
+      return;
+    }
+    if (!mounted) return;
+    _update(index, (i) => i.withPieces(pieces));
   }
 
   Future<void> _manualEntry() async {
@@ -480,7 +506,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           // 보기만 하는 지난 날 끼니는 항목을 바꿀 수 없다
           IgnorePointer(
             ignoring: !canEdit,
-            child: _ItemCard(item: _items[i], onChange: (f) => _update(i, f), onSearch: () => _openSearch(replaceIndex: i), onRemove: () => setState(() => _items = [..._items]..removeAt(i))),
+            child: _ItemCard(item: _items[i], onChange: (f) => _update(i, f), onSearch: () => _openSearch(replaceIndex: i), onRemove: () => setState(() => _items = [..._items]..removeAt(i)),
+                onPieces: () => _editPieces(i)),
           ),
         if (canEdit) ...[
           ChButton('항목 추가 — 검색 · 최근 음식 · 직접 입력', kind: BtnKind.secondary, icon: Icons.add_rounded, onPressed: _openSearch),
@@ -550,6 +577,55 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   }
 }
 
+/// '몇 개입' 입력(2~200). 저장하면 개수, '1회분 기준으로 되돌리기'면 [reset], 취소면 null 로 창을 닫는다.
+class _PiecesForm extends StatefulWidget {
+  const _PiecesForm({this.initial});
+
+  /// 지금 쓰는 개입 수(낱개로 계산 중일 때만). 있으면 되돌리기를 보인다
+  final int? initial;
+
+  static const reset = Object();
+
+  @override
+  State<_PiecesForm> createState() => _PiecesFormState();
+}
+
+class _PiecesFormState extends State<_PiecesForm> {
+  late final _text = TextEditingController(text: widget.initial?.toString() ?? '');
+  String? _error;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final n = int.tryParse(_text.text.trim());
+    if (n == null || n < minPieces || n > maxPieces) {
+      setState(() => _error = '$minPieces~$maxPieces 사이 숫자를 넣어 주세요');
+      return;
+    }
+    Navigator.of(context).pop(n);
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ChInput(controller: _text, hint: '예: 24', unit: '개', maxLength: 3, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
+        const SizedBox(height: 8),
+        const Txt.cap('포장에 적힌 ○개입 숫자를 넣어 주세요'),
+        if (_error != null) Padding(padding: const EdgeInsets.only(top: 6), child: Txt.cap(_error!, color: context.c.critical)),
+        if (widget.initial != null)
+          Align(alignment: Alignment.centerLeft, child: ChLink('1회분 기준으로 되돌리기', trailing: false, onTap: () => Navigator.of(context).pop(_PiecesForm.reset))),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: ChButton('취소', kind: BtnKind.quiet, onPressed: () => Navigator.of(context).pop())),
+          const SizedBox(width: 8),
+          Expanded(child: ChButton('저장', onPressed: _save)),
+        ]),
+      ]);
+}
+
 class _Tag extends StatelessWidget {
   const _Tag(this.text, {this.icon});
   final String text;
@@ -566,8 +642,11 @@ class _Tag extends StatelessWidget {
 }
 
 class _ItemCard extends StatelessWidget {
-  const _ItemCard({required this.item, required this.onChange, required this.onSearch, required this.onRemove});
+  const _ItemCard({required this.item, required this.onChange, required this.onSearch, required this.onRemove, required this.onPieces});
   final MealItem item;
+
+  /// 상품 항목의 '낱개로 계산'(몇 개입) 창을 연다
+  final VoidCallback onPieces;
   final void Function(MealItem Function(MealItem)) onChange;
   final VoidCallback onSearch;
   final VoidCallback onRemove;
@@ -685,6 +764,9 @@ class _ItemCard extends StatelessWidget {
                 ]),
               ),
               if (it.kind != ItemKind.count) _PortionStepper(item: it, onChange: onChange),
+              // 포장 크기를 아는 상품만: '몇 개입'으로 1개 단위 계산(D64)
+              if (it.product case final p? when p.canSplit)
+                Align(alignment: Alignment.centerRight, child: ChLink(p.pieces == null ? '낱개로 계산' : '낱개 ${p.pieces}개 기준 · 바꾸기', trailing: false, onTap: onPieces)),
               if (it.kind == ItemKind.soup)
                 row('국물 안 먹음 (−40%)', ChSwitch(value: it.brothOff, onChanged: (v) => onChange((i) => i.copyWith(brothOff: v)), label: '국물 안 먹음')),
               if (it.kind == ItemKind.count)

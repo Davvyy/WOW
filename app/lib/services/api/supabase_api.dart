@@ -183,6 +183,11 @@ class SupabaseChalloryApi implements ChalloryApi {
     return [for (final r in rows) foodHitFromServer(Map<String, dynamic>.from(r as Map), recent: true)];
   }
 
+  @override
+  Future<void> setProductPieces(String foodCode, int? pieces) async {
+    await _rpc('set_product_pieces', {'p_food_code': foodCode, 'p_pieces': pieces});
+  }
+
   /// 테이블 직접 쓰기(RLS) 오류 → ApiException
   ApiException _pg(Object e, {String? conflict, String? denied}) {
     if (e is PostgrestException) {
@@ -361,7 +366,8 @@ class SupabaseChalloryApi implements ChalloryApi {
 
   static const _mealCols = 'id, slot, status, version, engine, ai_kcal, confirmed_kcal, captured_at, late_upload, '
       'meal_items(chosen_name, name_candidates, food_code, count, portion_multiplier, has_broth, needs_check, ai_kcal, serving_kcal, '
-      'candidate_kcal, candidate_food_codes, confirmed_kcal, eaten, broth_off, bite_fraction, food_db_cache(unit_label))';
+      'candidate_kcal, candidate_food_codes, confirmed_kcal, eaten, broth_off, bite_fraction, '
+      'food_db_cache(unit_label, kcal, serving_g, package_g, user_product_pieces(pieces)))';
 
   @override
   Future<ServerMeal?> fetchMeal(String mealId) async {

@@ -65,6 +65,9 @@ abstract class ChalloryApi {
   /// 최근 음식(30일 내 내가 확정한 음식, 최신순)
   Future<List<FoodHit>> recentFoods();
 
+  /// 상품의 '몇 개입' 저장(2~200)·지우기(null). 포장 크기를 아는 상품만(아니면 422, D64)
+  Future<void> setProductPieces(String foodCode, int? pieces);
+
   /// API #17 리더보드: 최신 스냅샷(오늘·누적) + 내 행(본인 점수는 내 장부에서)
   Future<Leaderboard> fetchLeaderboard();
 
@@ -262,7 +265,7 @@ class CreatedMeal {
 class ServerMealItem {
   const ServerMealItem({required this.candidates, required this.candidateKcal, required this.candidateFoodCodes, required this.count,
       required this.portionMultiplier, required this.hasBroth, required this.needsCheck, required this.aiKcal,
-      this.chosen = 0, this.eaten = true, this.brothOff = false, this.unitLabel});
+      this.chosen = 0, this.eaten = true, this.brothOff = false, this.unitLabel, this.unitKcal, this.servingG, this.packageG, this.pieces});
   final List<String> candidates;
   final List<double> candidateKcal;
   final List<String?> candidateFoodCodes;
@@ -282,6 +285,12 @@ class ServerMealItem {
   /// 고른 음식이 가공식품(상품)이면 1개 단위 라벨(food_db_cache.unit_label, D63)
   final String? unitLabel;
 
+  /// 고른 상품의 1단위 kcal·양·포장 전체 양(food_db_cache.kcal·serving_g·package_g)과 내 개입 수(user_product_pieces, D64)
+  final num? unitKcal;
+  final num? servingG;
+  final num? packageG;
+  final int? pieces;
+
   factory ServerMealItem.fromJson(Map<String, dynamic> j) {
     final ai = (j['ai_kcal'] as num?)?.toDouble() ?? 0;
     final chosen = (j['chosen_name'] as String?) ?? ((j['name_candidates'] as List?)?.firstOrNull as String? ?? '음식');
@@ -291,6 +300,7 @@ class ServerMealItem {
     final count = (j['count'] as num?)?.toInt() ?? 1;
     final mult = (j['portion_multiplier'] as num?)?.toDouble() ?? 1;
     final brothOff = j['broth_off'] as bool? ?? false;
+    final food = j['food_db_cache'] as Map?;
     if (kcals.length != cands.length || cands.isEmpty) {
       // 후보 kcal 이 없는 행(구버전·직접 입력): 선택 이름 하나만. 1인분 kcal 이 없는 옛 확정 행은 확정 kcal 에서 되살린다.
       final confirmed = (j['confirmed_kcal'] as num?)?.toDouble();
@@ -314,7 +324,15 @@ class ServerMealItem {
       chosen: cands.indexOf(chosen).clamp(0, cands.length - 1),
       eaten: j['eaten'] as bool? ?? true,
       brothOff: brothOff,
-      unitLabel: (j['food_db_cache'] as Map?)?['unit_label'] as String?,
+      unitLabel: food?['unit_label'] as String?,
+      unitKcal: food?['kcal'] as num?,
+      servingG: food?['serving_g'] as num?,
+      packageG: food?['package_g'] as num?,
+      pieces: switch (food?['user_product_pieces']) {
+        final List l when l.isNotEmpty => ((l.first as Map)['pieces'] as num?)?.toInt(),
+        final Map m => (m['pieces'] as num?)?.toInt(),
+        _ => null,
+      },
     );
   }
 }

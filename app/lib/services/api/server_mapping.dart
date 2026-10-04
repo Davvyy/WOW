@@ -287,13 +287,27 @@ MyReview myReviewFromServer(Map<String, dynamic> r) {
   );
 }
 
-/// food_search(name_kr) · recent_foods(name) 행 → 검색 결과(1인분 kcal 정수). 상품 행은 1개 kcal·제조사·단위 라벨(D63)
-FoodHit foodHitFromServer(Map<String, dynamic> r, {bool recent = false}) => FoodHit(
-      name: (r['name_kr'] ?? r['name']) as String,
-      kcal: ((r['kcal'] as num?) ?? 0).round(),
-      foodCode: r['food_code'] as String?,
-      recent: recent,
-      isProduct: r['is_product'] as bool? ?? false,
-      maker: r['maker'] as String?,
-      unitLabel: r['unit_label'] as String?,
-    );
+/// food_search(name_kr) · recent_foods(name) 행 → 검색 결과(1인분 kcal 정수). 상품 행은 1개 kcal·제조사·단위 라벨(D63),
+/// 내가 개입 수를 넣은 상품(포장 크기를 아는 상품)은 1개(약 7.5g) 단위와 그 kcal(소수 1자리, D64)
+FoodHit foodHitFromServer(Map<String, dynamic> r, {bool recent = false}) {
+  final kcal = (r['kcal'] as num?) ?? 0;
+  final isProduct = r['is_product'] as bool? ?? false;
+  final label = r['unit_label'] as String?;
+  final serving = r['serving_g'] as num?;
+  final pieces = (r['pieces'] as num?)?.toInt();
+  var product = isProduct && label != null && serving != null
+      ? ProductUnit(unitLabel: label, kcal: kcal, servingG: serving, packageG: r['package_g'] as num?)
+      : null;
+  if (product != null && product.canSplit && pieces != null && pieces >= minPieces && pieces <= maxPieces) product = product.withPieces(pieces);
+  final split = product?.pieces != null;
+  return FoodHit(
+    name: (r['name_kr'] ?? r['name']) as String,
+    kcal: split ? product!.unitKcal : kcal.round(),
+    foodCode: r['food_code'] as String?,
+    recent: recent,
+    isProduct: isProduct,
+    maker: r['maker'] as String?,
+    unitLabel: split ? product!.label : label,
+    product: product,
+  );
+}

@@ -157,6 +157,20 @@ class MockChalloryApi implements ChalloryApi {
     return [for (final (n, k) in mockFoodDb.take(6)) FoodHit(name: n, kcal: k, recent: true)];
   }
 
+  /// 상품 코드 → 개입 수(서버 user_product_pieces 본인 행). 테스트가 확인한다.
+  final productPieces = <String, int>{};
+
+  @override
+  Future<void> setProductPieces(String foodCode, int? pieces) async {
+    _maybeFail('set_product_pieces');
+    if (pieces == null) {
+      productPieces.remove(foodCode);
+      return;
+    }
+    if (pieces < minPieces || pieces > maxPieces) throw const ApiException(422, '개수는 2~200 사이로 넣어 주세요');
+    productPieces[foodCode] = pieces;
+  }
+
   /// 오늘 보낸 응원(챌린지마다 하루 1회, 서버 cheers 와 같음). 키는 지금 세션의 challengeId.
   final _cheers = <String?, String>{};
   String? get cheeredTo => _cheers[currentSession.challengeId];

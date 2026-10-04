@@ -38,6 +38,13 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
   final name = s.candidates[s.chosen];
   // 가공식품(상품, D63)은 이름이 밥으로 끝나도 밥(공기)이 아니라 상품 단위로 연다
   final product = s.unitLabel;
+  // 상품 단위 정보: 저장된 1단위 kcal 이 낱개(몇 개입의 1개) kcal 이면 그 단위로 연다(D64)
+  final serving = s.chosen < s.candidateKcal.length ? s.candidateKcal[s.chosen] : 0;
+  final base = product != null && s.unitKcal != null && s.servingG != null
+      ? ProductUnit(unitLabel: product, kcal: s.unitKcal!, servingG: s.servingG!, packageG: s.packageG)
+      : null;
+  final unit = base?.withPieces(base.piecesOf(serving, saved: s.pieces));
+  final split = unit?.pieces != null;
   final riceOrSoup = s.hasBroth || (product == null && name.endsWith('밥'));
   // 밥·국이 개수 2 이상이면 개수를 먹은 양 배수로 접는다(2 × 1.5 → 3.0공기).
   // 3.0 을 넘어 줄이면 kcal 이 바뀌는 행과 그 밖의 개수 2 이상 행(옛 반찬 젓가락 수 포함)은 개수 항목.
@@ -53,10 +60,11 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
   return MealItem(
     id: 's$index',
     candidates: s.candidates,
-    candKcal: [for (final k in s.candidateKcal) k.round()],
+    candKcal: [for (var i = 0; i < s.candidateKcal.length; i++) split && i == s.chosen ? s.candidateKcal[i] : s.candidateKcal[i].round()],
     foodCodes: s.candidateFoodCodes,
     portion: kind == ItemKind.rice ? '1공기' : (kind == ItemKind.count ? '개' : '1인분'), // 상품 단위 라벨은 unitLabels(고른 후보만)
-    unitLabels: [for (var i = 0; i < s.candidates.length; i++) i == s.chosen ? product : null],
+    unitLabels: [for (var i = 0; i < s.candidates.length; i++) i == s.chosen ? (unit?.label ?? product) : null],
+    products: [for (var i = 0; i < s.candidates.length; i++) i == s.chosen ? unit : null],
     kind: kind,
     baseCount: count,
     count: count,
