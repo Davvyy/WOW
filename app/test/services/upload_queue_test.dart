@@ -24,7 +24,7 @@ class _FlakyApi extends MockChalloryApi {
   _FlakyApi({super.clock});
   final failOn = <String, ApiException>{}; // 'upload' | 'meals' → 한 번 던질 오류
   final queuedFlags = <bool>[];
-  final snackFlags = <bool>[];
+  final slots = <MealSlot?>[];
   final uploadKeys = <String>[];
   int uploads = 0;
 
@@ -44,12 +44,12 @@ class _FlakyApi extends MockChalloryApi {
   }
 
   @override
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false}) {
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, MealSlot? slot}) {
     queuedFlags.add(queued);
-    snackFlags.add(snack);
+    slots.add(slot);
     final e = _take('meals');
     if (e != null) throw e;
-    return super.createMeal(photoId, queued: queued, idempotencyKey: idempotencyKey, snack: snack);
+    return super.createMeal(photoId, queued: queued, idempotencyKey: idempotencyKey, slot: slot);
   }
 }
 
@@ -132,17 +132,19 @@ void main() {
     expect(await up.retryPending(force: true), hasLength(1));
   });
 
-  test('간식으로 찍은 사진은 대기열에서 다시 보낼 때도 간식으로(D55)', () async {
+  test('고른 끼니는 대기열에서 다시 보낼 때도 그 끼니로(D55·D58)', () async {
     final api = _FlakyApi()..failOn['meals'] = const ApiException(0, 'offline');
     expect(await MealUploader(api, store: FilePendingStore.at(dir)).submit(photo(), localTag: 'snack'), isNull);
     final done = await MealUploader(api, store: FilePendingStore.at(dir)).retryPending();
     expect(done.single.$1, 'snack');
-    expect(api.snackFlags, [true, true]);
+    expect(api.slots, [MealSlot.snack, MealSlot.snack]);
     await MealUploader(api, store: FilePendingStore.at(dir)).submit(photo(2), localTag: 'lunch');
-    expect(api.snackFlags.last, isFalse, reason: '끼니 칸은 서버 시각 그대로');
+    expect(api.slots.last, MealSlot.lunch, reason: '끼니도 고른 대로');
+    await MealUploader(api, store: FilePendingStore.at(dir)).submit(photo(3));
+    expect(api.slots.last, isNull, reason: '고르지 않았으면 서버 시각');
   });
 
-  testWidgets('07:00 에 간식을 골라 찍으면 간식 칸에, 아침을 고르면 아침 칸에(D55)', (tester) async {
+  testWidgets('07:00 에 간식·아침·점심·저녁을 골라 찍으면 고른 칸에(D55·D58)', (tester) async {
     final api = _FlakyApi(clock: () => DateTime.utc(2026, 10, 12, 22)); // KST 07:00
     final c = ProviderContainer(overrides: [apiProvider.overrideWithValue(api)]);
     addTearDown(c.dispose);
@@ -150,16 +152,25 @@ void main() {
     n.reset([for (final s in MealSlot.values) MealRecord(slot: s)]);
 
     await tester.runAsync(() => n.capture(MealSlot.snack, '07:00', photo: _jpeg(), capturedAt: DateTime.now()));
-    expect(api.snackFlags, [true]);
+    expect(api.slots, [MealSlot.snack]);
     expect(n.lastCapturedSlot, MealSlot.snack);
     expect(n.inSlot(MealSlot.snack).single.serverId, isNotNull);
     expect(n.inSlot(MealSlot.snack).single.status, MealStatus.captured);
     expect(n.inSlot(MealSlot.breakfast), isEmpty, reason: '아침 칸은 그대로 빈 칸');
 
     await tester.runAsync(() => n.capture(MealSlot.breakfast, '07:00', photo: _jpeg(), capturedAt: DateTime.now()));
-    expect(api.snackFlags, [true, false]);
+    expect(api.slots, [MealSlot.snack, MealSlot.breakfast]);
     expect(n.lastCapturedSlot, MealSlot.breakfast);
     expect(n.inSlot(MealSlot.breakfast).single.serverId, isNotNull);
+
+    // 아침 시간이어도 점심·저녁을 고르면 그 칸에 남는다(서버도 고른 끼니로 저장)
+    for (final slot in [MealSlot.lunch, MealSlot.dinner]) {
+      await tester.runAsync(() => n.capture(slot, '07:00', photo: _jpeg(), capturedAt: DateTime.now()));
+      expect(api.slots.last, slot);
+      expect(n.lastCapturedSlot, slot);
+      expect(n.inSlot(slot).single.serverId, isNotNull, reason: slot.name);
+    }
+    expect(n.inSlot(MealSlot.breakfast), hasLength(1), reason: '아침 칸에 몰리지 않음');
   });
 
   testWidgets('재실행 후 홈 끼니 칸에 "업로드 대기" 표시', (tester) async {

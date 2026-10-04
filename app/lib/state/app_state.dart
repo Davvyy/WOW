@@ -421,7 +421,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
   MealsNotifier([List<MealRecord>? initial]) : _initial = initial;
   final List<MealRecord>? _initial;
 
-  /// 마지막 [capture] 로 서버 끼니가 만들어진 슬롯(서버가 서버 시각으로 정함). 대기열로 갔거나 오류면 null.
+  /// 마지막 [capture] 로 서버 끼니가 만들어진 슬롯(고른 끼니, D58). 대기열로 갔거나 오류면 null.
   MealSlot? lastCapturedSlot;
 
   /// 마지막 [capture] 가 더한 끼니의 키(오류로 빠졌으면 null). '지금 확정'은 이 끼니의 P7 을 열어 분석을 기다린다.
@@ -626,7 +626,7 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
 
   /// P6 촬영 직후: 새 끼니를 더한다(같은 슬롯의 다른 끼니는 그대로). 분석 중(captured) → AI 초안(draft).
   /// 국외 AI 미동의면 분석 없이 저장. [photo] 가 있으면 업로드 파이프라인(리사이즈·EXIF 제거·SHA-256 → 서버 끼니 생성)을 탄다.
-  /// 슬롯은 서버가 서버 시각으로 정하므로 응답 슬롯으로 옮긴다. 간식을 고른 경우만 간식 슬롯으로 저장된다(D55).
+  /// 서버는 고른 끼니로 저장하지만(D58), 응답 슬롯이 다르면 그 슬롯으로 옮긴다.
   Future<String?> capture(MealSlot slot, String time, {bool aiConsent = true, Uint8List? photo, DateTime? capturedAt}) async {
     lastCapturedSlot = null;
     final key = _newKey();

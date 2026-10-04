@@ -162,15 +162,14 @@ void main() {
     });
     tearDown(() => c.dispose());
 
-    test('촬영 → 서버 끼니 → 분석 초안 반영(슬롯은 서버가 정함)', () async {
+    test('촬영 → 서버 끼니 → 분석 초안 반영(고른 끼니로 저장, D58)', () async {
       final n = c.read(mealsProvider.notifier);
       n.reset([for (final s in MealSlot.values) MealRecord(slot: s)]);
       final err = await n.capture(MealSlot.lunch, '12:20', photo: Uint8List(3), capturedAt: DateTime.now());
       expect(err, isNull);
-      final serverSlot = slotForKst(DateTime.now());
       final key = n.lastCapturedKey!;
       final rec = n.byKey(key)!;
-      expect(rec.slot, serverSlot);
+      expect(rec.slot, MealSlot.lunch, reason: '서버 시각과 상관없이 고른 점심');
       expect(rec.serverId, isNotNull);
       await Future<void>.delayed(const Duration(milliseconds: 1700)); // 첫 확인(1.5초)
       expect(n.byKey(key)!.status, MealStatus.draft);
@@ -217,12 +216,12 @@ class _QueuedSpyApi extends MockChalloryApi {
   String? failOn;
   final queuedFlags = <bool>[];
   @override
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false}) {
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, MealSlot? slot}) {
     queuedFlags.add(queued);
     if (failOn == 'meals') {
       calls.add('meals');
       throw const ApiException(0, 'offline');
     }
-    return super.createMeal(photoId, queued: queued, idempotencyKey: idempotencyKey, snack: snack);
+    return super.createMeal(photoId, queued: queued, idempotencyKey: idempotencyKey, slot: slot);
   }
 }

@@ -7,7 +7,7 @@ import '../../state/session.dart' show ChallengeSession, currentSession;
 import 'challory_api.dart';
 
 /// 서버 없이 같은 흐름을 돌리는 모의 구현(SUPABASE_URL 미설정 · 테스트).
-/// 서버 규칙 중 화면에 보이는 것만 흉내 낸다: 서버 시각 슬롯 태그, 분석 2초 뒤 초안, 버전 증가, 확인 문구.
+/// 서버 규칙 중 화면에 보이는 것만 흉내 낸다: 고른 끼니(없으면 서버 시각) 슬롯 태그, 분석 2초 뒤 초안, 버전 증가, 확인 문구.
 class MockChalloryApi implements ChalloryApi {
   MockChalloryApi({this.analysisDelay = const Duration(seconds: 2), DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
 
@@ -220,13 +220,13 @@ class MockChalloryApi implements ChalloryApi {
   Future<void> uploadPhoto(PhotoUploadTicket t, Uint8List bytes) async => _maybeFail('upload');
 
   @override
-  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, bool snack = false}) async {
+  Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, MealSlot? slot}) async {
     _maybeFail('meals');
     final id = 'meal-${++_seq}';
     final now = _clock();
-    final slot = snack ? MealSlot.snack : slotForKst(now);
-    _meals[id] = _MockMeal(slot, now);
-    return CreatedMeal(mealId: id, slot: slot, localDate: '${now.year}-${now.month}-${now.day}', analyze: true);
+    final tagged = slot ?? slotForKst(now);
+    _meals[id] = _MockMeal(tagged, now);
+    return CreatedMeal(mealId: id, slot: tagged, localDate: '${now.year}-${now.month}-${now.day}', analyze: true);
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../core/engine/engine.dart' show MealSlot;
 import '../api/challory_api.dart';
 import '../health/health_source.dart' show newUuidV4;
 import '../share/meal_share.dart';
@@ -78,9 +79,9 @@ class MealUploader {
         job.uploaded = true;
         await _persistIfQueued(job);
       }
-      // 촬영 화면에서 간식을 고른 경우만 서버에 알린다(D55). localTag 는 대기열에 저장돼 재시도에도 남는다.
+      // 촬영 화면에서 고른 끼니로 저장한다(D58). localTag(슬롯 이름)는 대기열에 저장돼 재시도에도 남는다.
       final meal = await api.createMeal(job.ticket!.photoId, queued: queued, idempotencyKey: job.mealKey,
-          snack: job.localTag == 'snack');
+          slot: MealSlot.values.where((s) => s.name == job.localTag).firstOrNull);
       await _drop(job);
       try {
         await shareStore?.put(meal.mealId, job.photo.bytes);
