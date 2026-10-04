@@ -7,7 +7,10 @@
 // 규칙(docs/02 §10 D63)
 //  - 끼니로 먹는 대분류(KEEP_LV3)만 넣는다. 조미식품·식용유지류·장류·절임류·주류 등은 뺀다. kcal 이 없는 행도 뺀다.
 //  - 같은 상품(공백을 뺀 이름 + 제조사)은 데이터생성일자가 가장 최근인 행 하나만.
-//  - 1개 = 포장 전체(식품중량이 1회 섭취참고량의 2배 이하) → 1회 섭취참고량 → 포장 전체(500 이하) → 기준량(100g·ml).
+//  - 포장이 5,000(g·ml, kg·L 은 1,000배)을 넘는 업소용·대용량은 뺀다. kcal 0 은 음료·차·커피·생수·탄산과 제로·무설탕 이름만 남긴다.
+//  - 이름의 중량·용량 표기('(70g)' · ' 2kg' · '-450g')는 떼고 저장·중복 판단한다.
+//  - 1개 = 포장 전체(식품중량이 1회 섭취참고량의 2배 이하) → 1회 섭취참고량
+//    → 포장 전체(500 이하이고 포장 전체 700 kcal 이하) → 기준량(100g·ml).
 //    kcal·탄단지는 기준량당 값 × 1개 양 ÷ 기준량. 라벨은 '1개(40g)' · '1회분(30g)' · '100g'.
 //  - food_code 는 식약처 상품 코드(P…), is_product = true 로 음식(D…) 자동 매칭과 나눈다.
 //  - package_g = 포장 전체 양(식품중량의 g·ml 숫자, 읽을 수 없으면 null). 앱의 '몇 개입' 낱개 계산(D64)에 쓴다.
@@ -26,8 +29,12 @@ export const KEEP_LV3 = new Set([
   '유가공품류', '빙과류', '두부류 또는 묵류', '알가공품류', '당류', '농산가공식품류', '특수영양식품',
 ]);
 
-/** 1회 섭취참고량이 없을 때 포장 전체를 1개로 보는 최대 양(g·ml) */
+/** 1회 섭취참고량이 없을 때 포장 전체를 1개로 보는 최대 양(g·ml)과 포장 전체 최대 kcal */
 export const WHOLE_PACKAGE_MAX = 500;
+export const WHOLE_PACKAGE_MAX_KCAL = 700;
+
+/** 업소용·대용량: 포장이 이 양(g·ml)을 넘으면 넣지 않는다 */
+export const BULK_MAX = 5000;
 
 /** 포장이 1회 섭취참고량의 이 배수 이하면 포장 전체를 1개로 */
 export const WHOLE_PACKAGE_RATIO = 2;
@@ -57,12 +64,29 @@ const num = (s) => {
 };
 const fmt = (v) => String(r1(v));
 
-/** '30g' · '130ml' · '100ml(g)' · '100g(ml)' → {value, unit}. 다른 꼴('1식', 분류 공통 문구)·0 은 null */
+/** '30g' · '130ml' · '100ml(g)' · '100g(ml)' · '2kg' · '1.5L' → {value, unit(g·ml)}. kg·L 은 1,000배. 다른 꼴('1식', 분류 공통 문구)·0 은 null */
 export function parseAmount(s) {
-  const m = /^([0-9]+(?:\.[0-9]+)?)\s*(g|ml)(?:\s*\((?:g|ml)\))?$/i.exec(String(s ?? '').trim());
+  const m = /^([0-9]+(?:\.[0-9]+)?)\s*(kg|g|ml|l|ℓ)(?:\s*\((?:g|ml)\))?$/i.exec(String(s ?? '').trim());
   if (!m || Number(m[1]) <= 0) return null;
-  return { value: Number(m[1]), unit: m[2].toLowerCase() };
+  const u = m[2].toLowerCase();
+  if (u === 'kg') return { value: Number(m[1]) * 1000, unit: 'g' };
+  if (u === 'l' || u === 'ℓ') return { value: Number(m[1]) * 1000, unit: 'ml' };
+  return { value: Number(m[1]), unit: u };
 }
+
+/** 이름 속 중량·용량 표기('(70g)' · ' 2kg' · '-450g' · ' 1.5L'). '100g당'처럼 글자가 붙으면 그대로 */
+const AMOUNT_TOKEN = /[(\[]?\s*\d+(?:[.,]\d+)?\s*(?:kg|mg|g|그램|ml|㎖|l|ℓ|리터)(?![a-z가-힣])\s*[)\]]?/gi;
+const TRAILING_AMOUNT = /\s*[-–]\s*\d+(?:[.,]\d+)?\s*(?:kg|mg|g|그램|ml|㎖|l|ℓ|리터)\s*$/i;
+
+/** 저장·중복 판단용 이름: 중량·용량 표기를 떼고 공백을 하나로. 다 지워지면 원래 이름 */
+export function cleanName(name) {
+  const raw = String(name ?? '').trim();
+  const s = raw.replace(TRAILING_AMOUNT, ' ').replace(AMOUNT_TOKEN, ' ').replace(/\s+/g, ' ').trim();
+  return s || raw;
+}
+
+/** 0 kcal 이 맞을 수 있는 행: 음료류, 음료·차·커피·생수·탄산 소분류, 제로·무설탕 이름 */
+const zeroOk = (r) => r.lv3 === '음료류' || /음료|다류|커피|생수|탄산/.test(r.lv4 ?? '') || /제로|zero|0\s*kcal|무설탕|슈가프리/i.test(String(r.name ?? ''));
 
 /** 1개(포장 전체·1회분·기준량)의 양·라벨·kcal·탄단지 */
 export function unitOf(r) {
@@ -76,7 +100,7 @@ export function unitOf(r) {
   } else if (serv) {
     amount = serv.value;
     label = `1회분(${fmt(serv.value)}${serv.unit})`;
-  } else if (size && size.value <= WHOLE_PACKAGE_MAX) {
+  } else if (size && size.value <= WHOLE_PACKAGE_MAX && ((num(r.kcal) ?? 0) * size.value) / per.value <= WHOLE_PACKAGE_MAX_KCAL) {
     amount = size.value;
     label = `1개(${fmt(size.value)}${size.unit})`;
   } else {
@@ -89,12 +113,14 @@ export function unitOf(r) {
 
 /** NDJSON 행 → 상품 목록(분류·kcal 거르기, 이름+제조사 중복 제거, food_code 순) */
 export function pickProducts(rows) {
-  const skipped = { category: 0, noKcal: 0, duplicate: 0 };
+  const skipped = { category: 0, noKcal: 0, bulk: 0, zero: 0, duplicate: 0 };
   const best = new Map();
   for (const r of rows) {
     if (!KEEP_LV3.has(r.lv3)) { skipped.category++; continue; }
     if (num(r.kcal) === null) { skipped.noKcal++; continue; }
-    const key = `${String(r.name).replace(/\s+/g, '')}\u0000${makerOf(r) ?? ''}`;
+    if ((parseAmount(r.size)?.value ?? 0) > BULK_MAX) { skipped.bulk++; continue; }
+    if (num(r.kcal) === 0 && !zeroOk(r)) { skipped.zero++; continue; }
+    const key = `${cleanName(r.name).replace(/\s+/g, '')}\u0000${makerOf(r) ?? ''}`;
     const prev = best.get(key);
     if (prev) skipped.duplicate++;
     if (!prev || newer(r, prev)) best.set(key, r);
@@ -111,7 +137,7 @@ export function pickProducts(rows) {
     .map((r) => {
       const u = unitOf(r);
       return {
-        food_code: r.code, name_kr: String(r.name).trim(), category: (r.lv4 || '').trim() || r.lv3, serving_g: u.amount, kcal: u.kcal,
+        food_code: r.code, name_kr: cleanName(r.name), category: (r.lv4 || '').trim() || r.lv3, serving_g: u.amount, kcal: u.kcal,
         carb_g: u.carb, protein_g: u.prot, fat_g: u.fat, maker: makerOf(r), unit_label: u.label,
         package_g: parseAmount(r.size)?.value ?? null,
       };

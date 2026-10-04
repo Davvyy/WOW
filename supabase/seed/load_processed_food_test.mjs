@@ -1,7 +1,7 @@
 // node --test supabase/seed/
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { KEEP_LV3, chunkSizeArg, chunkSql, makerOf, parseAmount, pickProducts, unitOf } from './load_processed_food.mjs';
+import { KEEP_LV3, chunkSizeArg, chunkSql, cleanName, makerOf, parseAmount, pickProducts, unitOf } from './load_processed_food.mjs';
 
 const row = (o) => ({
   code: 'P1', name: '칙촉', lv3: '과자류·빵류 또는 떡류', lv4: '비스킷/쿠키/크래커', lv6: '과자', per: '100g', kcal: '501',
@@ -54,7 +54,7 @@ test('분류: 남길 대분류만, kcal 없는 행은 뺀다', () => {
     row({ code: 'P6', name: '두부', lv3: '두부류 또는 묵류' }),
   ]);
   assert.deepEqual(products.map((p) => p.food_code), ['P1', 'P6']);
-  assert.deepEqual(skipped, { category: 3, noKcal: 1, duplicate: 0 });
+  assert.deepEqual(skipped, { category: 3, noKcal: 1, bulk: 0, zero: 0, duplicate: 0 });
 });
 
 test('중복: 공백 뺀 이름 + 제조사가 같으면 데이터생성일자가 최근인 행 하나', () => {
@@ -135,4 +135,60 @@ test('1개 규칙: 포장이 1회분의 2배 이하면 통째(46g/30g → 1개),
   assert.deepEqual(pick(unitOf(row({ name: '홈런볼딸기', kcal: '543', serv: '30g', size: '46g' }))), [46, '1개(46g)', 249.8]);
   assert.deepEqual(pick(unitOf(row({ name: '홈런볼', kcal: '543', serv: '30g', size: '60g' }))), [60, '1개(60g)', 325.8]);
   assert.deepEqual(pick(unitOf(row({ name: '홈런볼', kcal: '543', serv: '30g', size: '61g' }))), [30, '1회분(30g)', 162.9]);
+});
+
+test('수량 파싱: kg·L 은 1,000배(g·ml)', () => {
+  assert.deepEqual(parseAmount('2kg'), { value: 2000, unit: 'g' });
+  assert.deepEqual(parseAmount('1.5L'), { value: 1500, unit: 'ml' });
+  assert.deepEqual(parseAmount('1.8ℓ'), { value: 1800, unit: 'ml' });
+  assert.equal(pickProducts([row({ size: '2kg', serv: '100g' })]).products[0].package_g, 2000);
+});
+
+test('대용량: 포장이 5,000(g·ml)을 넘으면 뺀다', () => {
+  const { products, skipped } = pickProducts([
+    row({ code: 'P1', size: '5kg' }),
+    row({ code: 'P2', name: '대용량 과자', size: '5001g' }),
+    row({ code: 'P3', name: '업소용 음료', lv3: '음료류', per: '100ml', size: '18L', serv: '200ml' }),
+  ]);
+  assert.deepEqual(products.map((p) => p.food_code), ['P1']);
+  assert.equal(skipped.bulk, 2);
+});
+
+test('1회분이 없으면: 500 이하이고 포장 전체 700 kcal 이하일 때만 통째, 아니면 100g·100ml', () => {
+  assert.deepEqual(pick(unitOf(row({ name: '링귀니', serv: '', size: '500g', kcal: '355' }))), [100, '100g', 355]);
+  assert.deepEqual(pick(unitOf(row({ serv: '', size: '200g', kcal: '400' }))), [100, '100g', 400]);
+  assert.deepEqual(pick(unitOf(row({ serv: '', size: '175g', kcal: '400' }))), [175, '1개(175g)', 700]);
+  assert.deepEqual(pick(unitOf(row({ serv: '', size: '1L', per: '100ml', kcal: '40' }))), [100, '100ml', 40]);
+});
+
+test('0 kcal 행: 음료·차·커피·생수·탄산이나 제로·무설탕 이름만 남긴다', () => {
+  const { products, skipped } = pickProducts([
+    row({ code: 'P1', name: '쭈꾸미 볶음', lv3: '즉석식품류', lv4: '즉석조리식품', kcal: '0' }),
+    row({ code: 'P2', name: '요거트 젤라또', lv3: '빙과류', lv4: '샤베트', kcal: '0.0' }),
+    row({ code: 'P3', name: '콜라 제로', lv3: '음료류', lv4: '탄산음료', kcal: '0' }),
+    row({ code: 'P4', name: '아메리카노', lv3: '농산가공식품류', lv4: '액상커피', kcal: '0' }),
+    row({ code: 'P5', name: '죠스바 0kcal', lv3: '빙과류', lv4: '빙과', kcal: '0' }),
+    row({ code: 'P6', name: '무설탕 젤리', lv3: '과자류·빵류 또는 떡류', lv4: '젤리', kcal: '0' }),
+    row({ code: 'P7', name: 'ZERO 캔디', lv3: '과자류·빵류 또는 떡류', lv4: '사탕', kcal: '0' }),
+  ]);
+  assert.deepEqual(products.map((p) => p.food_code), ['P3', 'P4', 'P5', 'P6', 'P7']);
+  assert.equal(skipped.zero, 2);
+});
+
+test('이름의 중량·용량 표기는 떼고 저장·중복 판단(지우면 빈 이름이면 원래 이름)', () => {
+  assert.equal(cleanName('로즈봉봉(70g)'), '로즈봉봉');
+  assert.equal(cleanName('취나물 듬뿍 소불고기 2kg'), '취나물 듬뿍 소불고기');
+  assert.equal(cleanName('충샹풍미수좌병-450g'), '충샹풍미수좌병');
+  assert.equal(cleanName('로즈 플레이버 터키쉬딜라이트 (125g)'), '로즈 플레이버 터키쉬딜라이트');
+  assert.equal(cleanName('콜라 1.5L'), '콜라');
+  assert.equal(cleanName('100g당 단백질바'), '100g당 단백질바');
+  assert.equal(cleanName('1등급 한우 3겹살'), '1등급 한우 3겹살');
+  assert.equal(cleanName('90g'), '90g');
+  const { products, skipped } = pickProducts([
+    row({ code: 'P1', name: '새우깡 90g', date: '2024-01-01' }),
+    row({ code: 'P2', name: '새우깡', date: '2025-01-01' }),
+    row({ code: 'P3', name: '로즈봉봉(70g)' }),
+  ]);
+  assert.deepEqual(products.map((p) => [p.food_code, p.name_kr]), [['P2', '새우깡'], ['P3', '로즈봉봉']]);
+  assert.equal(skipped.duplicate, 1);
 });
