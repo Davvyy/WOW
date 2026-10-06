@@ -12,6 +12,7 @@ import '../../core/format.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
+import '../../services/health/health_models.dart' show toKstWall;
 import '../../state/app_state.dart';
 import '../../state/past_meals.dart';
 import '../widgets/challenge_cards.dart';
@@ -188,10 +189,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (row != null && row.hasRevision) caption = '저녁 무효 → 대체값 ${fmtM(inn.substituteFor(MealSlot.dinner))} 적용 · ${fmtK1(row.sBefore!)} → ${fmtK1(row.s)}점';
     }
 
-    // 반영률: 아침·점심·저녁 확정(슬롯에 확정 끼니가 하나라도 있으면) + 걸음
+    // 반영률: 아침·점심·저녁 + 걸음. 끼니 칸은 엔진과 같이 대체값이 들어가지 않은 칸만 반영으로 센다:
+    // 슬롯을 채운 확정 끼니(간식 수준 150 kcal 미만은 채우지 않음)가 있거나, 한도 안의 건너뜀(대체값 없음).
+    // 한도를 넘은 건너뜀은 대체값이 들어가므로 '건너뜀'으로 보이되 반영으로 세지 않는다.
     bool confirmed(MealRecord m) => isCountedStatus(m.status);
+    final slotFilled = {for (final s in mainSlots) s: mealsIn(dayMeals, s).any((m) => confirmed(m) && m.kcal >= engine.rules.snackKcal)};
+    final slotSkipped = {
+      for (final s in mainSlots) s: !slotFilled[s]! && mealsIn(dayMeals, s).any((m) => m.status == MealStatus.skipped),
+    };
     final cells = [
-      for (final s in mainSlots) mealsIn(dayMeals, s).any(confirmed),
+      for (final s in mainSlots) slotFilled[s]! || (slotSkipped[s]! && !inn.substituteValues.containsKey(s) && !inn.substituteSlots.contains(s)),
       steps > 0,
     ];
     final pct = (cells.where((x) => x).length * 25);
@@ -199,7 +206,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 건강 안내(확정 섭취, 대체값 제외 < 남 1,500 / 여 1,200)
     final confirmedKcal = dayMeals.where(confirmed).fold<double>(0, (a, m) => a + m.kcal);
     final nudgeMin = curMe.sex == Sex.m ? engine.rules.nudgeMinM : engine.rules.nudgeMinF;
-    final showNudge = !lifecycle && inn.mainMealCount > 0 && confirmedKcal < nudgeMin;
+    // 오늘은 하루가 거의 끝났을 때만(저녁을 기록했거나 건너뜀, 또는 KST 21시 이후). 지난 날은 그대로.
+    final dinnerDone = mealsIn(dayMeals, MealSlot.dinner).any((m) => confirmed(m) || m.status == MealStatus.skipped);
+    final lateEnough = toKstWall(ref.watch(clockProvider)()).hour >= 21;
+    final showNudge = !lifecycle && inn.mainMealCount > 0 && confirmedKcal < nudgeMin && (!isToday || dinnerDone || lateEnough);
 
     final d = sim.score.dD;
     // 소비·활동 kcal: 활동 탭과 같은 계산·같은 반올림(정수)
@@ -241,13 +251,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // ---- 상태 칩 ----
     Widget statusChip;
     if (phase == ChallengePhase.recruiting) {
-      statusChip = const ChChip('시작 전 · D−3', icon: Icons.event_rounded);
+      statusChip = ChChip('시작 전 · ${ch.start.difference(ch.today).inDays}일 뒤 시작', icon: Icons.event_rounded);
     } else if (phase == ChallengePhase.closing) {
       statusChip = const ChChip('최종 집계 중', tone: Tone.review, icon: Icons.hourglass_top_rounded);
     } else if (phase == ChallengePhase.published) {
       statusChip = const ChChip('결과 확정', tone: Tone.good, icon: Icons.verified_rounded);
     } else if (reviewing) {
-      statusChip = const ChChip('검토 중 · 잠정 유지', tone: Tone.review, icon: Icons.policy_rounded);
+      // 설명은 위 검토 배너 한 곳에서. 여기는 짧은 표시만
+      statusChip = const ChChip('검토 중', tone: Tone.review, icon: Icons.policy_rounded);
     } else if (!isToday) {
       statusChip = Wrap(spacing: 6, children: [
         ChChip('확정 · ${date.month}.${date.day + 1} 09:00', tone: Tone.good, icon: Icons.check_rounded),
@@ -294,7 +305,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // ---- 카드 본문 ----
     Widget ringCard() {
       final threeNums = Row(children: [
-        _Num(label: '소비', dot: c.burn, value: '약 ${fmtInt(burn.total)}', unit: 'kcal'),
+        _Num(label: '소비', dot: c.burn, prefix: '약', value: fmtInt(burn.total), unit: 'kcal'),
         _Num(label: '섭취', dot: c.intake, value: fmtInt(inn.iD), unit: 'kcal'),
         _Num(label: '점수', star: true, value: fmtK1(sim.score.sD), unit: '점'),
       ]);
@@ -436,14 +447,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ChCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
             Semantics(
-              label: '아침 ${cells[0] ? '확정' : '미확정'}, 점심 ${cells[1] ? '확정' : '미확정'}, 저녁 ${cells[2] ? '확정' : '미확정'}, 걸음 ${cells[3] ? '동기화됨' : '미동기화'} · 반영률 $pct%',
+              label: '${[
+                for (final s in mainSlots) '${slotLabel[s]} ${slotFilled[s]! ? '확정' : slotSkipped[s]! ? '건너뜀' : '미확정'}',
+                '걸음 ${cells[3] ? '동기화됨' : '미동기화'}',
+              ].join(', ')} · 반영률 $pct%',
               child: ExcludeSemantics(
-                child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 4, children: [
+                child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 10, runSpacing: 4, children: [
                   Fill4(cells: cells),
-                  Text.rich(TextSpan(children: [
-                    TextSpan(text: '아침 ${cells[0] ? '✓' : '–'} · 점심 ${cells[1] ? '✓' : '–'} · 저녁 ${cells[2] ? '✓' : '–'} · 걸음 ${cells[3] ? '✓' : '–'} · ', style: T.body(c, size: 13, color: c.fg2)),
-                    TextSpan(text: '반영률 $pct%', style: T.body(c, size: 13, w: FontWeight.w700, color: c.fg)),
-                  ])),
+                  for (final s in mainSlots)
+                    _CoverItem(
+                      slotSkipped[s]! ? '${slotLabel[s]} 건너뜀' : slotLabel[s]!,
+                      slotFilled[s]! ? Icons.check_rounded : (slotSkipped[s]! ? Icons.block_rounded : Icons.remove_rounded),
+                      done: slotFilled[s]!,
+                    ),
+                  _CoverItem('걸음', cells[3] ? Icons.check_rounded : Icons.remove_rounded, done: cells[3]),
+                  Txt('반영률 $pct%', size: 13, weight: FontWeight.w700, color: c.fg),
                 ]),
               ),
             ),
@@ -459,10 +477,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Icon(Icons.spa_rounded, color: c.fg2),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Txt('오늘 섭취 기록이 적어요', weight: FontWeight.w600),
-                Txt.cap('점수와 무관하게 충분히 드세요 · 추정치예요 · 이 안내는 순위·점수에 영향이 없어요'),
+                Txt('${isToday ? '오늘' : '이날'} 섭취 기록이 적어요', weight: FontWeight.w600),
+                const Txt.cap('점수와 상관없이 충분히 드세요.\n이 안내는 순위와 점수에 영향을 주지 않아요.'),
               ]),
             ),
           ]),
@@ -482,11 +500,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Row(children: [const Txt('오늘 걸음을 못 읽었어요 · '), Txt('연결 확인', weight: FontWeight.w700, color: c.brand)])
             else
               Wrap(spacing: 16, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                Text.rich(TextSpan(children: [TextSpan(text: '걸음 ', style: T.body(c)), TextSpan(text: fmtInt(steps), style: T.num(c.fg, size: 18, w: FontWeight.w700))])),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text.rich(TextSpan(children: [TextSpan(text: '걸음 ', style: T.body(c)), TextSpan(text: fmtInt(steps), style: T.num(c.fg, size: 18, w: FontWeight.w700))])),
+                  // 검토 중: 설명은 위 배너에서, 여기는 방패 표시만
+                  if (reviewing) ...[
+                    const SizedBox(width: 4),
+                    Tooltip(message: '검토 중', excludeFromSemantics: true, child: Semantics(label: '검토 중', child: Icon(Icons.policy_rounded, size: 16, color: c.review))),
+                  ],
+                ]),
                 Text.rich(TextSpan(children: [TextSpan(text: '활동 ', style: T.body(c)), TextSpan(text: '약 ${fmtInt(burn.activity)}', style: T.num(c.fg, size: 18, w: FontWeight.w700)), TextSpan(text: ' kcal', style: T.body(c))])),
                 Txt(act.source, color: c.fg2),
               ]),
-            if (reviewing) Row(children: [Icon(Icons.policy_rounded, size: 14, color: c.review), const SizedBox(width: 4), Expanded(child: Txt.cap('걸음이 검토 중이에요 · 잠정 점수에는 그대로 반영돼요', color: c.review))]),
           ], gap: 6)),
         ),
       const Disclaimer('모든 수치는 추정이에요 · 의료 조언이 아니에요'),
@@ -528,8 +552,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 class _Num extends StatelessWidget {
-  const _Num({required this.label, required this.value, required this.unit, this.dot, this.star = false});
+  const _Num({required this.label, required this.value, required this.unit, this.prefix, this.dot, this.star = false});
   final String label;
+
+  /// 값 앞의 작은 말('약')
+  final String? prefix;
   final String value;
   final String unit;
   final Color? dot;
@@ -539,7 +566,7 @@ class _Num extends StatelessWidget {
     final c = context.c;
     return Expanded(
       child: Semantics(
-        label: '$label $value $unit',
+        label: '$label ${prefix == null ? '' : '$prefix '}$value $unit',
         excludeSemantics: true,
         child: Column(children: [
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -548,10 +575,43 @@ class _Num extends StatelessWidget {
             const SizedBox(width: 4),
             Txt(label, size: 11, color: c.fg2),
           ]),
-          NumText(value, size: 22, weight: FontWeight.w700, unit: unit),
+          // 값은 세 칸 모두 같은 높이의 한 줄: 좁은 폭이면 줄바꿈 대신 글자를 줄인다
+          SizedBox(
+            key: ValueKey('home-stat-$label'),
+            height: 32,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text.rich(
+                TextSpan(children: [
+                  if (prefix != null) TextSpan(text: '$prefix ', style: T.body(c, size: 13, w: FontWeight.w500, color: c.fg2)),
+                  TextSpan(text: value, style: T.num(c.fg, size: 22, w: FontWeight.w700)),
+                  TextSpan(text: ' $unit', style: T.body(c, size: 12, w: FontWeight.w500, color: c.fg2)),
+                ]),
+                maxLines: 1,
+                softWrap: false,
+              ),
+            ),
+          ),
         ]),
       ),
     );
+  }
+}
+
+/// 반영률 줄의 칸 하나(아이콘 + 이름). 반영된 칸만 초록 아이콘, 글자는 모두 같은 색.
+class _CoverItem extends StatelessWidget {
+  const _CoverItem(this.text, this.icon, {required this.done});
+  final String text;
+  final IconData icon;
+  final bool done;
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 14, color: done ? c.good : c.fg2),
+      const SizedBox(width: 2),
+      Txt(text, size: 13, color: c.fg2),
+    ]);
   }
 }
 

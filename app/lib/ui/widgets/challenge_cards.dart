@@ -44,6 +44,9 @@ class ChallengeCards extends ConsumerWidget {
       final sel = current?.challengeId == s.challengeId && i == list.indexWhere((x) => x.challengeId == s.challengeId);
       final ch = s.challenge;
       final left = ch.end.difference(ch.today).inDays;
+      // 남은 날은 'N일 남음' 하나로(앱바는 D+경과일). 카드가 하나뿐이면 이름은 앱바 제목과 같아 빼고 카운터를 앞에 둔다.
+      final leftText = left > 0 ? '$left일 남음' : (left == 0 ? '오늘 마지막 날' : '종료');
+      final named = list.length > 1;
       return SizedBox(
         key: ValueKey('challenge-card-$i'),
         width: 220,
@@ -55,11 +58,11 @@ class ChallengeCards extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Txt(ch.name, weight: FontWeight.w600, maxLines: 1)),
+              Expanded(child: Txt(named ? ch.name : leftText, weight: FontWeight.w600, maxLines: 1)),
               ChChip(s.monthly ? '월간' : '초대'),
             ]),
             const SizedBox(height: 2),
-            Txt.cap(left >= 0 ? 'D-$left' : '종료'),
+            if (named) Txt.cap(leftText),
             Txt.cap(statusLine(s, ch.today), maxLines: 1),
           ]),
         ),

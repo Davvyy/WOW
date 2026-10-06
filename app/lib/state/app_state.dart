@@ -228,6 +228,9 @@ final mealPhotoProvider = FutureProvider.autoDispose.family<Uint8List?, String>(
 /// 폰 기본 공유 창
 final mealSharerProvider = Provider<MealSharer>((ref) => const SystemMealSharer());
 
+/// 지금 시각(테스트에서 바꿔 끼운다). 화면의 시각 조건(예: 21시 이후 안내)에 쓴다.
+final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
 String todayKst() => kstDateString(toKstWall(DateTime.now()));
 
 /// 서버 오류를 화면 문구로(수치심 없는 카피, 06 §6)
