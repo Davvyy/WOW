@@ -20,6 +20,8 @@ class _Steps extends ActivityNotifier {
 
 void main() {
   _weekBars();
+  _weekOrder();
+  _breakdownUnits();
   testWidgets('A6 홈 소비·활동 = 활동 탭 소비·활동(정수)', (tester) async {
     final c = await pumpApp(tester, overrides: [activityProvider.overrideWith(_Steps.new)]);
     final sim = c.read(todayResultProvider);
@@ -73,5 +75,31 @@ void _weekBars() {
     expect(label, contains('${last3[0].date.split('.').last}일 8'), reason: '7.9 → 8');
     expect(label, contains('${last3[1].date.split('.').last}일 0'));
     expect(label, contains('${last3[2].date.split('.').last}일 ${fmtInt(todayA)}'), reason: '오늘은 현재 계산값');
+  });
+}
+
+void _weekOrder() {
+  testWidgets('최근 7일 막대: 서버 장부가 최신순이어도 왼쪽부터 오래된 날 → 오늘', (tester) async {
+    final today = curChallenge.dayIndex;
+    final rows = [for (final r in mockLedger.where((r) => r.d <= today)) r].reversed.toList(); // 최신순(서버와 같게)
+    await pumpApp(tester, location: R.activity, overrides: [
+      activityProvider.overrideWith(_Steps.new),
+      ledgerProvider.overrideWith((ref) async => rows),
+    ]);
+    final label = tester
+        .widget<Semantics>(find.byWidgetPredicate((w) => w is Semantics && (w.properties.label ?? '').startsWith('최근 7일 활동 칼로리')))
+        .properties
+        .label!;
+    final days = RegExp(r'10월 (\d+)일').allMatches(label).map((m) => int.parse(m.group(1)!)).toList();
+    expect(days, [...days]..sort(), reason: '오름차순');
+    expect(days.last, int.parse(rows.first.date.split('.').last), reason: '마지막이 오늘');
+  });
+}
+
+void _breakdownUnits() {
+  testWidgets('소비 분해: 단위 kcal 표시, 걸음 줄에 걸음 수(보)를 함께', (tester) async {
+    await pumpApp(tester, location: R.activity, overrides: [activityProvider.overrideWith(_Steps.new)]);
+    expect(find.text('단위 kcal'), findsOneWidget);
+    expect(find.text('+ 걸음 11,959보'), findsOneWidget);
   });
 }

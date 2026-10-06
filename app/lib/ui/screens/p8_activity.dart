@@ -141,7 +141,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         );
 
     // 최근 7일 막대: 오늘만 현재 계산값, 지난 날은 확정 전이어도 그날 장부 값. 서버 모드는 내 장부, 모의는 프로토타입 장부
-    final ledger = watchLedger(ref) ?? const <LedgerRow>[];
+    // 서버 장부는 최신순일 수 있어 날짜 순으로 정렬(왼쪽 오래된 날 → 오른쪽 오늘)
+    final ledger = [...?watchLedger(ref)]..sort((x, y) => x.d.compareTo(y.d));
     final todayIdx = curChallenge.dayIndex;
     final week = [
       for (final r in ledger.skip(ledger.length > 7 ? ledger.length - 7 : 0))
@@ -167,9 +168,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   Align(alignment: Alignment.centerLeft, child: syncChip()),
                   ChCard(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
-                      const Txt.title('소비 분해'),
+                      // 이 카드의 숫자는 모두 kcal. 걸음 줄은 걸음 수(보)와 그 kcal 을 함께 적어 아래 '걸음' 카드의 걸음 수와 헷갈리지 않게
+                      const Row(children: [Expanded(child: Txt.title('소비 분해')), Txt.cap('단위 kcal')]),
                       Kv(const Txt.cap('기초대사 (BMR)'), NumText(fmtInt(burn.bmr))),
-                      Kv(const Txt.cap('+ 걸음'), NumText(fmtInt(burn.steps))),
+                      Kv(Txt.cap('+ 걸음 ${fmtInt(steps)}보'), NumText(fmtInt(burn.steps))),
                       Kv(const Txt.cap('+ 운동 세션'), NumText(fmtInt(burn.sessions))),
                       if (a.floorsKcal > 0) Kv(const Txt.cap('+ 층수'), NumText(fmtInt(burn.floors))),
                       Divider(height: 1, color: c.border),
