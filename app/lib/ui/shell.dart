@@ -14,6 +14,9 @@ class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.shell});
   final StatefulNavigationShell shell;
 
+  /// 탭 이름의 아래 여백(탭 막대 72 높이 기준). 네 탭과 가운데 촬영이 같은 값을 쓴다.
+  static const _labelBottom = 12.0;
+
   /// 시각에 따른 끼니 자동 태그. 경계는 챌린지 규칙(challenge_rules: 기본 04:00 / 10:30 / 15:00 / 22:00).
   /// 서버도 같은 경계로 태그하므로(create_meal) 여기 값은 화면의 기본 선택일 뿐이다.
   static MealSlot slotForNow(DateTime now) { // now: 실제 시각(인스턴트)
@@ -80,13 +83,17 @@ class AppShell extends ConsumerWidget {
           excludeSemantics: true,
           child: InkWell(
             onTap: () => shell.goBranch(index, initialLocation: index == shell.currentIndex),
+            // 이름은 촬영 버튼 이름과 같은 아래 여백([_labelBottom])에 맞춰 다섯 이름이 한 줄에 놓인다
             child: SizedBox(
-              height: 64,
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(active ? activeIcon : icon, size: 24, color: active ? c.brand : c.fg2),
-                const SizedBox(height: 2),
-                Text(label, style: T.body(c, size: 11, w: active ? FontWeight.w700 : FontWeight.w500, color: active ? c.brand : c.fg2)),
-              ]),
+              height: 72,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: _labelBottom),
+                child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  Icon(active ? activeIcon : icon, size: 24, color: active ? c.brand : c.fg2),
+                  const SizedBox(height: 2),
+                  Text(label, style: T.body(c, size: 11, w: active ? FontWeight.w700 : FontWeight.w500, color: active ? c.brand : c.fg2)),
+                ]),
+              ),
             ),
           ),
         ),
@@ -101,6 +108,7 @@ class AppShell extends ConsumerWidget {
         child: SafeArea(
           top: false,
           child: SizedBox(
+            key: const ValueKey('tab-bar'),
             height: 72,
             child: Row(children: [
               tab(0, Icons.home_outlined, Icons.home_rounded, '홈'),
@@ -126,7 +134,7 @@ class AppShell extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  Positioned(bottom: 10, child: Text('촬영', style: T.body(c, size: 11, w: FontWeight.w500, color: c.fg2))),
+                  Positioned(bottom: _labelBottom, child: Text('촬영', style: T.body(c, size: 11, w: FontWeight.w500, color: c.fg2))),
                 ]),
               ),
               tab(2, Icons.directions_walk_outlined, Icons.directions_walk_rounded, '활동'),
