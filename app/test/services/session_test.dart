@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:challory/core/engine/engine.dart';
+import 'package:challory/data/models.dart';
 import 'package:challory/services/api/server_mapping.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/state/session.dart';
@@ -72,5 +73,29 @@ void main() {
     });
     expect([r.type, r.status, r.appealText, r.open, r.decided], ['steps_spike', 'appealed', '하프마라톤에 나갔어요', false, false]);
     expect(myReviewFromServer({'id': 'r2', 'type': 'report', 'status': 'open', 'appeals': []}).appealText, isNull);
+  });
+
+  test('미확인 출처 검토: target 의 출처·걸음·첫/마지막 시각(D72)', () {
+    final r = myReviewFromServer({
+      'id': 'r3', 'type': 'source_unknown', 'status': 'open', 'appeals': [],
+      'target': {'key': 'com.android.healthconnect.phone.a1', 'origin': 'com.android.healthconnect.phone.a1', 'steps': 3200,
+        'first_at': '2026-10-12T09:12:00+09:00', 'last_at': '2026-10-12T21:40:00+09:00'},
+    });
+    expect(r.origin, 'com.android.healthconnect.phone.a1');
+    expect(r.sourceSteps, 3200);
+    expect(r.firstAt, DateTime.utc(2026, 10, 12, 0, 12));
+    expect(r.lastAt, DateTime.utc(2026, 10, 12, 12, 40));
+    expect(reviewSourceDetail(r), '휴대폰 센서 · 09:12–21:40 · 3,200보');
+
+    final bare = myReviewFromServer({'id': 'r4', 'type': 'source_unknown', 'status': 'open', 'target': {'origin': 'com.sec.android.app.shealth'}});
+    expect(reviewSourceDetail(bare), '삼성헬스');
+    expect(myReviewFromServer({'id': 'r5', 'type': 'dup_photo', 'status': 'open', 'target': {'meal_id': 'm1'}}).origin, isNull);
+  });
+
+  test('출처 이름', () {
+    expect(sourceDisplayName('com.android.healthconnect.phone.xyz'), '휴대폰 센서');
+    expect(sourceDisplayName('com.sec.android.app.shealth'), '삼성헬스');
+    expect(sourceDisplayName('com.google.android.apps.healthdata'), 'Health Connect');
+    expect(sourceDisplayName('com.example.stepper'), 'com.example.stepper');
   });
 }

@@ -1,4 +1,5 @@
 import '../core/engine/engine.dart';
+import '../core/format.dart';
 
 const slotLabel = {
   MealSlot.breakfast: '아침',
@@ -429,7 +430,7 @@ class Notice {
 /// 내 검토 1건(reviews, 본인 행) + 내가 보낸 소명/이의 본문(appeals)
 class MyReview {
   const MyReview({required this.id, required this.type, required this.status, this.localDate, this.slaDueAt, this.reasonTemplate,
-      this.verdict, this.message, this.appealText, this.decidedAt});
+      this.verdict, this.message, this.appealText, this.decidedAt, this.origin, this.sourceSteps, this.firstAt, this.lastAt});
   final String id;
 
   /// reviews.type (steps_spike·dup_photo·report·objection …)
@@ -447,8 +448,43 @@ class MyReview {
   final String? appealText;
   final DateTime? decidedAt;
 
+  /// 미확인 출처 검토(source_unknown)의 출처 패키지명(reviews.target.origin). 'manual' 은 수동 입력 출처
+  final String? origin;
+
+  /// 그 출처의 걸음 합계 · 첫 기록 시작 · 마지막 기록 끝(앱이 보냈을 때만, D72)
+  final int? sourceSteps;
+  final DateTime? firstAt;
+  final DateTime? lastAt;
+
   bool get open => status == 'open';
   bool get decided => status == 'decided';
+}
+
+/// 걸음 출처 패키지명 → 화면 이름. 휴대폰 자체 센서는 Health Connect 가 기기값을 붙여 'com.android.healthconnect.phone.<기기값>'.
+String sourceDisplayName(String origin) => switch (origin) {
+      _ when origin.startsWith('com.android.healthconnect.phone.') => '휴대폰 센서',
+      'com.sec.android.app.shealth' => '삼성헬스',
+      'com.google.android.apps.healthdata' => 'Health Connect',
+      'manual' => '수동 입력',
+      _ => origin,
+    };
+
+/// 미확인 출처 검토의 상세 한 줄: '휴대폰 센서 · 09:12–21:40 · 3,200보'(KST). 시각·걸음이 없으면 출처 이름만.
+/// 미확인 출처 검토가 아니거나 출처를 모르면 null.
+String? reviewSourceDetail(MyReview r) {
+  final origin = r.origin;
+  if (r.type != 'source_unknown' || origin == null || origin.isEmpty) return null;
+  String hm(DateTime t) {
+    final k = t.toUtc().add(const Duration(hours: 9));
+    return '${k.hour.toString().padLeft(2, '0')}:${k.minute.toString().padLeft(2, '0')}';
+  }
+
+  final first = r.firstAt, last = r.lastAt, steps = r.sourceSteps;
+  return [
+    sourceDisplayName(origin),
+    if (first != null && last != null) '${hm(first)}–${hm(last)}',
+    if (steps != null) '${fmtInt(steps)}보',
+  ].join(' · ');
 }
 
 /// 검토 사유 문장(docs/06 §6 판정 템플릿). 키는 reviews.type·reason_template

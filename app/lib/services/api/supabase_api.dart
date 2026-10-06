@@ -239,7 +239,7 @@ class SupabaseChalloryApi implements ChalloryApi {
     if (me == null) return const [];
     try {
       final rows = await _client.from('reviews')
-          .select('id, type, status, local_date, sla_due_at, reason_template, verdict, message, decided_at, appeals(text)')
+          .select('id, type, status, local_date, sla_due_at, reason_template, verdict, message, decided_at, target, appeals(text)')
           .eq('participant_id', me).order('created_at', ascending: false);
       return [for (final r in rows) myReviewFromServer(r)];
     } catch (e) {

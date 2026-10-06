@@ -223,6 +223,24 @@ void main() {
     expect(find.textContaining('설명을 보냈어요.'), findsOneWidget);
   });
 
+  testWidgets('P10 미확인 출처 검토: 출처 이름 · 시각 범위 · 걸음', (tester) async {
+    final api = _RemoteFake()
+      ..reviews.add(MyReview(id: 'rv6', type: 'source_unknown', status: 'open', localDate: DateTime(2026, 10, 12),
+          origin: 'com.android.healthconnect.phone.a1', sourceSteps: 3200,
+          firstAt: DateTime.utc(2026, 10, 12, 0, 12), lastAt: DateTime.utc(2026, 10, 12, 12, 40)));
+    await _pump(tester, R.ledger, api);
+    expect(find.textContaining('확인되지 않은 출처의 운동 기록이 있었어요 · 검토 중'), findsOneWidget);
+    expect(find.text('휴대폰 센서 · 09:12–21:40 · 3,200보'), findsOneWidget);
+  });
+
+  testWidgets('P10 미확인 출처 검토: 상세가 없으면 출처 이름만', (tester) async {
+    final api = _RemoteFake()
+      ..reviews.add(MyReview(id: 'rv7', type: 'source_unknown', status: 'open', localDate: DateTime(2026, 10, 12), origin: 'com.example.stepper'));
+    await _pump(tester, R.ledger, api);
+    expect(find.text('com.example.stepper'), findsOneWidget);
+    expect(find.textContaining('com.example.stepper ·'), findsNothing);
+  });
+
   testWidgets('P10 판정 통지: 서버 문장(사유+판정+점수 영향) 그대로', (tester) async {
     final api = _RemoteFake()
       ..reviews.add(const MyReview(id: 'rv2', type: 'dup_photo', status: 'decided', verdict: 'void',

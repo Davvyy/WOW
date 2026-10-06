@@ -182,6 +182,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Txt('$day$reason · 검토 중', weight: FontWeight.w600, color: c.review),
+                  // 미확인 출처: 어떤 기록인지(출처 · 첫–마지막 시각 · 걸음, D72)
+                  if (reviewSourceDetail(active) case final detail?) Txt(detail, size: 13, weight: FontWeight.w600, color: c.review),
                   Txt.cap(
                       '${active.slaDueAt == null ? '' : '${when(active.slaDueAt!)}까지 '}설명을 남길 수 있어요(1회). 순위는 잠정으로 유지되고, 다른 참가자에게는 "집계 중"으로만 보여요.',
                       color: c.review),

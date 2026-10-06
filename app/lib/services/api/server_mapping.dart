@@ -273,7 +273,13 @@ MyReview myReviewFromServer(Map<String, dynamic> r) {
   DateTime? t(Object? v) => v == null ? null : DateTime.parse(v as String);
   final ap = r['appeals'];
   final appeal = ap is List ? (ap.isEmpty ? null : ap.first as Map) : ap as Map?;
+  // 미확인 출처 검토만 target 의 출처·걸음·시각을 읽는다(D72). 다른 검토의 target 은 화면에 쓰지 않는다
+  final target = r['type'] == 'source_unknown' && r['target'] is Map ? r['target'] as Map : const {};
   return MyReview(
+    origin: target['origin'] as String?,
+    sourceSteps: (target['steps'] as num?)?.toInt(),
+    firstAt: t(target['first_at']),
+    lastAt: t(target['last_at']),
     id: r['id'] as String,
     type: r['type'] as String,
     status: r['status'] as String,
