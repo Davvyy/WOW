@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/burn.dart';
 import '../../core/config.dart';
 import '../../core/engine/engine.dart';
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
@@ -22,30 +22,28 @@ class ActivityScreen extends ConsumerStatefulWidget {
 }
 
 class _ActivityScreenState extends ConsumerState<ActivityScreen> {
-  bool _watch = false;
-
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final ch = curChallenge;
     final act = ref.watch(activityProvider);
-    final mySim = ref.watch(todayResultProvider);
-
-    final SimulateResult sim = _watch ? watchToday() : mySim;
+    final sim = ref.watch(todayResultProvider);
     final a = sim.activity;
-    final who = _watch ? mockWatchProfile : curMe.profile;
-    final steps = _watch ? 12000 : act.stepsTotal;
-    final src = _watch ? 'Apple 건강' : act.source;
-    final ios = !_watch && act.stepsManual > 0;
-    final manualSource = !_watch && act.hasManualSource && !ios;
-    final reviewing = !_watch && steps > AppConfig.stepsSpikeAbs;
-    final zero = !_watch && steps == 0;
+    // 홈과 같은 계산·같은 반올림(정수 kcal)
+    final burn = BurnFigures.of(sim);
+    final weightKg = curMe.weightKg;
+    final steps = act.stepsTotal;
+    final src = act.source;
+    final ios = act.stepsManual > 0;
+    final manualSource = act.hasManualSource && !ios;
+    final reviewing = steps > AppConfig.stepsSpikeAbs;
+    final zero = steps == 0;
     final remote = ref.read(apiProvider).isRemote;
     final reviewBanner = reviewBannerText(
       remote: remote,
       review: remote && reviewing ? openReviewOn(ref.watch(myReviewsProvider).value, ch.today) : null,
     );
-    final perStep = engine.kcalPerStep(who.weightKg);
+    final perStep = engine.kcalPerStep(weightKg);
 
     Widget syncChip() {
       if (zero) return const ChChip('동기화 없음 · 연결 확인', tone: Tone.critical, icon: Icons.sync_problem_rounded);
@@ -91,8 +89,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
       return ChCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
           Row(children: [const Expanded(child: Txt.title('걸음')), Txt.cap(src)]),
-          Kv(Txt.cap(_watch ? '세션 밖 걸음' : '걸음'), NumText(fmtInt(_watch ? a.stepsOut : steps), size: 20, weight: FontWeight.w700)),
-          if (_watch) Txt.cap('기록 ${fmtInt(steps)}보 중 ${fmtInt(mockWatchSession.stepsInRange)}보는 세션으로 계산됐어요(이중 계산 방지).'),
+          Kv(const Txt.cap('걸음'), NumText(fmtInt(steps), size: 20, weight: FontWeight.w700)),
           if (reviewing)
             Txt.cap(
               reviewBanner.spike
@@ -107,7 +104,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     }
 
     // 세션 목록
-    final sessions = _watch ? [mockWatchSession] : act.sessions;
+    final sessions = act.sessions;
     Widget sessionsCard() => ChCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Row(children: [Expanded(child: Txt.title('운동 세션')), Txt.cap('자동 기록만')]),
@@ -123,7 +120,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   onTap: () {
                     final s = sessions[i];
                     final met = a.sessionMets.length > i ? a.sessionMets[i] : null;
-                    showChSheet<void>(context, builder: (_) => _SessionSheet(session: s, met: met, weightKg: who.weightKg, source: _watch ? 'Apple Watch' : src));
+                    showChSheet<void>(context, builder: (_) => _SessionSheet(session: s, met: met, weightKg: weightKg, source: src));
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -133,10 +130,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Txt('${_sessionLabel(sessions[i].type)} ${sessions[i].minutes.round()}분${_kmh(sessions[i]) == null ? '' : ' · ${_kmh(sessions[i])!.toStringAsFixed(0)} km/h'}', weight: FontWeight.w600),
-                          Txt.cap('${_watch ? '06:30 · Apple Watch · ' : ''}MET ${a.sessionMets.length > i ? a.sessionMets[i] : '—'}'),
+                          Txt.cap('MET ${a.sessionMets.length > i ? a.sessionMets[i] : '—'}'),
                         ]),
                       ),
-                      NumText(fmtK1(a.sessionsNetKcal), size: 18, weight: FontWeight.w700),
+                      NumText(fmtInt(burn.sessions), size: 18, weight: FontWeight.w700),
                     ]),
                   ),
                 ),
@@ -150,15 +147,14 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     ];
     final maxA = week.fold<double>(1, (m, w) => w.$2 > m ? w.$2 : m);
 
-    final todayAct = _watch ? null : act;
-    final platformRef = _watch || ios ? (_watch ? 380.0 : todayAct?.platformActiveKcal) : null;
+    final platformRef = ios ? act.platformActiveKcal : null;
 
     return Scaffold(
       backgroundColor: c.bg,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          ChAppBar(title: '활동', meta: _watch ? '밤산책 예시' : '${ch.today.month}.${ch.today.day} 오늘'),
+          ChAppBar(title: '활동', meta: '${ch.today.month}.${ch.today.day} 오늘'),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => ref.read(activityProvider.notifier).refresh(),
@@ -166,19 +162,18 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
-                  ChSeg<bool>(small: true, label: '보기', items: const [(false, '내 활동'), (true, '워치 예시(밤산책)')], value: _watch, onChanged: (v) => setState(() => _watch = v)),
                   Align(alignment: Alignment.centerLeft, child: syncChip()),
                   ChCard(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
                       const Txt.title('소비 분해'),
-                      Kv(Txt.cap('기초대사 (BMR)'), NumText(fmtInt(sim.bmr))),
-                      Kv(Txt.cap('+ 걸음'), NumText(fmtK1(a.stepsNetKcal))),
-                      Kv(Txt.cap('+ 운동 세션'), NumText(fmtK1(a.sessionsNetKcal))),
-                      if (a.floorsKcal > 0) Kv(Txt.cap('+ 층수'), NumText(fmtK1(a.floorsKcal))),
+                      Kv(const Txt.cap('기초대사 (BMR)'), NumText(fmtInt(burn.bmr))),
+                      Kv(const Txt.cap('+ 걸음'), NumText(fmtInt(burn.steps))),
+                      Kv(const Txt.cap('+ 운동 세션'), NumText(fmtInt(burn.sessions))),
+                      if (a.floorsKcal > 0) Kv(const Txt.cap('+ 층수'), NumText(fmtInt(burn.floors))),
                       Divider(height: 1, color: c.border),
-                      Kv(Txt.cap('= 소비 (추정)'), Row(mainAxisSize: MainAxisSize.min, children: [Txt('약 ', color: c.fg2), NumText(fmtInt(sim.e), size: 24, weight: FontWeight.w700), const Txt.cap(' kcal')])),
+                      Kv(const Txt.cap('= 소비 (추정)'), Row(mainAxisSize: MainAxisSize.min, children: [Txt('약 ', color: c.fg2), NumText(fmtInt(burn.total), size: 24, weight: FontWeight.w700), const Txt.cap(' kcal')])),
                       Column(children: [
-                        Kv(Txt.cap('활동 ${fmtK1(a.aD)}'), Txt.cap('상한 ${fmtInt(engine.rules.c)}')),
+                        Kv(Txt.cap('활동 ${fmtInt(burn.activity)}'), Txt.cap('상한 ${fmtInt(engine.rules.c)}')),
                         const SizedBox(height: 4),
                         ChGauge(value: a.aD, max: engine.rules.c, warn: a.aCapped, label: '활동 칼로리 상한 게이지'),
                         if (a.aCapped) Padding(padding: const EdgeInsets.only(top: 4), child: Txt.cap('상한 초과 ${fmtInt(a.overCap)} kcal 미반영', color: c.warn)),
@@ -187,33 +182,32 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   ),
                   stepsCard(),
                   sessionsCard(),
-                  if (!_watch)
-                    ChCard(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                        const Row(children: [Expanded(child: Txt.title('최근 7일 활동 kcal')), Txt.cap('추정 · 상한 1,000')]),
-                        const SizedBox(height: 6),
-                        Semantics(
-                          label: '최근 7일 활동 칼로리: ${week.map((w) => '10월 ${w.$1}일 ${fmtInt(w.$2)}').join(', ')}',
-                          child: ExcludeSemantics(
-                            child: SizedBox(
-                              height: 110,
-                              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                for (final w in week)
-                                  Expanded(
-                                    child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                                      NumText(fmtInt(w.$2), size: 11, color: c.fg2),
-                                      const SizedBox(height: 2),
-                                      Container(width: 22, height: (w.$2 / maxA * 60).clamp(4, 60), decoration: BoxDecoration(color: w.$3 ? c.brand : c.brand.withValues(alpha: 0.55), borderRadius: const BorderRadius.vertical(top: Radius.circular(4)))),
-                                      const SizedBox(height: 4),
-                                      NumText(w.$1, size: 11, color: w.$3 ? c.brand : c.fg2, weight: w.$3 ? FontWeight.w700 : FontWeight.w500),
-                                    ]),
-                                  ),
-                              ]),
-                            ),
+                  ChCard(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      const Row(children: [Expanded(child: Txt.title('최근 7일 활동 kcal')), Txt.cap('추정 · 상한 1,000')]),
+                      const SizedBox(height: 6),
+                      Semantics(
+                        label: '최근 7일 활동 칼로리: ${week.map((w) => '10월 ${w.$1}일 ${fmtInt(w.$2)}').join(', ')}',
+                        child: ExcludeSemantics(
+                          child: SizedBox(
+                            height: 110,
+                            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                              for (final w in week)
+                                Expanded(
+                                  child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                                    NumText(fmtInt(w.$2), size: 11, color: c.fg2),
+                                    const SizedBox(height: 2),
+                                    Container(width: 22, height: (w.$2 / maxA * 60).clamp(4, 60), decoration: BoxDecoration(color: w.$3 ? c.brand : c.brand.withValues(alpha: 0.55), borderRadius: const BorderRadius.vertical(top: Radius.circular(4)))),
+                                    const SizedBox(height: 4),
+                                    NumText(w.$1, size: 11, color: w.$3 ? c.brand : c.fg2, weight: w.$3 ? FontWeight.w700 : FontWeight.w500),
+                                  ]),
+                                ),
+                            ]),
                           ),
                         ),
-                      ]),
-                    ),
+                      ),
+                    ]),
+                  ),
                   ChCard(
                     outline: true,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
@@ -233,8 +227,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              '걸음 × (${engine.rules.stepMet}−1) × ${who.weightKg.round()} ÷ 6,000 = ${fmtFixed(perStep, 4)} kcal/보'
-                              '${_watch ? '\n세션 (MET ${a.sessionMets.isEmpty ? '—' : a.sessionMets.first}−1) × ${who.weightKg.round()} kg × 0.5 h = ${fmtK1(a.sessionsNetKcal)}' : ''}'
+                              '걸음 × (${engine.rules.stepMet}−1) × ${weightKg.round()} ÷ 6,000 = ${fmtFixed(perStep, 4)} kcal/보'
                               '\n상한: 걸음 ${fmtInt(engine.rules.stepsCap)}보 · 층수 ${engine.rules.floorsCap}층 · 활동 ${fmtInt(engine.rules.c)} kcal · 2024 Compendium 17190(걷기) · 17131(계단)',
                               style: T.body(c, size: 13, color: c.fg2),
                             ),

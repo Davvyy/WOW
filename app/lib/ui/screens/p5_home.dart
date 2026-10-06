@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/burn.dart';
 import '../../core/config.dart';
 import '../../core/engine/engine.dart';
 import '../../core/format.dart';
@@ -201,6 +202,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final showNudge = !lifecycle && inn.mainMealCount > 0 && confirmedKcal < nudgeMin;
 
     final d = sim.score.dD;
+    // 소비·활동 kcal: 활동 탭과 같은 계산·같은 반올림(정수)
+    final burn = BurnFigures.of(sim);
     final zeroMeal = inn.mainMealCount == 0;
 
     // ---- 링 ----
@@ -291,7 +294,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // ---- 카드 본문 ----
     Widget ringCard() {
       final threeNums = Row(children: [
-        _Num(label: '소비', dot: c.burn, value: '약 ${fmtInt(sim.e)}', unit: 'kcal'),
+        _Num(label: '소비', dot: c.burn, value: '약 ${fmtInt(burn.total)}', unit: 'kcal'),
         _Num(label: '섭취', dot: c.intake, value: fmtInt(inn.iD), unit: 'kcal'),
         _Num(label: '점수', star: true, value: fmtK1(sim.score.sD), unit: '점'),
       ]);
@@ -480,7 +483,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             else
               Wrap(spacing: 16, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                 Text.rich(TextSpan(children: [TextSpan(text: '걸음 ', style: T.body(c)), TextSpan(text: fmtInt(steps), style: T.num(c.fg, size: 18, w: FontWeight.w700))])),
-                Text.rich(TextSpan(children: [TextSpan(text: '활동 ', style: T.body(c)), TextSpan(text: '약 ${fmtInt(sim.activity.aD)}', style: T.num(c.fg, size: 18, w: FontWeight.w700)), TextSpan(text: ' kcal', style: T.body(c))])),
+                Text.rich(TextSpan(children: [TextSpan(text: '활동 ', style: T.body(c)), TextSpan(text: '약 ${fmtInt(burn.activity)}', style: T.num(c.fg, size: 18, w: FontWeight.w700)), TextSpan(text: ' kcal', style: T.body(c))])),
                 Txt(act.source, color: c.fg2),
               ]),
             if (reviewing) Row(children: [Icon(Icons.policy_rounded, size: 14, color: c.review), const SizedBox(width: 4), Expanded(child: Txt.cap('걸음이 검토 중이에요 · 잠정 점수에는 그대로 반영돼요', color: c.review))]),
