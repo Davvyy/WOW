@@ -397,6 +397,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     final skipLimit = remaining <= 0 || skipsToday >= engine.rules.skipPerDay;
     // 건너뜀은 끼니를 채운 기록이 없을 때만(비었거나 간식 수준 기록뿐인 슬롯)
     final canSkip = canSkipSlot(meals, slot, snackKcal: engine.rules.snackKcal);
+    // 이미 섭취에 반영된 끼니(확정·자동 확정·정정)로 슬롯이 채워졌으면 건너뜀은 뜻이 없다: 버튼·한도 안내를 숨긴다.
+    // 빈 칸·초안·간식 수준 기록은 지금처럼(꺼진 버튼과 안내 포함).
+    final showSkip = !isPast && !(isCountedStatus((live ?? _origin).status) && !canSkip);
     final total = _total;
     final isSnackLevel = total > 0 && total < engine.rules.snackKcal;
     final auto = _origin.status == MealStatus.auto;
@@ -432,10 +435,11 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           ),
           child: Semantics(
             label: '$label 사진',
-            child: Row(children: [
-              _Tag('$label${_origin.time.isEmpty ? '' : ' · ${_origin.time}'}'),
-              const Spacer(),
-              const _Tag('인앱 촬영 · 서버 시각', icon: Icons.photo_camera_rounded),
+            // 좁은 폭에서는 태그 글자를 줄여 넘치지 않게
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Flexible(child: _Tag('$label${_origin.time.isEmpty ? '' : ' · ${_origin.time}'}')),
+              const SizedBox(width: 8),
+              const Flexible(child: _Tag('인앱 촬영 · 서버 시각', icon: Icons.photo_camera_rounded)),
             ]),
           ),
         );
@@ -505,7 +509,13 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
             ]),
             Align(
               alignment: Alignment.centerRight,
-              child: Txt.cap('AI 초안 약 ${fmtInt(_aiTotal)} · $sure개 확실 · $check개 확인 필요${unchecked > 0 ? ' · $unchecked개 먹지 않음' : ''}'),
+              // 0개인 부분은 빼고 보인다
+              child: Txt.cap([
+                'AI 초안 약 ${fmtInt(_aiTotal)}',
+                if (sure > 0) '$sure개 확실',
+                if (check > 0) '$check개 확인 필요',
+                if (unchecked > 0) '$unchecked개 먹지 않음',
+              ].join(' · ')),
             ),
           ]),
         ),
@@ -575,11 +585,11 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
                     Expanded(child: Txt.cap('체크한 음식이 없어요. 먹은 것을 체크해 주세요.${canDelete ? ' 먹지 않았다면 위의 휴지통으로 기록을 지워 주세요.' : ''}', color: c.warn)),
                   ]),
                 ),
-              // 건너뜀은 오늘만
-              if (!isPast && skipLimit && !searchMode)
+              // 건너뜀은 오늘만, 이미 반영된 끼니에는 없다
+              if (showSkip && skipLimit && !searchMode)
                 Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Icon(Icons.info_rounded, size: 14, color: c.warn), const SizedBox(width: 4), Expanded(child: Txt.cap('이번 주 건너뜀 ${engine.rules.skipPerWeek}회를 모두 썼어요. 안 먹은 끼니는 $sub kcal로 계산돼요.', color: c.warn))])),
               Row(children: [
-                if (!isPast) ...[
+                if (showSkip) ...[
                   ChButton(skipLimit ? '건너뜀' : '건너뜀 (남은 $remaining회)', kind: BtnKind.quiet, expand: false, onPressed: skipLimit || !canSkip ? null : _skip),
                   const SizedBox(width: 8),
                 ],
@@ -657,7 +667,7 @@ class _Tag extends StatelessWidget {
         decoration: BoxDecoration(color: const Color(0x73000000), borderRadius: BorderRadius.circular(999)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (icon != null) ...[Icon(icon, size: 14, color: Colors.white), const SizedBox(width: 4)],
-          Txt(text, size: 11, weight: FontWeight.w600, color: Colors.white),
+          Flexible(child: Txt(text, size: 11, weight: FontWeight.w600, color: Colors.white, maxLines: 1)),
         ]),
       );
 }
@@ -677,27 +687,33 @@ class _ItemCard extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onRemove;
 
-  /// 1인분(밥은 1공기, 상품은 단위 라벨) 기준 분량. 먹은 양은 아래 스테퍼로 고른다.
+  /// 지금 고른 먹은 양 기준 분량(밥은 공기, 상품은 단위 라벨, 개수 항목은 개수). 스테퍼를 바꾸면 함께 바뀐다.
+  /// 무게를 모르거나 0 이면 g 은 쓰지 않는다.
   String _assume() {
     final it = item;
+    final tenths = portionTenths(it.mult);
+    final amt = tenths % 10 == 0 ? '${tenths ~/ 10}' : (tenths / 10).toStringAsFixed(1);
+    final broth = it.brothOff ? ' · 국물 안 먹음 −40%' : '';
+    String grams(num? g) => g == null || g <= 0 || fmtInt(g) == '0' ? '' : ' · 약 ${fmtInt(g)} g';
     final unit = it.unitLabel;
     if (unit != null) {
       return switch (it.kind) {
         ItemKind.count => '$unit × ${it.count}',
-        ItemKind.soup => '$unit${it.brothOff ? ' · 국물 안 먹음 −40%' : ''}',
-        _ => unit,
+        _ => '$unit${tenths == 10 ? '' : ' × $amt'}${it.kind == ItemKind.soup ? broth : ''}',
       };
     }
+    final g = it.grams == null ? null : it.grams! * it.mult;
     switch (it.kind) {
       case ItemKind.rice:
-        return '1공기 · 약 ${fmtInt(it.grams ?? 0)} g';
+        return '$amt공기${grams(g)}';
       case ItemKind.count:
         final unit = it.portion == '조각' ? '조각' : it.portion.replaceFirst(RegExp('^1'), '');
-        return '${it.count}$unit${it.grams != null ? ' · 약 ${fmtInt(it.grams! * it.count * it.mult)} g' : ''}';
+        return '${it.count}$unit${grams(g == null ? null : g * it.count)}';
       case ItemKind.soup:
-        return '1인분 · 약 ${fmtInt(it.grams ?? 0)} g${it.brothOff ? ' · 국물 안 먹음 −40%' : ''}';
+        return '$amt인분${grams(g)}$broth';
       case ItemKind.side:
-        return '${it.portion} · 약 ${fmtInt(it.grams ?? 0)} g';
+        final base = it.portion == '1인분' ? '$amt인분' : '${it.portion}${tenths == 10 ? '' : ' × $amt'}';
+        return '$base${grams(g)}';
     }
   }
 
@@ -852,10 +868,12 @@ class _PortionStepper extends StatelessWidget {
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           padding: EdgeInsets.zero,
         );
+    // 이름 줄은 스테퍼 위에 따로 둔다(좁은 폭에서 스테퍼 테두리와 겹치지 않게)
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        Expanded(child: Txt.cap(isCount ? label : '$label · 0.1$unit 단위', color: c.fg2)),
-        Container(
+      Txt.cap(isCount ? label : '$label · 0.1$unit 단위', color: c.fg2),
+      const SizedBox(height: 6),
+      Center(
+        child: Container(
           decoration: BoxDecoration(border: Border.all(color: c.borderStrong), borderRadius: BorderRadius.circular(999)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             btn(isCount ? '1개 크기 줄이기' : '덜 먹음', Icons.remove_rounded, tenths > minPortionTenths ? () => set(tenths - 1) : null),
@@ -866,7 +884,7 @@ class _PortionStepper extends StatelessWidget {
             btn(isCount ? '1개 크기 늘리기' : '더 먹음', Icons.add_rounded, tenths < maxPortionTenths ? () => set(tenths + 1) : null),
           ]),
         ),
-      ]),
+      ),
       const SizedBox(height: 8),
       ChSeg<int>(small: true, label: '$label 빠른 선택', items: _quick, value: tenths, onChanged: set),
     ]);

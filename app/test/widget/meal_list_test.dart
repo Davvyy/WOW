@@ -109,8 +109,18 @@ void main() {
     expect(find.byTooltip('기록 지우기'), findsNothing);
   });
 
-  testWidgets('끼니를 채운 기록이 있는 슬롯의 P7 은 건너뜀을 끈다', (tester) async {
+  testWidgets('끼니를 채운 기록이 있는 슬롯: 반영된 끼니의 P7 에는 건너뜀이 없다', (tester) async {
     await pumpApp(tester, location: R.meal(MealSlot.breakfast, meal: 'm-b2'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
+    expect(find.byWidgetPredicate((w) => w is ChButton && w.label.startsWith('건너뜀')), findsNothing);
+  });
+
+  testWidgets('끼니를 채운 기록이 있는 슬롯: 같은 슬롯 초안의 P7 은 건너뜀을 끈다', (tester) async {
+    final meals = [
+      ..._twoBreakfasts(),
+      const MealRecord(slot: MealSlot.breakfast, status: MealStatus.draft, aiKcal: 200, title: '바나나', time: '10:40', serverId: 'm-b3',
+          items: [MealItem(id: 'b', candidates: ['바나나'], candKcal: [200], portion: '1개', kind: ItemKind.count)]),
+    ];
+    await pumpApp(tester, location: R.meal(MealSlot.breakfast, meal: 'm-b3'), overrides: [mealsProvider.overrideWith(() => MealsNotifier(meals))]);
     final skip = tester.widget<ChButton>(find.byWidgetPredicate((w) => w is ChButton && w.label.startsWith('건너뜀')));
     expect(skip.onPressed, isNull);
   });
