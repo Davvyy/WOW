@@ -465,7 +465,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           ]),
         ),
         history,
-        const Disclaimer('모든 수치는 추정이에요 · 점수는 매시간 잠정 · D+1 09:00 확정 · 이후 변경은 "정정"으로 기록돼요'),
+        const Disclaimer('모든 수치는 추정이에요. 점수는 매시간 잠정으로 바뀌고 다음 날 09:00에 확정돼요.\n이후 변경은 "정정"으로 기록돼요.'),
       ],
     );
   }

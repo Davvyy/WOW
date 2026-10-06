@@ -234,7 +234,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                       ]),
                     ),
                     ChGauge(value: s.score.ratio, max: r.sMax / 100, label: '예상 점수 게이지'),
-                    Txt.cap('가정: 3끼 확정 · 달리기는 ${_runKmh.round()} km/h 기준이고 달리기 중 걸음 $_runStepsPerMin보/분은 걸음에서 빼요 · 결과는 P5·P10과 같은 산식 함수'),
+                    Txt.cap('3끼를 확정했다고 가정해요. 달리기는 ${_runKmh.round()} km/h 기준이고 달리기 중 걸음 $_runStepsPerMin보/분은 걸음에서 빼요.\n결과는 P5·P10과 같은 산식으로 계산해요.'),
                     ChLink('오늘 실제값과 비교', onTap: () => context.push(R.ledger)),
                   ], gap: 10)),
                 ),
