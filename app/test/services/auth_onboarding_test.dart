@@ -122,9 +122,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     c = ProviderScope.containerOf(tester.element(find.byType(Scaffold).first));
-    await tester.tap(find.text('카카오로 계속하기'), warnIfMissed: false);
-    await tester.pumpAndSettle();
-    expect(auth.calls, isEmpty); // 아직 고르지 않음 → 비활성
+    // 로그인 버튼은 고르기 전에도 켜져 있다(이미 참가한 사용자의 재로그인). 여기서는 먼저 고르고 로그인한다.
     await tester.tap(find.text('이번 달 챌린지 참가하기'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('카카오로 계속하기'));

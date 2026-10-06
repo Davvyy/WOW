@@ -125,6 +125,13 @@ class _StartScreenState extends ConsumerState<StartScreen> {
       context.go(R.home);
       return;
     }
+    // 참가 기록 없이 로그인만 한 경우(로그인 버튼을 먼저 누름): 여기 머물며 챌린지를 고르게 한다.
+    // 이후 '이번 달 챌린지 참가하기'·초대코드는 로그인된 상태라 바로 P2 로 간다.
+    final picked = _monthlyChosen || (_state == _CodeState.valid && _invite != null);
+    if (!picked) {
+      showToast(context, '참가할 챌린지를 골라 주세요');
+      return;
+    }
     final draft = ref.read(onboardingProvider);
     if (draft.nickname.isEmpty) {
       final name = ref.read(authServiceProvider).displayName;
@@ -174,7 +181,8 @@ class _StartScreenState extends ConsumerState<StartScreen> {
     };
     final inv = _invite;
     final valid = st == _CodeState.valid && inv != null;
-    final canLogin = valid || _monthlyChosen;
+    // 로그인은 언제나 가능(이미 참가한 사용자가 다시 로그인). 참가 기록이 없으면 로그인 뒤 챌린지를 고르게 한다.
+    const canLogin = true;
     return Scaffold(
       backgroundColor: c.bg,
       body: SafeArea(
