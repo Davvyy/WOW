@@ -14,6 +14,7 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../services/health/health_models.dart' show toKstWall;
 import '../../state/app_state.dart';
+import '../../state/coverage.dart';
 import '../../state/past_meals.dart';
 import '../widgets/challenge_cards.dart';
 import '../widgets/common.dart';
@@ -189,18 +190,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (row != null && row.hasRevision) caption = '저녁 무효 → 대체값 ${fmtM(inn.substituteFor(MealSlot.dinner))} 적용 · ${fmtK1(row.sBefore!)} → ${fmtK1(row.s)}점';
     }
 
-    // 반영률: 아침·점심·저녁 + 걸음. 끼니 칸은 엔진과 같이 대체값이 들어가지 않은 칸만 반영으로 센다:
-    // 슬롯을 채운 확정 끼니(간식 수준 150 kcal 미만은 채우지 않음)가 있거나, 한도 안의 건너뜀(대체값 없음).
-    // 한도를 넘은 건너뜀은 대체값이 들어가므로 '건너뜀'으로 보이되 반영으로 세지 않는다.
+    // 반영률: 순위표 내 줄·서버 fill 과 같은 계산(D69, coverageCells)
     bool confirmed(MealRecord m) => isCountedStatus(m.status);
+    final cells = coverageCells(meals: dayMeals, intake: inn, steps: steps, snackKcal: engine.rules.snackKcal);
     final slotFilled = {for (final s in mainSlots) s: mealsIn(dayMeals, s).any((m) => confirmed(m) && m.kcal >= engine.rules.snackKcal)};
     final slotSkipped = {
       for (final s in mainSlots) s: !slotFilled[s]! && mealsIn(dayMeals, s).any((m) => m.status == MealStatus.skipped),
     };
-    final cells = [
-      for (final s in mainSlots) slotFilled[s]! || (slotSkipped[s]! && !inn.substituteValues.containsKey(s) && !inn.substituteSlots.contains(s)),
-      steps > 0,
-    ];
     final pct = (cells.where((x) => x).length * 25);
 
     // 건강 안내(확정 섭취, 대체값 제외 < 남 1,500 / 여 1,200)

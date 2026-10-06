@@ -8,6 +8,7 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../services/health/health_source.dart' show newUuidV4;
 import '../../state/app_state.dart';
+import '../../state/coverage.dart';
 import '../widgets/common.dart';
 import '../../state/session.dart';
 
@@ -109,6 +110,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     if (loaded == null) return _loadingScaffold(context, ch.name);
     final lb = loaded;
     final today = _today;
+    final myTodayCells = ref.watch(todayCoverageProvider);
     final list = today ? lb.today : lb.cumulative;
     final me = lb.meIn(list) ?? LeaderRow(rank: 0, name: curMe.nickname, me: true);
     // 검토 중: 서버는 내 장부의 under_review, 모의는 걸음 급증 시나리오
@@ -140,8 +142,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       final mine = r.me;
       final isHearted = hearted == (r.participantId ?? r.name);
       final locked = hearted != null && !isHearted;
-      final fillPct = r.fill * 25;
-      final cells = [for (var i = 0; i < 4; i++) i < r.fill];
+      // 오늘 탭의 내 줄은 홈과 같은 반영률(D69). 검토 중이면 서버 행이 '집계 중'이라 앱이 내 줄을 만들기 때문.
+      final fill = mine && today ? coverageCount(myTodayCells) : r.fill;
+      final fillPct = fill * 25;
+      final cells = mine && today ? myTodayCells : [for (var i = 0; i < 4; i++) i < fill];
       final semantics = '${r.rank == 0 ? '순위 제외' : '${r.rank}위'}${r.tie ? '(공동)' : ''} ${r.name}${mine ? '(나)' : ''} ${r.score == null ? '' : '${fmtK1(r.score!)}점'} 반영률 $fillPct%';
       return Semantics(
         label: semantics,
@@ -176,7 +180,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                   ]),
                   const SizedBox(height: 2),
                   Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, children: [
-                    Semantics(label: '반영률 ${r.fill}/4', child: ExcludeSemantics(child: Fill4(cells: cells, small: true))),
+                    Semantics(label: '반영률 $fill/4', child: ExcludeSemantics(child: Fill4(cells: cells, small: true))),
                     Txt('$fillPct%', size: 11, color: c.fg2),
                     if (mine && r.delta > 0) Semantics(label: '${r.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${r.delta}', size: 11, color: c.good))),
                     if (mine && reviewMe && today) InkWell(onTap: () => context.push('${R.ledger}?v=review'), child: Txt('소명하기', size: 11, weight: FontWeight.w600, color: c.brand)),
