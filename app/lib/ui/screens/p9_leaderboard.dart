@@ -290,10 +290,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           addBox(centerCard(Icons.visibility_off_rounded, '순위 비공개', '설정에서 "순위에 내 행 보이기"를 켜면 전체 순위를 볼 수 있어요.', extra: ChLink('설정으로', onTap: () => context.push(R.settings))));
           break;
         }
-        addBox(Align(
-          alignment: Alignment.centerLeft,
-          child: today ? const ChChip('잠정 · 매시간 갱신 · 내일 09:00 확정', icon: Icons.schedule_rounded) : ChChip('확정 · ${ch.today.month}.${ch.today.day} 09:00', tone: Tone.good, icon: Icons.check_rounded),
-        ));
+        addBox(today
+            ? const InlineNote(Icons.schedule_rounded, '잠정 순위예요. 매시간 바뀌고 내일 09:00에 확정돼요.')
+            : Align(alignment: Alignment.centerLeft, child: ChChip('확정 · ${ch.today.month}.${ch.today.day} 09:00', tone: Tone.good, icon: Icons.check_rounded)));
         final ranked = list.where((r) => !r.pending).toList();
         final pending = list.where((r) => r.pending && !r.aggregating && !(r.me && me.pending)).toList();
         final others = ranked.where((r) => !r.me).toList();
@@ -316,7 +315,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             addBox(Txt('${r.name} · 참여 ${r.days ?? 0}/${r.minDays ?? 7}일'), bottom: 4);
           }
         }
-        addBox(Center(child: Txt.cap('전체 ${lb.total}명 · 20명씩 더 보기')), bottom: 10);
+        // '더 보기'는 보이는 행보다 더 있을 때만
+        addBox(Center(child: Txt.cap('전체 ${lb.total}명${lb.total > list.length ? ' · 20명씩 더 보기' : ''}')), bottom: 10);
         if (weekly != null) {
           addBox(ChCard(
             outline: true,
@@ -327,7 +327,12 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             ], gap: 4)),
           ), bottom: 4);
         } else if (list.isEmpty || list.every((r) => r.me)) {
-          addBox(centerCard(Icons.hourglass_empty_rounded, '아직 확정된 점수가 없어요', '점검 기간이 끝나고 첫 확정(다음 날 09:00) 뒤에 순위가 보여요.'));
+          // 오늘(잠정) 탭은 위에 내 잠정 행이 있어 빈 화면 대신 한 줄 안내, 확정 점수의 빈 화면은 누적 탭에만
+          if (today) {
+            addBox(const Center(child: Txt.cap('확정 순위는 점검 기간이 끝난 다음 날 09:00부터 보여요', align: TextAlign.center)), bottom: 10);
+          } else {
+            addBox(centerCard(Icons.hourglass_empty_rounded, '아직 확정된 점수가 없어요', '점검 기간이 끝나고 첫 확정(다음 날 09:00) 뒤에 순위가 보여요.'));
+          }
         }
         addBox(const Disclaimer('점수는 추정 kcal 기준이에요 · 의료 조언이 아니에요'), bottom: 0);
     }

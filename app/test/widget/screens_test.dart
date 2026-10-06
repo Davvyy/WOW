@@ -179,7 +179,7 @@ void main() {
       await pumpWidgetScreen(tester, const LeaderboardScreen());
       expect(find.text('오늘 (잠정)'), findsOneWidget);
       expect(find.text('누적'), findsOneWidget);
-      expect(find.textContaining('잠정 · 매시간 갱신'), findsOneWidget);
+      expect(find.text('잠정 순위예요. 매시간 바뀌고 내일 09:00에 확정돼요.'), findsOneWidget);
       expect(find.textContaining('지수(나)'), findsOneWidget);
       expect(find.textContaining('위 순위까지 3.2점'), findsOneWidget);
       expect(find.text('집계 중'), findsOneWidget);
