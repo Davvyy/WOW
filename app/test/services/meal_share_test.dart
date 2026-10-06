@@ -75,6 +75,8 @@ void main() {
       await store.put('old', Uint8List.fromList([1]));
       await store.put('new', Uint8List.fromList([2]));
       File('${dir.path}/old.jpg').setLastModifiedSync(now.subtract(const Duration(days: 8)));
+      // 실제 파일 시각(오늘)이 아니라 테스트 시계 기준으로: 날짜에 따라 결과가 바뀌지 않게
+      File('${dir.path}/new.jpg').setLastModifiedSync(now);
       expect(await store.prune(), 1);
       expect(await store.get('old'), isNull);
       expect(await store.get('new'), [2]);
