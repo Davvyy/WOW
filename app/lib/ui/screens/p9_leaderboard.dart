@@ -294,21 +294,39 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           addBox(centerCard(Icons.visibility_off_rounded, '순위 비공개', '설정에서 "순위에 내 행 보이기"를 켜면 전체 순위를 볼 수 있어요.', extra: ChLink('설정으로', onTap: () => context.push(R.settings))));
           break;
         }
-        addBox(today
-            ? const InlineNote(Icons.schedule_rounded, '잠정 순위예요. 매시간 바뀌고 내일 09:00에 확정돼요.')
-            : Align(alignment: Alignment.centerLeft, child: ChChip('확정 · ${ch.today.month}.${ch.today.day} 09:00', tone: Tone.good, icon: Icons.check_rounded)));
         final ranked = list.where((r) => !r.pending).toList();
         final pending = list.where((r) => r.pending && !r.aggregating && !(r.me && me.pending)).toList();
         final others = ranked.where((r) => !r.me).toList();
         final top3 = others.where((r) => !r.aggregating && r.score != null).take(3).toList();
         final rest = ranked.where((r) => (r.rank > 3 || r.aggregating) && !r.me).toList();
+        final st = currentSession.stats;
+        final days = st?.days ?? me.days ?? 0;
+        final minDays = st?.minDays ?? me.minDays ?? 7;
+        // 누적 탭에서 아직 순위에 없을 때 상태 카드는 하나만: 점검 기간 → 순위 대기 → 아무도 확정 점수가 없음
+        final first = firstCountedDay;
+        final Widget? cumState = today
+            ? null
+            : inCheckPeriod && first != null
+            ? centerCard(Icons.hourglass_top_rounded, '점검 기간이에요', '${fmtMd(first)}부터 누적 순위에 들어가요.')
+            : me.pending
+            ? centerCard(Icons.hourglass_top_rounded, '순위 대기', '참여 $days/$minDays일 · $minDays일 채우면 순위에 들어가요.')
+            : list.isEmpty || list.every((r) => r.me)
+            ? centerCard(Icons.hourglass_empty_rounded, '아직 확정된 점수가 없어요', '점검 기간이 끝나고 첫 확정(다음 날 09:00) 뒤에 순위가 보여요.')
+            : null;
+        // 내 행: 순위 대기·점검 기간(누적 탭)에는 고정하지 않는다
+        final pinMe = !me.pending && cumState == null;
+        if (today) {
+          addBox(const InlineNote(Icons.schedule_rounded, '잠정 순위예요. 매시간 바뀌고 내일 09:00에 확정돼요.'));
+        } else if (ranked.isNotEmpty) {
+          // 확정 칩은 순위에 든 행이 하나라도 있을 때만
+          addBox(Align(alignment: Alignment.centerLeft, child: ChChip('확정 · ${ch.today.month}.${ch.today.day} 09:00', tone: Tone.good, icon: Icons.check_rounded)));
+        }
         addBox(podium(top3, showAvg: !today));
-        if (me.pending) {
-          final st = currentSession.stats;
-          final days = st?.days ?? me.days ?? 0;
-          final minDays = st?.minDays ?? me.minDays ?? 7;
+        if (cumState != null) {
+          addBox(cumState);
+        } else if (me.pending) {
           addBox(centerCard(Icons.hourglass_top_rounded, '순위 대기 · 참여 $days/$minDays일', '점검 기간이 끝난 뒤 참여일이 쌓이면 순위에 들어가요'));
-        } else {
+        } else if (pinMe) {
           slivers.add(SliverPersistentHeader(pinned: true, delegate: _PinnedRow(height: pinnedHeight(me, pinned: true), color: c.bg, child: rowW(me, pinned: true))));
         }
         slivers.add(SliverList(delegate: SliverChildListDelegate([for (final r in rest) rowW(r)])));
@@ -319,8 +337,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             addBox(Txt('${r.name} · 참여 ${r.days ?? 0}/${r.minDays ?? 7}일'), bottom: 4);
           }
         }
-        // '더 보기'는 보이는 행보다 더 있을 때만
-        addBox(Center(child: Txt.cap('전체 ${lb.total}명${lb.total > list.length ? ' · 20명씩 더 보기' : ''}')), bottom: 10);
+        // '전체 N명'은 보이는 행이 있을 때만, '더 보기'는 보이는 행보다 더 있을 때만
+        final visibleRows = top3.isNotEmpty || rest.isNotEmpty || pending.isNotEmpty || pinMe;
+        if (visibleRows) addBox(Center(child: Txt.cap('전체 ${lb.total}명${lb.total > list.length ? ' · 20명씩 더 보기' : ''}')), bottom: 10);
         if (weekly != null) {
           addBox(ChCard(
             outline: true,
@@ -330,13 +349,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               const Txt.cap('순위와 무관한 내 기록이에요. 저녁을 확정하는 날이 늘면 반영률이 올라가요.'),
             ], gap: 4)),
           ), bottom: 4);
-        } else if (list.isEmpty || list.every((r) => r.me)) {
-          // 오늘(잠정) 탭은 위에 내 잠정 행이 있어 빈 화면 대신 한 줄 안내, 확정 점수의 빈 화면은 누적 탭에만
-          if (today) {
-            addBox(const Center(child: Txt.cap('확정 순위는 점검 기간이 끝난 다음 날 09:00부터 보여요', align: TextAlign.center)), bottom: 10);
-          } else {
-            addBox(centerCard(Icons.hourglass_empty_rounded, '아직 확정된 점수가 없어요', '점검 기간이 끝나고 첫 확정(다음 날 09:00) 뒤에 순위가 보여요.'));
-          }
+        } else if (today && (list.isEmpty || list.every((r) => r.me))) {
+          // 오늘(잠정) 탭은 위에 내 잠정 행이 있어 빈 화면 대신 한 줄 안내(누적 탭의 빈 화면은 위 상태 카드 하나로)
+          addBox(const Center(child: Txt.cap('확정 순위는 점검 기간이 끝난 다음 날 09:00부터 보여요', align: TextAlign.center)), bottom: 10);
         }
         addBox(const Disclaimer('점수는 추정 kcal 기준이에요 · 의료 조언이 아니에요'), bottom: 0);
     }

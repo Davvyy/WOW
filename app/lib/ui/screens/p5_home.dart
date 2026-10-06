@@ -409,10 +409,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // ---- 누적·순위(카드 없이): 굵은 누적 점수 한 줄 + 아래 짧은 순위 문구. 오른쪽에 '점수 계산 보기' ----
     // 내 점검 기간(점검 시작 + check_days 전)에는 누적 대신 첫 반영일 안내 한 줄
-    final cs = currentSession.checkStart;
-    final firstCounted = cs == null ? null : DateTime(cs.year, cs.month, cs.day + engine.rules.checkDays);
-    final t0 = ch.today;
-    final inCheck = firstCounted != null && DateTime(t0.year, t0.month, t0.day).isBefore(firstCounted);
+    final firstCounted = firstCountedDay;
+    final inCheck = inCheckPeriod && firstCounted != null;
     Widget scoreLine(String lead, double score) => Text.rich(TextSpan(children: [
           TextSpan(text: lead, style: T.body(c, size: 15, w: FontWeight.w600)),
           TextSpan(text: fmtK1(score), style: T.num(c.fg, size: 17, w: FontWeight.w700)),

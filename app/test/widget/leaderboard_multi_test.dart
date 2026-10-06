@@ -75,7 +75,10 @@ void main() {
     await pumpApp(tester, location: R.rank, overrides: [apiProvider.overrideWithValue(_PendingMeApi())]);
     await tester.tap(find.text('누적'));
     await tester.pumpAndSettle();
-    expect(find.text('순위 대기 · 참여 3/7일'), findsOneWidget);
+    // 누적 탭 상태 카드 하나(제목 '순위 대기' + 참여 n/m일) · 다른 대기 참가자 묶음 제목도 '순위 대기'
+    expect(find.text('참여 3/7일 · 7일 채우면 순위에 들어가요.'), findsOneWidget);
+    expect(find.text('순위 대기'), findsNWidgets(2));
+    expect(find.text('아직 확정된 점수가 없어요'), findsNothing);
     expect(find.textContaining('지수 · 참여'), findsNothing);
     expect(find.textContaining('늦은참가 · 참여 2/7일'), findsOneWidget);
   });

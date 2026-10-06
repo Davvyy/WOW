@@ -805,6 +805,19 @@ int get firstSelectableDay {
   return max(1, days + 1);
 }
 
+/// 내 누적에 처음 반영되는 날(점검 시작 + check_days). 서버가 점검 시작일을 주지 않으면 null
+DateTime? get firstCountedDay {
+  final cs = currentSession.checkStart;
+  return cs == null ? null : DateTime(cs.year, cs.month, cs.day + engine.rules.checkDays);
+}
+
+/// 오늘이 내 점검 기간인지(오늘 < 점검 시작 + check_days). 홈 누적 줄·순위 누적 탭이 같이 쓴다
+bool get inCheckPeriod {
+  final first = firstCountedDay;
+  final t = curChallenge.today;
+  return first != null && DateTime(t.year, t.month, t.day).isBefore(first);
+}
+
 final selectedDayProvider = NotifierProvider<DayNotifier, int>(DayNotifier.new);
 
 // ---------- 응원(하루 1회) ----------
