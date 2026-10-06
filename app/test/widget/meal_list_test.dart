@@ -1,4 +1,4 @@
-// 홈: 한 슬롯의 끼니를 모두 한 줄씩 보여 주고, 누른 그 끼니의 P7 을 연다. P7: 서버 끼니는 지울 수 있다.
+// 홈 '오늘 기록': 한 슬롯의 끼니를 모두 한 줄씩 보여 주고, 누른 그 끼니의 P7 을 연다. P7: 서버 끼니는 지울 수 있다.
 import 'package:challory/core/engine/engine.dart';
 import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/data/models.dart';
@@ -8,7 +8,7 @@ import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/ui/screens/p6_camera.dart';
 import 'package:challory/ui/widgets/common.dart';
-import 'package:challory/ui/widgets/meal_slot_card.dart';
+import 'package:challory/ui/widgets/day_timeline.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'screens_test.dart' show pumpApp;
@@ -28,21 +28,23 @@ List<MealRecord> _twoBreakfasts() => [
       ),
     ];
 
-Finder _rowsOf(MealSlot s) => find.byWidgetPredicate((w) => w is MealRow && w.meal.slot == s);
+/// '오늘 기록' 목록에서 [s] 슬롯의 끼니 줄(빈 칸 줄 제외)
+Finder _rowsOf(MealSlot s) => find.byWidgetPredicate((w) => w is DayTimelineRow && w.meal.slot == s && w.meal.status != MealStatus.empty);
 
 void main() {
   _unknownKey();
   _checkboxes();
   _skipSnackLevel();
-  testWidgets('홈 아침 카드: 끼니 2개면 2줄 · 머리글은 반영 kcal 합계 · 두 번째를 누르면 그 끼니의 P7', (tester) async {
+  testWidgets("홈 '오늘 기록': 아침 끼니 2개면 2줄 · 각 줄에 kcal · 두 번째를 누르면 그 끼니의 P7", (tester) async {
     await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
     expect(_rowsOf(MealSlot.breakfast), findsNWidgets(2));
     expect(_rowsOf(MealSlot.lunch), findsOneWidget);
-    expect(find.bySemanticsLabel('아침 720 kcal'), findsOneWidget);
+    expect(find.bySemanticsLabel('아침 계란토스트 · 바나나 420 kcal 확정, 열기'), findsOneWidget);
+    expect(find.bySemanticsLabel('아침 요거트 볼 300 kcal 확정, 열기'), findsOneWidget);
     expect(find.text('요거트 볼'), findsOneWidget);
-    expect(find.bySemanticsLabel('아침 추가'), findsOneWidget);
-    // 기록이 없는 간식은 지금처럼 촬영 칸
-    expect(find.byWidgetPredicate((w) => w is MealSlotCard && w.meal.slot == MealSlot.snack && w.meal.status == MealStatus.empty), findsOneWidget);
+    expect(find.bySemanticsLabel('아침 추가'), findsOneWidget, reason: '슬롯의 마지막 줄 끝에 하나');
+    // 기록이 없는 간식은 빈 칸 한 줄
+    expect(find.byWidgetPredicate((w) => w is DayTimelineRow && w.meal.slot == MealSlot.snack && w.meal.status == MealStatus.empty), findsOneWidget);
 
     await tester.tap(_rowsOf(MealSlot.breakfast).at(1));
     await tester.pumpAndSettle();
@@ -54,7 +56,7 @@ void main() {
 
   testWidgets("'추가'는 그 슬롯을 고른 촬영 화면을 연다", (tester) async {
     await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(_twoBreakfasts()))]);
-    await tester.tap(find.descendant(of: find.byWidgetPredicate((w) => w is MealSlotGroupCard && w.slot == MealSlot.breakfast), matching: find.text('추가')));
+    await tester.tap(find.bySemanticsLabel('아침 추가'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.widget<CameraScreen>(find.byType(CameraScreen)).initialSlot, MealSlot.breakfast);

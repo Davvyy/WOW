@@ -11,7 +11,7 @@ import 'package:challory/state/app_state.dart';
 import 'package:challory/state/past_meals.dart';
 import 'package:challory/state/session.dart';
 import 'package:challory/ui/widgets/common.dart';
-import 'package:challory/ui/widgets/meal_slot_card.dart';
+import 'package:challory/ui/widgets/day_timeline.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -120,7 +120,8 @@ Future<void> _pickPastDay(WidgetTester tester, ProviderContainer c) async {
   await tester.pumpAndSettle();
 }
 
-Finder _rowsOf(MealSlot s) => find.byWidgetPredicate((w) => w is MealRow && w.meal.slot == s);
+/// '오늘 기록' 목록에서 [s] 슬롯의 끼니 줄(빈 칸 줄 제외)
+Finder _rowsOf(MealSlot s) => find.byWidgetPredicate((w) => w is DayTimelineRow && w.meal.slot == s && w.meal.status != MealStatus.empty);
 
 Finder _cta(String prefix) => find.byWidgetPredicate((w) => w is ChButton && w.label.startsWith(prefix));
 
@@ -133,9 +134,13 @@ void main() {
     expect(_rowsOf(MealSlot.breakfast), findsNWidgets(2));
     expect(find.text('계란토스트'), findsOneWidget);
     expect(find.bySemanticsLabel('아침 추가'), findsNothing, reason: '지난 날에는 새로 찍지 않는다');
-    // 기록 없는 점심은 빈 칸(누를 수 없음)
-    final lunch = tester.widget<MealSlotCard>(find.byWidgetPredicate((w) => w is MealSlotCard && w.meal.slot == MealSlot.lunch));
+    expect(find.text('10.12 기록'), findsOneWidget, reason: '지난 날 머리글');
+    // 기록 없는 점심은 빈 칸(누를 수 없음, 찍기 없음)
+    final lunch = tester.widget<DayTimelineRow>(find.byWidgetPredicate((w) => w is DayTimelineRow && w.meal.slot == MealSlot.lunch));
+    expect(lunch.meal.status, MealStatus.empty);
     expect(lunch.onTap, isNull);
+    expect(lunch.trailing, isNull);
+    expect(find.text('찍기'), findsNothing);
 
     await tester.tap(_rowsOf(MealSlot.breakfast).at(1));
     await tester.pumpAndSettle();
@@ -242,10 +247,9 @@ void main() {
     final c = await pumpApp(tester);
     c.read(selectedDayProvider.notifier).set(7);
     await tester.pumpAndSettle();
-    expect(find.byType(MealRow), findsNothing);
-    final cards = tester.widgetList<MealSlotCard>(find.byType(MealSlotCard));
-    expect(cards, hasLength(4));
-    expect(cards.every((w) => w.onTap == null), isTrue);
+    final rows = tester.widgetList<DayTimelineRow>(find.byType(DayTimelineRow));
+    expect(rows, hasLength(4), reason: '슬롯당 한 줄');
+    expect(rows.every((w) => w.onTap == null && w.trailing == null), isTrue);
   });
 
   _fixRound1();

@@ -1,4 +1,4 @@
-// 홈 끼니 카드: 이 폰에 보관된 실제 사진을 썸네일로 보여 준다
+// 홈 '오늘 기록' 줄: 이 폰에 보관된 실제 사진을 작은 썸네일(32)로 보여 준다. 사진이 없으면 썸네일 없이.
 import 'dart:typed_data';
 
 import 'package:challory/core/engine/engine.dart';
@@ -6,7 +6,7 @@ import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/data/models.dart';
 import 'package:challory/services/share/meal_share.dart';
 import 'package:challory/state/app_state.dart';
-import 'package:challory/ui/widgets/meal_slot_card.dart';
+import 'package:challory/ui/widgets/day_timeline.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -24,49 +24,50 @@ MemoryImage? _photoOf(Image i) {
 Iterable<Image> _memoryImages(WidgetTester tester) => tester.widgetList<Image>(find.byType(Image)).where((i) => _photoOf(i) != null);
 
 void main() {
-  group('MealSlotCard 사진 썸네일', () {
-    testWidgets('photo 가 있으면 Image.memory 로 보여 준다', (tester) async {
+  group('DayTimelineRow 사진 썸네일', () {
+    testWidgets('photo 가 있으면 32 썸네일, 타일 크기로만 디코딩', (tester) async {
       const meal = MealRecord(slot: MealSlot.lunch, status: MealStatus.confirmed, kcal: 780, time: '12:20', title: '김치찌개 백반');
-      await pumpWidgetScreen(tester, Scaffold(body: MealSlotCard(meal: meal, photo: _png())));
+      await pumpWidgetScreen(tester, Scaffold(body: DayTimelineRow(meal: meal, photo: _png())));
       final images = _memoryImages(tester).toList();
       expect(images, hasLength(1));
       expect(images.single.fit, BoxFit.cover);
       expect(images.single.gaplessPlayback, isTrue);
+      expect(tester.getSize(find.byType(Image)), const Size(DayTimelineRow.thumbSize, DayTimelineRow.thumbSize));
       final resize = images.single.image as ResizeImage;
       final dpr = tester.view.devicePixelRatio;
       expect(resize.width, isNotNull);
       expect(resize.height, isNotNull);
-      expect(resize.width!, lessThanOrEqualTo(168 * dpr));
-      expect(resize.height!, lessThanOrEqualTo(168 * dpr));
+      expect(resize.width!, lessThanOrEqualTo(DayTimelineRow.thumbSize * 1.5 * dpr + 1));
+      expect(resize.height!, lessThanOrEqualTo(DayTimelineRow.thumbSize * 1.5 * dpr + 1));
       expect(resize.policy, ResizeImagePolicy.fit);
     });
 
-    testWidgets('photo 가 없으면 사진 이미지가 없다', (tester) async {
+    testWidgets('photo 가 없으면 썸네일이 없다', (tester) async {
       const meal = MealRecord(slot: MealSlot.lunch, status: MealStatus.confirmed, kcal: 780, time: '12:20', title: '김치찌개 백반');
-      await pumpWidgetScreen(tester, const Scaffold(body: MealSlotCard(meal: meal)));
-      expect(_memoryImages(tester), isEmpty);
+      await pumpWidgetScreen(tester, const Scaffold(body: DayTimelineRow(meal: meal)));
+      expect(find.byType(Image), findsNothing);
     });
 
-    testWidgets('분석 중·업로드 대기는 사진 위에 상태 아이콘이 남는다', (tester) async {
+    testWidgets('분석 중은 사진과 함께 상태 문구', (tester) async {
       const analyzing = MealRecord(slot: MealSlot.lunch, status: MealStatus.captured, time: '12:20');
-      await pumpWidgetScreen(tester, Scaffold(body: MealSlotCard(meal: analyzing, photo: _png())));
+      await pumpWidgetScreen(tester, Scaffold(body: DayTimelineRow(meal: analyzing, photo: _png())));
       expect(_memoryImages(tester), hasLength(1));
-      // 배지(칩) 아이콘 + 사진 위 아이콘
-      expect(find.byIcon(Icons.hourglass_top_rounded), findsNWidgets(2));
+      expect(find.text('분석 중…'), findsOneWidget);
+      expect(find.text('12:20 · 끝나면 알려드려요'), findsOneWidget);
     });
 
     testWidgets('빈 칸·건너뜀은 photo 가 있어도 사진을 쓰지 않는다', (tester) async {
       const empty = MealRecord(slot: MealSlot.lunch);
       const skipped = MealRecord(slot: MealSlot.lunch, status: MealStatus.skipped);
       for (final m in [empty, skipped]) {
-        await pumpWidgetScreen(tester, Scaffold(body: MealSlotCard(meal: m, photo: _png())));
+        await pumpWidgetScreen(tester, Scaffold(body: DayTimelineRow(meal: m, photo: _png())));
         expect(_memoryImages(tester), isEmpty);
       }
     });
   });
 
-  group('홈 끼니 카드', () {
-    testWidgets('이 폰에 보관된 사진이 있으면 그 끼니 카드에 사진이 보인다', (tester) async {
+  group('홈 끼니 줄', () {
+    testWidgets('이 폰에 보관된 사진이 있으면 그 끼니 줄에 사진이 보인다', (tester) async {
       final meals = buildTodayMeals();
       final withId = [for (final m in meals) m.slot == MealSlot.lunch ? m.copyWith(serverId: 'meal-lunch-1') : m];
       final shares = MemorySharePhotoStore()..photos['meal-lunch-1'] = _png();
@@ -76,12 +77,12 @@ void main() {
       ]);
       await tester.pumpAndSettle();
       expect(_memoryImages(tester), hasLength(1));
-      final row = find.ancestor(of: find.byType(Image), matching: find.byType(MealRow));
+      final row = find.ancestor(of: find.byType(Image), matching: find.byType(DayTimelineRow));
       expect(row, findsOneWidget);
-      expect(tester.widget<MealRow>(row).meal.slot, MealSlot.lunch);
+      expect(tester.widget<DayTimelineRow>(row).meal.slot, MealSlot.lunch);
     });
 
-    testWidgets('방금 찍어 올린 사진은 카드가 바로 이어 받는다', (tester) async {
+    testWidgets('방금 찍어 올린 사진은 줄이 바로 이어 받는다', (tester) async {
       final container = await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(buildTodayMeals()))]);
       await tester.pumpAndSettle();
       expect(_memoryImages(tester), isEmpty);
@@ -94,7 +95,7 @@ void main() {
       expect(_memoryImages(tester), hasLength(1));
     });
 
-    testWidgets('보관된 사진이 없으면 아이콘 썸네일 그대로', (tester) async {
+    testWidgets('보관된 사진이 없으면 썸네일 없이', (tester) async {
       final withId = [for (final m in buildTodayMeals()) m.slot == MealSlot.lunch ? m.copyWith(serverId: 'meal-lunch-1') : m];
       await pumpApp(tester, overrides: [
         mealsProvider.overrideWith(() => MealsNotifier(withId)),

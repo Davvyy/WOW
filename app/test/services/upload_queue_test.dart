@@ -8,7 +8,7 @@ import 'package:challory/services/api/challory_api.dart';
 import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/services/photo/meal_uploader.dart';
 import 'package:challory/state/app_state.dart';
-import 'package:challory/ui/widgets/meal_slot_card.dart';
+import 'package:challory/ui/widgets/day_timeline.dart';
 import 'package:challory/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -189,8 +189,8 @@ void main() {
     expect(lunch.time, '12:20');
     await tester.pumpWidget(UncontrolledProviderScope(
       container: c,
-      child: MaterialApp(theme: buildTheme(Brightness.light), home: Scaffold(body: MealSlotCard(meal: lunch))),
+      child: MaterialApp(theme: buildTheme(Brightness.light), home: Scaffold(body: DayTimelineRow(meal: lunch))),
     ));
-    expect(find.text('업로드 대기'), findsOneWidget);
+    expect(find.textContaining('업로드 대기 · 연결되면 보낼게요'), findsOneWidget);
   });
 }

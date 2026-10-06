@@ -7,7 +7,7 @@ import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/services/auth/auth_service.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/state/session.dart';
-import 'package:challory/ui/widgets/meal_slot_card.dart';
+import 'package:challory/ui/widgets/day_timeline.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -25,7 +25,7 @@ void main() {
     expect(today, isNot(8));
     expect(find.text('D+$today/31'), findsOneWidget);
     expect(find.text('D+8/31'), findsNothing);
-    expect(tester.widget<MealSlotCard>(find.byType(MealSlotCard).first).onTap, isNotNull, reason: '오늘이라 끼니를 누를 수 있다');
+    expect(tester.widget<DayTimelineRow>(find.byType(DayTimelineRow).first).onTap, isNotNull, reason: '오늘이라 끼니를 누를 수 있다');
   });
 
   testWidgets('규칙 탭은 선택한 챌린지를 따른다', (tester) async {

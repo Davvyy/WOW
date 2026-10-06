@@ -18,12 +18,13 @@ import '../../state/coverage.dart';
 import '../../state/past_meals.dart';
 import '../widgets/challenge_cards.dart';
 import '../widgets/common.dart';
-import '../widgets/meal_slot_card.dart';
+import '../widgets/day_timeline.dart';
 import '../widgets/ring.dart';
 import '../../state/session.dart';
 
-/// P5 홈(오늘): 링 하나 + 숫자 셋, 점수·순위 → '점수 계산 보기', 반영률 4칸, 끼니 슬롯 4개, 활동 카드.
-/// 모든 숫자는 엔진(`engine.simulate`)으로 계산한다. 링 카드를 좌우로 스와이프하면 날짜가 바뀐다.
+/// P5 홈(오늘, 구조 C · D71): 앱바(남은 날) · 안내 한 줄 · 날짜 · 링 + 숫자 셋(카드 없이) · 누적·순위 한 줄 ·
+/// '오늘 기록' 목록 하나(끼니마다 한 줄, 머리글에 반영 n/4) · 활동 한 줄.
+/// 모든 숫자는 엔진(`engine.simulate`)으로 계산한다. 링을 좌우로 스와이프하면 날짜가 바뀐다.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -33,6 +34,9 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _noticeOpen = true;
+
+  /// 안내 한 줄에서 지금 보이는 안내('외 n건'을 누르면 다음)
+  int _noticeIndex = 0;
 
   @override
   void initState() {
@@ -57,37 +61,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return id == null ? null : ref.watch(mealPhotoProvider(id)).value;
   }
 
-  /// 오늘 슬롯 카드: 기록이 없으면 지금처럼 촬영 칸, 있으면 끼니마다 한 줄 + '추가'.
-  /// 지난 날([pastDate] 의 서버 끼니를 읽었으면): 오늘처럼 끼니마다 한 줄이고 누르면 그 날짜의 P7. 촬영·'추가'는 없다.
-  /// 지난 날 끼니를 못 읽었거나 모의 모드면 장부 값으로 슬롯당 한 줄(누를 수 없음).
-  /// [sub] 는 이 칸의 대체값 max(M_p, 전날 같은 칸)(D61).
-  Widget _slotCard(MealSlot s, List<MealRecord> dayMeals, bool isToday, String? pastDate, double sub) {
+  /// '오늘 기록' 목록에서 한 슬롯의 줄들. 기록이 없으면 빈 칸 한 줄(오늘은 '찍기'·간식은 '+ 추가'),
+  /// 있으면 끼니마다 한 줄(오늘은 마지막 줄 끝에 '+'). 누르면 그 끼니의 P7(지난 날은 그 날짜의 P7).
+  /// 지난 날 끼니를 못 읽었거나 모의 모드면 장부 값으로 슬롯당 한 줄(누를 수 없음). 지난 날에는 촬영·'추가'가 없다.
+  /// [sub] 는 이 칸의 대체값 max(M_p, 전날 같은 칸)(D61). [overLimitSkip] 은 한도를 넘어 대체값이 들어간 건너뜀.
+  List<Widget> _slotRows(MealSlot s, List<MealRecord> dayMeals, bool isToday, String? pastDate, double sub, bool overLimitSkip) {
     void camera() => context.push('${R.camera}?slot=${s.name}');
+    final label = slotLabel[s]!;
     if (!isToday && pastDate == null) {
-      return MealSlotCard(meal: dayMeals.firstWhere((m) => m.slot == s, orElse: () => MealRecord(slot: s)), substitute: sub);
+      final m = dayMeals.firstWhere((m) => m.slot == s, orElse: () => MealRecord(slot: s));
+      return [DayTimelineRow(meal: m, substitute: sub, overLimitSkip: overLimitSkip, today: false)];
     }
     final list = mealsIn(dayMeals, s);
-    if (list.isEmpty) return MealSlotCard(meal: MealRecord(slot: s), onTap: isToday ? camera : null, substitute: sub);
-    final photos = {for (final m in list) m.key: _photoOf(m)}; // 홈 build 안에서 읽어 사진이 바뀌면 다시 그린다
-    return MealSlotGroupCard(
-      slot: s,
-      substitute: sub,
-      meals: list,
-      photoOf: (m) => photos[m.key],
-      onAdd: isToday ? camera : null,
-      // 지난 날 건너뜀은 열 것이 없다(건너뜀은 오늘만)
-      canOpen: isToday ? null : (m) => m.status != MealStatus.skipped,
-      onTapMeal: (m) {
-        final search = (m.status == MealStatus.captured && m.noAnalysis) || m.status == MealStatus.failed;
-        if (!isToday) {
-          context.push(R.meal(m.slot, meal: m.key, search: search, date: pastDate));
-        } else if (m.status == MealStatus.skipped) {
-          camera(); // 건너뜀은 지금처럼 촬영으로
-        } else {
-          context.push(R.meal(m.slot, meal: m.key, search: search));
-        }
-      },
-    );
+    if (list.isEmpty) {
+      final snack = s == MealSlot.snack;
+      return [
+        DayTimelineRow(
+          meal: MealRecord(slot: s),
+          substitute: sub,
+          today: isToday,
+          onTap: isToday ? camera : null,
+          actionHint: snack ? '추가' : '찍기',
+          trailing: isToday
+              ? RowAction(
+                  label: snack ? '추가' : '찍기',
+                  icon: snack ? Icons.add_rounded : Icons.photo_camera_rounded,
+                  semanticsLabel: '$label ${snack ? '추가' : '찍기'}',
+                  onTap: camera,
+                )
+              : null,
+        ),
+      ];
+    }
+    void open(MealRecord m) {
+      final search = (m.status == MealStatus.captured && m.noAnalysis) || m.status == MealStatus.failed;
+      if (!isToday) {
+        context.push(R.meal(m.slot, meal: m.key, search: search, date: pastDate));
+      } else if (m.status == MealStatus.skipped) {
+        camera(); // 건너뜀은 지금처럼 촬영으로
+      } else {
+        context.push(R.meal(m.slot, meal: m.key, search: search));
+      }
+    }
+
+    return [
+      for (var i = 0; i < list.length; i++)
+        DayTimelineRow(
+          meal: list[i],
+          photo: _photoOf(list[i]), // 홈 build 안에서 읽어 사진이 바뀌면 다시 그린다
+          substitute: sub,
+          overLimitSkip: overLimitSkip,
+          today: isToday,
+          // 지난 날 건너뜀은 열 것이 없다(건너뜀은 오늘만)
+          onTap: !isToday && list[i].status == MealStatus.skipped ? null : () => open(list[i]),
+          trailing: !isToday
+              ? null
+              : i == list.length - 1
+              ? RowAction(label: '추가', icon: Icons.add_rounded, iconOnly: true, semanticsLabel: '$label 추가', onTap: camera)
+              : const SizedBox(width: RowAction.width),
+        ),
+    ];
   }
 
   /// [day] 일째 날짜(달력 날짜 필드로 계산: 서머타임이 있는 시간대에서도 하루씩)
@@ -155,7 +188,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final lifecycle = phase != ChallengePhase.active;
     final date = _dateOf(day);
     final appTitle = ch.name;
-    final meta = lifecycle ? null : 'D+$day/${ch.days}';
+    // 참가 챌린지가 하나면 카드 대신 앱바에 남은 날을 붙인다. 여럿이면 카드 목록(전환)이 위에 그대로 있다.
+    final sessionCount = (ref.watch(sessionsProvider).value ?? const <ChallengeSession>[]).length;
+    final multi = sessionCount > 1;
+    final meta = lifecycle ? null : 'D+$day/${ch.days}${sessionCount == 1 ? ' · ${ChallengeCards.leftText(ch)}' : ''}';
 
     final lb = watchLeaderboard(ref);
     final finalRows = watchFinalRows(ref);
@@ -197,7 +233,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final slotSkipped = {
       for (final s in mainSlots) s: !slotFilled[s]! && mealsIn(dayMeals, s).any((m) => m.status == MealStatus.skipped),
     };
-    final pct = (cells.where((x) => x).length * 25);
+    // 한도를 넘은 건너뜀: 대체값이 들어간 칸(반영 아님)
+    bool overLimitSkip(MealSlot s) => (slotSkipped[s] ?? false) && inn.substituteValues.containsKey(s);
 
     // 건강 안내(확정 섭취, 대체값 제외 < 남 1,500 / 여 1,200)
     final confirmedKcal = dayMeals.where(confirmed).fold<double>(0, (a, m) => a + m.kcal);
@@ -284,7 +321,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 borderRadius: BorderRadius.circular(10),
                 onTap: future ? null : () => ref.read(selectedDayProvider.notifier).set(dd),
                 child: Container(
-                  height: 64,
+                  constraints: const BoxConstraints(minHeight: 64), // 글자를 키우면 칸이 늘어난다
+                  padding: const EdgeInsets.symmetric(vertical: 2),
                   decoration: BoxDecoration(color: sel ? c.brand : Colors.transparent, borderRadius: BorderRadius.circular(10)),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     NumText('${dt.day}', size: 20, weight: FontWeight.w700, color: sel ? c.onBrand : (future ? c.borderStrong : c.fg)),
@@ -298,8 +336,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
     ]);
 
-    // ---- 카드 본문 ----
-    Widget ringCard() {
+    // ---- 링 + 숫자 셋(카드 없이 바탕 위) ----
+    Widget ringSection() {
       final threeNums = Row(children: [
         _Num(label: '소비', dot: c.burn, prefix: '약', value: fmtInt(burn.total), unit: 'kcal'),
         _Num(label: '섭취', dot: c.intake, value: fmtInt(inn.iD), unit: 'kcal'),
@@ -330,185 +368,199 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ], gap: 6)),
               ),
           };
+      final ringAndNums = Column(children: [
+        Center(child: CalorieRing(ratio: ringRatio, provisional: provisional, empty: ringEmpty, center: ringCenter, semanticsLabel: ringLabel)),
+        if (!lifecycle) ...[const SizedBox(height: 6), threeNums],
+      ]);
       return GestureDetector(
         onHorizontalDragEnd: lifecycle ? null : _swipe,
-        child: ChCard(
-          onTap: lifecycle ? null : () => context.push('${R.ledger}?day=$day'),
-          semanticsLabel: '점수 계산 보기',
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
-          child: Column(children: [
-            CalorieRing(ratio: ringRatio, provisional: provisional, empty: ringEmpty, center: ringCenter, semanticsLabel: ringLabel),
-            const SizedBox(height: 6),
-            if (lifecycle) lifecycleCard() else ...[
-              threeNums,
-              const SizedBox(height: 8),
-              Center(child: statusChip),
-              if (caption != null) ...[
-                const SizedBox(height: 6),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.info_rounded, size: 14, color: c.warn),
-                  const SizedBox(width: 4),
-                  Flexible(child: Txt.cap(caption, color: c.warn, align: TextAlign.center)),
-                ]),
-              ],
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (lifecycle)
+            ringAndNums
+          else
+            Semantics(
+              button: true,
+              label: '점수 계산 보기',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => context.push('${R.ledger}?day=$day'),
+                child: Padding(padding: const EdgeInsets.only(top: 4, bottom: 4), child: ringAndNums),
+              ),
+            ),
+          const SizedBox(height: 6),
+          if (lifecycle) lifecycleCard() else ...[
+            Center(child: statusChip),
+            if (caption != null) ...[
+              const SizedBox(height: 4),
+              // 한 줄 · 조용히(줄임표). 읽기 이름에는 전체 문장이 남는다
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.info_rounded, size: 14, color: c.warn),
+                const SizedBox(width: 4),
+                Flexible(child: Txt.cap(caption, maxLines: 1)),
+              ]),
             ],
-          ]),
-        ),
+          ],
+        ]),
       );
     }
 
-    final scoreToday = fmtK1(sim.score.sD);
-    final rankCard = lifecycle && phase != ChallengePhase.published
+    // ---- 누적·순위 한 줄(카드 없이) ----
+    final rankRow = lifecycle && phase != ChallengePhase.published
         ? null
-        : ChCard(
-            onTap: () => context.push('${R.ledger}?day=$day'),
-            semanticsLabel: '점수 계산 보기',
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
-              if (phase == ChallengePhase.published)
-                Text.rich(TextSpan(children: [
-                  TextSpan(text: '최종 누적 ', style: T.body(c, size: 17, w: FontWeight.w600)),
-                  TextSpan(text: fmtK1(myFinal.score ?? 0), style: T.num(c.fg, size: 21, w: FontWeight.w700)),
-                  TextSpan(text: '점', style: T.body(c, size: 17, w: FontWeight.w600)),
-                ]))
-              else
-                Text.rich(TextSpan(children: [
-                  TextSpan(text: isToday ? '오늘 ' : '${date.month}.${date.day} ', style: T.body(c, size: 17, w: FontWeight.w600)),
-                  TextSpan(text: scoreToday, style: T.num(c.fg, size: 21, w: FontWeight.w700)),
-                  TextSpan(text: '점 · 누적 ', style: T.body(c, size: 17, w: FontWeight.w600)),
-                  TextSpan(text: fmtK1(cumulative), style: T.num(c.fg, size: 21, w: FontWeight.w700)),
-                  TextSpan(text: '점', style: T.body(c, size: 17, w: FontWeight.w600)),
-                ])),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                if (phase == ChallengePhase.published)
-                  Txt('최종 ${myFinal.rank == 0 ? '순위 제외' : '${myFinal.rank}위'} · ${finalRows.where((r) => !r.aggregating).length}명')
-                else
-                  Flexible(
-                    child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
+        : Row(children: [
+            Expanded(
+              child: phase == ChallengePhase.published
+                  ? Text.rich(TextSpan(children: [
+                      TextSpan(text: '최종 누적 ', style: T.body(c, size: 15)),
+                      TextSpan(text: fmtK1(myFinal.score ?? 0), style: T.num(c.fg, size: 17, w: FontWeight.w700)),
+                      TextSpan(
+                          text: '점 · 최종 ${myFinal.rank == 0 ? '순위 제외' : '${myFinal.rank}위'} · ${finalRows.where((r) => !r.aggregating).length}명',
+                          style: T.body(c, size: 15)),
+                    ]))
+                  : Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
+                      Text.rich(TextSpan(children: [
+                        TextSpan(text: '누적 ', style: T.body(c, size: 15)),
+                        TextSpan(text: fmtK1(cumulative), style: T.num(c.fg, size: 17, w: FontWeight.w700)),
+                        TextSpan(text: '점 · ', style: T.body(c, size: 15)),
+                      ])),
                       Txt(cumMe.rank == 0 ? '순위 제외 · 점수만 보여요' : '잠정 ${cumMe.rank}위'),
                       if (cumMe.delta > 0) Semantics(label: '${cumMe.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${cumMe.delta}', color: c.good))),
                       if (reviewing) Txt('· 검토 중', color: c.fg2),
                     ]),
-                  ),
-                ChLink('점수 계산 보기', onTap: () => context.push('${R.ledger}?day=$day')),
-              ]),
-            ], gap: 6)),
-          );
+            ),
+            ChLink('점수 계산 보기', onTap: () => context.push('${R.ledger}?day=$day')),
+          ]);
 
-    // 최신 공지(N-03) 1건. 읽지 않았으면 빨간 점, 누르면 전문 + 읽음 처리
+    // ---- 안내 한 줄(검토 → 섭취 적음 → 분석 완료 → 공지). 하나만 보이고 나머지는 '외 n건' 뒤에 ----
     final latestNotice = ref.watch(noticesProvider).value?.firstOrNull;
-    final body = <Widget>[
-      const ChallengeCards(),
-      if (_noticeOpen && !lifecycle && latestNotice != null)
-        InfoBanner(
-          tone: Tone.neutral,
-          icon: Icons.campaign_rounded,
-          onClose: () => setState(() => _noticeOpen = false),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              ref.read(noticesProvider.notifier).markRead([latestNotice.id]);
-              showChSheet(context, builder: (_) => _NoticeSheet(title: latestNotice.title, body: latestNotice.body, date: fmtMd(latestNotice.at)));
-            },
-            child: Row(children: [
-              Expanded(child: boldThen(context, '[공지] ', latestNotice.title, color: c.fg2)),
-              if (!latestNotice.read)
-                Semantics(
-                  label: '읽지 않음',
-                  child: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.critical, shape: BoxShape.circle), margin: const EdgeInsets.only(left: 6)),
-                ),
-            ]),
-          ),
-        ),
+    final fullReview = reviewBanner.spike
+        ? '걸음 ${fmtInt(steps)}이 평소의 2.5배를 넘어 검토 중이에요. 순위는 잠정으로 유지되고, 72시간 안에 설명을 남길 수 있어요.'
+        : '${reviewBanner.lead}${reviewBanner.rest}';
+    // 걸음 급증·출처 미확인은 '운동 기록', 그 밖의 사유는 그 사유 문장(짧은 한 줄)
+    final reviewLine = reviewBanner.spike || reviewBanner.lead == reasonText['source_unknown'] ? '운동 기록을 확인 중이에요' : reviewBanner.lead;
+    final draftMeal = isToday ? meals.where((m) => m.status == MealStatus.draft).firstOrNull : null;
+    final notices = <_HomeNotice>[
       if (reviewing)
-        InfoBanner(
+        _HomeNotice(
           tone: Tone.review,
           icon: Icons.policy_rounded,
-          action: ChButton('소명하기', small: true, kind: BtnKind.quiet, onPressed: () => context.push('${R.ledger}?v=review')),
-          child: reviewBanner.spike
-              ? boldThen(context, '걸음 ${fmtInt(steps)}이 평소의 2.5배를 넘어 검토 중이에요.', ' 순위는 잠정으로 유지되고, 72시간 안에 설명을 남길 수 있어요.', color: c.review)
-              : boldThen(context, reviewBanner.lead, reviewBanner.rest, color: c.review),
+          text: reviewLine,
+          semantics: fullReview,
+          action: ('소명하기', () => context.push('${R.ledger}?v=review')),
         ),
-      if (isToday)
-        for (final m in meals.where((m) => m.status == MealStatus.draft).take(1))
-          InfoBanner(
-            tone: Tone.brand,
-            icon: Icons.notifications_off_rounded,
-            action: ChButton('${slotLabel[m.slot]} 확인하기', small: true, kind: BtnKind.quiet, onPressed: () => context.push(R.meal(m.slot, meal: m.key))),
-            child: boldThen(context, '${slotLabel[m.slot]} 분석 완료 · 확인하기', '\n알림이 꺼져 있어도 홈에서 알려드려요', color: c.brand),
-          ),
-      if (!lifecycle) strip,
-      ringCard(),
-      ?rankCard,
-      if (!lifecycle)
-        ChCard(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
-            Semantics(
-              label: '${[
-                for (final s in mainSlots) '${slotLabel[s]} ${slotFilled[s]! ? '확정' : slotSkipped[s]! ? '건너뜀' : '미확정'}',
-                '걸음 ${cells[3] ? '동기화됨' : '미동기화'}',
-              ].join(', ')} · 반영률 $pct%',
-              child: ExcludeSemantics(
-                child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 10, runSpacing: 4, children: [
-                  Fill4(cells: cells),
-                  for (final s in mainSlots)
-                    _CoverItem(
-                      slotSkipped[s]! ? '${slotLabel[s]} 건너뜀' : slotLabel[s]!,
-                      slotFilled[s]! ? Icons.check_rounded : (slotSkipped[s]! ? Icons.block_rounded : Icons.remove_rounded),
-                      done: slotFilled[s]!,
-                    ),
-                  _CoverItem('걸음', cells[3] ? Icons.check_rounded : Icons.remove_rounded, done: cells[3]),
-                  Txt('반영률 $pct%', size: 13, weight: FontWeight.w700, color: c.fg),
+      if (showNudge)
+        _HomeNotice(
+          tone: Tone.neutral,
+          icon: Icons.spa_rounded,
+          text: '${isToday ? '오늘' : '이날'} 섭취 기록이 적어요',
+          info: () => showChSheet<void>(context, builder: (ctx) => const _NudgeSheet()),
+        ),
+      if (draftMeal case final m?)
+        _HomeNotice(
+          tone: Tone.brand,
+          icon: Icons.notifications_off_rounded,
+          text: '${slotLabel[m.slot]} 분석 완료 · 확인하기',
+          semantics: '${slotLabel[m.slot]} 분석 완료 · 확인하기. 알림이 꺼져 있어도 홈에서 알려드려요',
+          onTap: () => context.push(R.meal(m.slot, meal: m.key)),
+        ),
+      if (_noticeOpen && !lifecycle && latestNotice != null)
+        _HomeNotice(
+          tone: Tone.neutral,
+          icon: Icons.campaign_rounded,
+          text: '[공지] ${latestNotice.title}',
+          boldPrefix: '[공지] ',
+          unread: !latestNotice.read,
+          onTap: () {
+            ref.read(noticesProvider.notifier).markRead([latestNotice.id]);
+            showChSheet(context, builder: (_) => _NoticeSheet(title: latestNotice.title, body: latestNotice.body, date: fmtMd(latestNotice.at)));
+          },
+          onClose: () => setState(() => _noticeOpen = false),
+        ),
+    ];
+    final noticeAt = notices.isEmpty ? 0 : _noticeIndex % notices.length;
+
+    // ---- '오늘 기록' 목록(끼니 칸 4개 + 반영률을 한 목록으로) ----
+    Widget timeline() {
+      final rows = <Widget>[
+        for (final s in [MealSlot.breakfast, MealSlot.lunch, MealSlot.dinner, MealSlot.snack])
+          ..._slotRows(s, dayMeals, isToday, pastDate, inn.substituteFor(s), overLimitSkip(s)),
+      ];
+      final divider = Divider(height: 1, thickness: 1, color: c.border);
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        TimelineHeader(
+          title: isToday ? '오늘 기록' : '${date.month}.${date.day} 기록',
+          cells: cells,
+          semanticsDetail: [
+            for (final s in mainSlots) '${slotLabel[s]} ${slotFilled[s]! ? '확정' : slotSkipped[s]! ? '건너뜀' : '미확정'}',
+            '걸음 ${cells[3] ? '동기화됨' : '미동기화'}',
+          ].join(', '),
+        ),
+        for (final r in rows) ...[divider, r],
+        divider,
+      ]);
+    }
+
+    // ---- 활동 한 줄 ----
+    Widget activityRow() {
+      final label = steps == 0 ? '오늘 걸음을 못 읽었어요 · 연결 확인' : '걸음 ${fmtInt(steps)} · 활동 ${fmtInt(burn.activity)} kcal';
+      return Semantics(
+        button: true,
+        label: '$label${reviewing ? ' · 걸음 검토 중' : ''}, 활동 상세 보기',
+        excludeSemantics: true,
+        child: InkWell(
+          key: const ValueKey('home-activity'),
+          onTap: () => context.go(R.activity),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 52),
+            child: Row(children: [
+              Icon(Icons.directions_walk_rounded, size: 20, color: c.fg),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Row(children: [
+              Flexible(
+                child: steps == 0
+                    ? Text.rich(TextSpan(children: [
+                        TextSpan(text: '오늘 걸음을 못 읽었어요 · ', style: T.body(c)),
+                        TextSpan(text: '연결 확인', style: T.body(c, w: FontWeight.w700, color: c.brand)),
+                      ]), maxLines: 1, overflow: TextOverflow.ellipsis)
+                    : Text.rich(TextSpan(children: [
+                        TextSpan(text: '걸음 ', style: T.body(c)),
+                        TextSpan(text: fmtInt(steps), style: T.num(c.fg, size: 17, w: FontWeight.w700)),
+                        TextSpan(text: ' · 활동 ', style: T.body(c)),
+                        TextSpan(text: fmtInt(burn.activity), style: T.num(c.fg, size: 17, w: FontWeight.w700)),
+                        TextSpan(text: ' kcal', style: T.body(c, size: 13, color: c.fg2)),
+                      ]), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+              // 검토 중: 설명은 위 안내 줄에서, 여기는 방패 표시만
+              if (reviewing) ...[
+                const SizedBox(width: 6),
+                Tooltip(message: '검토 중', excludeFromSemantics: true, child: Semantics(label: '검토 중', child: Icon(Icons.policy_rounded, size: 16, color: c.review))),
+              ],
                 ]),
               ),
-            ),
-            if (pct < 100) const Txt.cap('반영률이 낮으면 대체값이 들어가 점수가 낮아져요. 확정하면 바로 올라가요.'),
-          ], gap: 8)),
-        ),
-      if (!lifecycle)
-        for (final s in [MealSlot.breakfast, MealSlot.lunch, MealSlot.dinner, MealSlot.snack])
-          _slotCard(s, dayMeals, isToday, pastDate, inn.substituteFor(s)),
-      if (showNudge)
-        ChCard(
-          outline: true,
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(Icons.spa_rounded, color: c.fg2),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Txt('${isToday ? '오늘' : '이날'} 섭취 기록이 적어요', weight: FontWeight.w600),
-                const Txt.cap('점수와 상관없이 충분히 드세요.\n이 안내는 순위와 점수에 영향을 주지 않아요.'),
-              ]),
-            ),
-          ]),
-        ),
-      if (!lifecycle)
-        ChCard(
-          onTap: () => context.go(R.activity),
-          semanticsLabel: '활동 상세 보기',
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
-            Row(children: [
-              Icon(Icons.directions_walk_rounded, color: c.fg),
-              const SizedBox(width: 6),
-              const Expanded(child: Txt.title('활동')),
-              ChChip('${act.syncTime} 동기화', tone: Tone.good, icon: Icons.sync_rounded),
+              Icon(Icons.chevron_right_rounded, color: c.fg2),
             ]),
-            if (steps == 0)
-              Row(children: [const Txt('오늘 걸음을 못 읽었어요 · '), Txt('연결 확인', weight: FontWeight.w700, color: c.brand)])
-            else
-              Wrap(spacing: 16, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text.rich(TextSpan(children: [TextSpan(text: '걸음 ', style: T.body(c)), TextSpan(text: fmtInt(steps), style: T.num(c.fg, size: 18, w: FontWeight.w700))])),
-                  // 검토 중: 설명은 위 배너에서, 여기는 방패 표시만
-                  if (reviewing) ...[
-                    const SizedBox(width: 4),
-                    Tooltip(message: '검토 중', excludeFromSemantics: true, child: Semantics(label: '검토 중', child: Icon(Icons.policy_rounded, size: 16, color: c.review))),
-                  ],
-                ]),
-                Text.rich(TextSpan(children: [TextSpan(text: '활동 ', style: T.body(c)), TextSpan(text: '약 ${fmtInt(burn.activity)}', style: T.num(c.fg, size: 18, w: FontWeight.w700)), TextSpan(text: ' kcal', style: T.body(c))])),
-                Txt(act.source, color: c.fg2),
-              ]),
-          ], gap: 6)),
+          ),
         ),
+      );
+    }
+
+    final body = <Widget>[
+      if (multi) const ChallengeCards(),
+      if (notices.isNotEmpty)
+        _NoticeLine(
+          key: const ValueKey('home-notice'),
+          notice: notices[noticeAt],
+          more: notices.length - 1,
+          onNext: () => setState(() => _noticeIndex = noticeAt + 1),
+        ),
+      if (!lifecycle) strip,
+      // 챌린지가 하나면 카드 대신 날짜 아래 작은 링크(이번 달 참가 · 초대코드로 참가)
+      if (!multi) const ChallengeCards(),
+      ringSection(),
+      ?rankRow,
+      if (!lifecycle) timeline(),
+      if (!lifecycle) activityRow(),
       const Disclaimer('모든 수치는 추정이에요 · 의료 조언이 아니에요'),
     ];
 
@@ -594,21 +646,132 @@ class _Num extends StatelessWidget {
   }
 }
 
-/// 반영률 줄의 칸 하나(아이콘 + 이름). 반영된 칸만 초록 아이콘, 글자는 모두 같은 색.
-class _CoverItem extends StatelessWidget {
-  const _CoverItem(this.text, this.icon, {required this.done});
-  final String text;
+/// 홈 맨 위 안내 한 줄의 내용
+class _HomeNotice {
+  const _HomeNotice({required this.tone, required this.icon, required this.text, this.semantics, this.boldPrefix, this.action, this.info, this.onTap,
+    this.onClose, this.unread = false});
+  final Tone tone;
   final IconData icon;
-  final bool done;
+
+  /// 한 줄 문장(넘치면 줄임표)
+  final String text;
+
+  /// 읽기 이름(없으면 [text]). 줄임표로 잘린 설명을 여기에 모두 담는다
+  final String? semantics;
+
+  /// [text] 앞부분을 굵게('[공지] ')
+  final String? boldPrefix;
+
+  /// 끝 버튼(이름, 누르면)
+  final (String, VoidCallback)? action;
+
+  /// 정보 버튼(설명 시트)
+  final VoidCallback? info;
+
+  /// 줄 전체를 누르면
+  final VoidCallback? onTap;
+  final VoidCallback? onClose;
+  final bool unread;
+}
+
+/// 안내 한 줄: 아이콘 · 문장(한 줄) · '외 n건' · 끝 버튼. 누르는 곳은 모두 48dp 이상.
+class _NoticeLine extends StatelessWidget {
+  const _NoticeLine({super.key, required this.notice, required this.more, required this.onNext});
+  final _HomeNotice notice;
+  final int more;
+  final VoidCallback onNext;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 14, color: done ? c.good : c.fg2),
-      const SizedBox(width: 2),
-      Txt(text, size: 13, color: c.fg2),
+    final n = notice;
+    final (bg, fg) = toneColors(c, n.tone);
+    final textColor = n.tone == Tone.neutral ? c.fg : fg;
+    final style = T.body(c, size: 13, w: FontWeight.w600, color: textColor);
+    final bold = n.boldPrefix;
+    final text = bold != null && n.text.startsWith(bold)
+        ? Text.rich(TextSpan(children: [TextSpan(text: bold, style: style), TextSpan(text: n.text.substring(bold.length), style: style.copyWith(fontWeight: FontWeight.w400))]),
+            maxLines: 1, overflow: TextOverflow.ellipsis)
+        : Text(n.text, style: style, maxLines: 1, overflow: TextOverflow.ellipsis);
+
+    Widget textButton(String label, VoidCallback onTap, {String? semantics, bool strong = true}) => Semantics(
+          button: true,
+          label: semantics ?? label,
+          excludeSemantics: true,
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Center(widthFactor: 1, child: Txt(label, size: 13, weight: strong ? FontWeight.w700 : FontWeight.w500, color: strong ? textColor : c.fg2)),
+              ),
+            ),
+          ),
+        );
+
+    final main = Row(children: [
+      Icon(n.icon, size: 18, color: n.tone == Tone.neutral ? c.fg2 : fg),
+      const SizedBox(width: 8),
+      Flexible(child: text),
+      if (n.unread)
+        Semantics(
+          label: '읽지 않음',
+          child: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.critical, shape: BoxShape.circle), margin: const EdgeInsets.only(left: 6)),
+        ),
+      if (n.onTap != null && n.onClose == null) Icon(Icons.chevron_right_rounded, size: 18, color: n.tone == Tone.neutral ? c.fg2 : fg),
     ]);
+
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.only(left: 12, right: 4),
+        constraints: const BoxConstraints(minHeight: 48),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+        child: Row(children: [
+          Expanded(
+            child: n.onTap == null
+                ? Semantics(label: n.semantics, excludeSemantics: n.semantics != null, child: main)
+                : Semantics(
+                    button: true,
+                    label: n.semantics,
+                    excludeSemantics: n.semantics != null,
+                    child: InkWell(onTap: n.onTap, child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48), child: main)),
+                  ),
+          ),
+          if (more > 0) textButton('외 $more건', onNext, semantics: '다음 안내 보기, 외 $more건', strong: false),
+          if (n.info != null)
+            IconButton(
+              onPressed: n.info,
+              tooltip: '섭취 안내 보기',
+              icon: Icon(Icons.info_outline_rounded, size: 20, color: c.fg2),
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            ),
+          if (n.action case (final label, final onTap)) textButton(label, onTap),
+          if (n.onClose != null)
+            IconButton(
+              onPressed: n.onClose,
+              tooltip: '닫기',
+              icon: Icon(Icons.close_rounded, size: 18, color: c.fg2),
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            ),
+        ]),
+      ),
+    );
   }
+}
+
+/// 섭취 적음 안내의 설명(기존 카드 문장 그대로)
+class _NudgeSheet extends StatelessWidget {
+  const _NudgeSheet();
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
+        const Txt.title('섭취 안내'),
+        const Txt('점수와 상관없이 충분히 드세요.\n이 안내는 순위와 점수에 영향을 주지 않아요.'),
+        ChButton('닫기', kind: BtnKind.quiet, onPressed: () => Navigator.of(context).pop()),
+      ]));
 }
 
 class _NoticeSheet extends StatelessWidget {

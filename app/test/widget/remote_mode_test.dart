@@ -136,23 +136,33 @@ void main() {
     final api = _RemoteFake(underReview: true)
       ..reviews.add(MyReview(id: 'rv3', type: 'source_unknown', status: 'open', localDate: DateTime(2026, 10, 13)));
     await _pump(tester, R.home, api);
-    expect(find.textContaining('확인되지 않은 출처의 운동 기록이 있었어요'), findsOneWidget);
-    expect(find.textContaining('72시간 안에 설명을 남길 수 있어요'), findsOneWidget);
-    expect(find.textContaining('평소의 2.5배'), findsNothing);
+    // 한 줄은 짧게, 사유 문장 전체는 읽기 이름에
+    expect(find.text('운동 기록을 확인 중이에요'), findsOneWidget);
+    expect(find.bySemanticsLabel('확인되지 않은 출처의 운동 기록이 있었어요. 72시간 안에 설명을 남길 수 있어요.'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('평소의 2.5배')), findsNothing);
+  });
+
+  testWidgets('P5 검토 안내: 다른 사유는 그 사유 문장을 한 줄로', (tester) async {
+    final api = _RemoteFake(underReview: true)
+      ..reviews.add(MyReview(id: 'rv5', type: 'dup_photo', status: 'open', localDate: DateTime(2026, 10, 13)));
+    await _pump(tester, R.home, api);
+    expect(find.text('같은 사진이 두 번 이상 사용됐어요'), findsOneWidget);
+    expect(find.text('운동 기록을 확인 중이에요'), findsNothing);
   });
 
   testWidgets('P5 검토 배너: steps_spike 이면 걸음 급증 문구', (tester) async {
     final api = _RemoteFake(underReview: true)
       ..reviews.add(MyReview(id: 'rv4', type: 'steps_spike', status: 'open', localDate: DateTime(2026, 10, 13)));
     await _pump(tester, R.home, api);
-    expect(find.textContaining('평소의 2.5배를 넘어 검토 중이에요'), findsOneWidget);
-    expect(find.textContaining('확인되지 않은 출처'), findsNothing);
+    expect(find.text('운동 기록을 확인 중이에요'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('평소의 2.5배를 넘어 검토 중이에요')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('확인되지 않은 출처')), findsNothing);
   });
 
   testWidgets('P5 검토 배너: 검토 목록이 비어 있으면 일반 문구', (tester) async {
     await _pump(tester, R.home, _RemoteFake(underReview: true));
-    expect(find.textContaining('기록을 확인하고 있어요'), findsOneWidget);
-    expect(find.textContaining('평소의 2.5배'), findsNothing);
+    expect(find.text('기록을 확인하고 있어요'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('평소의 2.5배')), findsNothing);
   });
 
   testWidgets('세션 목록을 다시 읽는 동안 홈을 로딩 화면으로 바꾸지 않는다', (tester) async {

@@ -14,9 +14,16 @@ const kMaxConcurrent = 3;
 /// 상한에 세는 상태(서버 join_challenge 와 같음). 마감·발표된 챌린지는 세지 않는다.
 const kActiveStatuses = {'recruiting', 'checking', 'running'};
 
-/// 홈 맨 위: 참가 중인 챌린지 카드(누르면 그 챌린지를 본다) + 이번 달 참가 + 초대코드 참가.
+/// 홈: 참가 중인 챌린지가 여럿이면 맨 위에 카드(누르면 그 챌린지를 본다) + 이번 달 참가 + 초대코드 참가.
+/// 하나뿐이면 카드 없이(남은 날은 앱바에) 날짜 아래 작은 링크만: 이번 달 참가 · 초대코드로 참가.
 class ChallengeCards extends ConsumerWidget {
   const ChallengeCards({super.key});
+
+  /// 남은 날: 'N일 남음' · '오늘 마지막 날' · '종료'
+  static String leftText(ChallengeInfo ch) {
+    final left = ch.end.difference(ch.today).inDays;
+    return left > 0 ? '$left일 남음' : (left == 0 ? '오늘 마지막 날' : '종료');
+  }
 
   static String statusLine(ChallengeSession s, DateTime today) {
     final cs = s.checkStart;
@@ -39,14 +46,19 @@ class ChallengeCards extends ConsumerWidget {
         .where((o) => o.myStatus == null && o.joinable)
         .firstOrNull;
     final full = list.where((s) => kActiveStatuses.contains(s.status)).length >= kMaxConcurrent;
+    if (list.length <= 1) {
+      // 카드 없이 링크만(오른쪽 정렬, 날짜 줄 아래)
+      return Wrap(alignment: WrapAlignment.end, spacing: 12, children: [
+        if (!full && open != null) ChLink('이번 달 챌린지 참가하기', onTap: () => showJoinSheet(context, monthly: open)),
+        if (!full) ChLink('초대코드로 참가', onTap: () => _showCodeSheet(context)),
+      ]);
+    }
     Widget card(int i, ChallengeSession s) {
       // 같은 id 가 여러 번 있으면(테스트 목록) 첫 카드만 선택 표시
       final sel = current?.challengeId == s.challengeId && i == list.indexWhere((x) => x.challengeId == s.challengeId);
       final ch = s.challenge;
-      final left = ch.end.difference(ch.today).inDays;
-      // 남은 날은 'N일 남음' 하나로(앱바는 D+경과일). 카드가 하나뿐이면 이름은 앱바 제목과 같아 빼고 카운터를 앞에 둔다.
-      final leftText = left > 0 ? '$left일 남음' : (left == 0 ? '오늘 마지막 날' : '종료');
-      final named = list.length > 1;
+      // 남은 날은 'N일 남음' 하나로(앱바는 D+경과일)
+      final left = leftText(ch);
       return SizedBox(
         key: ValueKey('challenge-card-$i'),
         width: 220,
@@ -58,11 +70,11 @@ class ChallengeCards extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Txt(named ? ch.name : leftText, weight: FontWeight.w600, maxLines: 1)),
+              Expanded(child: Txt(ch.name, weight: FontWeight.w600, maxLines: 1)),
               ChChip(s.monthly ? '월간' : '초대'),
             ]),
             const SizedBox(height: 2),
-            if (named) Txt.cap(leftText),
+            Txt.cap(left),
             Txt.cap(statusLine(s, ch.today), maxLines: 1),
           ]),
         ),
@@ -71,7 +83,7 @@ class ChallengeCards extends ConsumerWidget {
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SizedBox(
-        height: 96,
+        height: 24 + MediaQuery.textScalerOf(context).scale(72), // 글자를 키우면 카드 줄도 높인다
         child: ListView(scrollDirection: Axis.horizontal, children: [
           for (var i = 0; i < list.length; i++) ...[card(i, list[i]), const SizedBox(width: 8)],
           if (!full && open != null)

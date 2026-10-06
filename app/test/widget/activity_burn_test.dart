@@ -29,7 +29,7 @@ void main() {
     final b = BurnFigures.of(sim);
     final total = fmtInt(b.total), act = fmtInt(b.activity);
     expect(find.textContaining('약 $total'), findsOneWidget, reason: '홈 숫자 셋 소비');
-    expect(find.textContaining('활동 약 $act kcal'), findsOneWidget, reason: '홈 활동 카드');
+    expect(find.textContaining('· 활동 $act kcal'), findsOneWidget, reason: '홈 활동 줄');
 
     await tester.tap(find.text('활동').last);
     await tester.pumpAndSettle();

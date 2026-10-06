@@ -67,7 +67,7 @@ void main() {
   });
 
   group('P5 홈', () {
-    testWidgets('링·숫자 셋·점수·반영률·슬롯 4개를 엔진 값으로 렌더', (tester) async {
+    testWidgets("링·숫자 셋·점수·반영 n/4·'오늘 기록' 슬롯 4줄을 엔진 값으로 렌더", (tester) async {
       await pumpApp(tester);
       expect(find.text('D+8/28'), findsOneWidget);
       expect(find.textContaining('−144'), findsOneWidget); // 링 중앙 −144 kcal
@@ -78,7 +78,8 @@ void main() {
       expect(find.textContaining('312.6'), findsOneWidget); // 누적
       expect(find.textContaining('잠정 4위'), findsOneWidget);
       expect(find.text('점수 계산 보기'), findsWidgets);
-      expect(find.textContaining('반영률 100%'), findsOneWidget);
+      expect(find.text('반영 4/4'), findsOneWidget);
+      expect(find.text('오늘 기록'), findsOneWidget);
       for (final s in ['아침', '점심', '저녁', '간식']) {
         expect(find.text(s), findsWidgets);
       }
