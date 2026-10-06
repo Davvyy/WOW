@@ -140,10 +140,12 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           ]),
         );
 
-    // 최근 7일 막대(오늘은 현재 계산값). 서버 모드는 내 장부, 모의는 프로토타입 장부
+    // 최근 7일 막대: 오늘만 현재 계산값, 지난 날은 확정 전이어도 그날 장부 값. 서버 모드는 내 장부, 모의는 프로토타입 장부
     final ledger = watchLedger(ref) ?? const <LedgerRow>[];
+    final todayIdx = curChallenge.dayIndex;
     final week = [
-      for (final r in ledger.skip(ledger.length > 7 ? ledger.length - 7 : 0)) (r.date.split('.').last, r.provisional ? a.aD : r.a, r.provisional),
+      for (final r in ledger.skip(ledger.length > 7 ? ledger.length - 7 : 0))
+        (r.date.split('.').last, r.d == todayIdx ? a.aD : r.a, r.d == todayIdx),
     ];
     final maxA = week.fold<double>(1, (m, w) => w.$2 > m ? w.$2 : m);
 

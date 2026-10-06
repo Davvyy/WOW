@@ -481,7 +481,7 @@ MyReview? openReviewOn(List<MyReview>? reviews, DateTime day) {
   if (key == 'steps_spike') return (spike: true, lead: '', rest: '');
   final reason = reasonText[key];
   if (reason == null) return (spike: false, lead: reviewReasonFallback, rest: '');
-  return (spike: false, lead: reason, rest: ' · 72시간 안에 설명을 남길 수 있어요');
+  return (spike: false, lead: reason, rest: '. 72시간 안에 설명을 남길 수 있어요.');
 }
 
 /// 음식 검색·최근 음식 한 건(1인분 kcal). 서버: food_search(식약처 DB, pg_trgm) / recent_foods(30일 확정)
