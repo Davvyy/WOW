@@ -120,6 +120,10 @@ class HealthPackageSource implements HealthSource {
 
     // 2) 출처·수동 여부
     final origins = <String, RecordMethod>{};
+    // 출처별 걸음 합계 · 첫 기록 시작 · 마지막 기록 끝(검토 상세용, D72)
+    final originSteps = <String, double>{};
+    final originFirst = <String, DateTime>{};
+    final originLast = <String, DateTime>{};
     var manualSeen = manualPart > 0;
     for (final p in stepPts) {
       final m = _method(p.recordingMethod);
@@ -128,6 +132,10 @@ class HealthPackageSource implements HealthSource {
       final origin = _origin(p);
       final prev = origins[origin];
       if (prev == null || m == RecordMethod.manual) origins[origin] = m;
+      originSteps[origin] = (originSteps[origin] ?? 0) + _num(p.value);
+      final first = originFirst[origin], last = originLast[origin];
+      if (first == null || p.dateFrom.isBefore(first)) originFirst[origin] = p.dateFrom;
+      if (last == null || p.dateTo.isAfter(last)) originLast[origin] = p.dateTo;
     }
 
     // 3) 층수(수동 제외), 활동 칼로리(참고)
@@ -168,7 +176,16 @@ class HealthPackageSource implements HealthSource {
       floors: floors,
       platformActiveKcal: activeKcal,
       hasManualSource: manualSeen,
-      sources: [for (final e in origins.entries) HealthOrigin(origin: e.key, method: e.value)],
+      sources: [
+        for (final e in origins.entries)
+          HealthOrigin(
+            origin: e.key,
+            method: e.value,
+            steps: originSteps[e.key]?.round(),
+            firstAt: originFirst[e.key],
+            lastAt: originLast[e.key],
+          ),
+      ],
       sessions: sessions,
     );
   }

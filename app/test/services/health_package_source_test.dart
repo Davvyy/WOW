@@ -39,13 +39,13 @@ class _FakeHealth implements Health {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-HealthDataPoint _steps(int count, String source, RecordingMethod method, {String? sourceName}) => HealthDataPoint(
-      uuid: '$source-$count-${method.name}',
+HealthDataPoint _steps(int count, String source, RecordingMethod method, {String? sourceName, DateTime? from, DateTime? to}) => HealthDataPoint(
+      uuid: '$source-$count-${method.name}-${from?.hour}',
       value: NumericHealthValue(numericValue: count),
       type: HealthDataType.STEPS,
       unit: HealthDataUnit.COUNT,
-      dateFrom: DateTime.utc(2026, 10, 3, 1),
-      dateTo: DateTime.utc(2026, 10, 3, 2),
+      dateFrom: from ?? DateTime.utc(2026, 10, 3, 1),
+      dateTo: to ?? DateTime.utc(2026, 10, 3, 2),
       sourcePlatform: HealthPlatformType.googleHealthConnect,
       sourceDeviceId: 'device',
       sourceId: source,
@@ -134,5 +134,32 @@ void main() {
 
       expect(days.first.sessions.single.origin, 'com.sec.android.app.shealth');
     });
+
+    test('출처마다 걸음 합계와 첫/마지막 기록 시각을 보낸다(D72)', () async {
+      const phone = 'com.android.healthconnect.phone.a1b2';
+      const shealth = 'com.sec.android.app.shealth';
+      final health = _FakeHealth(aggregate: 5200, records: [
+        _steps(1200, phone, RecordingMethod.automatic, from: DateTime.utc(2026, 10, 3, 0, 12), to: DateTime.utc(2026, 10, 3, 1)),
+        _steps(2000, phone, RecordingMethod.automatic, from: DateTime.utc(2026, 10, 3, 3), to: DateTime.utc(2026, 10, 3, 4, 40)),
+        _steps(2000, shealth, RecordingMethod.automatic, from: DateTime.utc(2026, 10, 3, 2), to: DateTime.utc(2026, 10, 3, 2, 30)),
+      ]);
+      final days = await HealthPackageSource(health: health, isAndroid: true).fetchDays(now: now);
+      final json = {for (final s in days.first.sources) s.origin: s.toJson()};
+
+      expect(json[phone], {
+        'origin': phone,
+        'method': 'AUTOMATICALLY_RECORDED',
+        'steps': 3200,
+        'first_at': '2026-10-03T09:12:00+09:00',
+        'last_at': '2026-10-03T13:40:00+09:00',
+      });
+      expect(json[shealth]!['steps'], 2000);
+      expect(json[shealth]!['first_at'], '2026-10-03T11:00:00+09:00');
+      expect(json[shealth]!['last_at'], '2026-10-03T11:30:00+09:00');
+    });
+  });
+
+  test('HealthOrigin: 걸음·시각이 없으면 origin·method 만', () {
+    expect(const HealthOrigin(origin: 'x', method: RecordMethod.automatic).toJson(), {'origin': 'x', 'method': 'AUTOMATICALLY_RECORDED'});
   });
 }

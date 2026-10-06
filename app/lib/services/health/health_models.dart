@@ -31,12 +31,23 @@ enum RecordMethod {
   final String wire;
 }
 
+/// 걸음 출처 하나. [steps]·[firstAt]·[lastAt] 은 그 출처 기록의 걸음 합계와 첫 시작·마지막 끝(있을 때만 보낸다).
+/// 서버는 믿지 않는 출처의 검토(source_unknown) 상세에 이 값을 남긴다(D72).
 class HealthOrigin {
-  const HealthOrigin({required this.origin, required this.method});
+  const HealthOrigin({required this.origin, required this.method, this.steps, this.firstAt, this.lastAt});
   final String origin;
   final RecordMethod method;
+  final int? steps;
+  final DateTime? firstAt;
+  final DateTime? lastAt;
 
-  Map<String, dynamic> toJson() => {'origin': origin, 'method': method.wire};
+  Map<String, dynamic> toJson() => {
+        'origin': origin,
+        'method': method.wire,
+        'steps': ?steps,
+        if (firstAt != null) 'first_at': toKstIso(firstAt!),
+        if (lastAt != null) 'last_at': toKstIso(lastAt!),
+      };
 }
 
 /// 운동 세션(걷기·달리기·계단). 수동 입력 세션은 만들지 않는다.
