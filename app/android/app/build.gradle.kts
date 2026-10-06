@@ -1,4 +1,6 @@
+import java.io.FileInputStream
 import java.util.Base64
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -19,6 +21,12 @@ fun dartDefine(key: String): String? =
         ?.firstOrNull { it.startsWith("$key=") }
         ?.substringAfter("=")
         ?.takeIf { it.isNotEmpty() }
+
+/** release 서명 정보: android/key.properties(git 제외, 키 파일 경로·비밀번호). 없으면 빈 값 */
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) FileInputStream(f).use { load(it) }
+}
 
 android {
     namespace = "app.challory.challory"
@@ -47,11 +55,21 @@ android {
         manifestPlaceholders["kakaoNativeAppKey"] = dartDefine("KAKAO_NATIVE_APP_KEY") ?: "none"
     }
 
+    signingConfigs {
+        if (keystoreProps.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // android/key.properties(git 제외)가 있으면 release 키로, 없으면 debug 키로(로컬 확인용)
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 }
