@@ -62,7 +62,7 @@ void main() {
     testWidgets('한도 안의 건너뜀은 "건너뜀"으로 보이고 반영된 칸으로 센다', (tester) async {
       await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(_skippedBreakfast()))]);
       expect(find.text('건너뜀'), findsOneWidget);
-      expect(find.bySemanticsLabel('아침 건너뜀 0 kcal 먹지 않았어요, 열기'), findsOneWidget);
+      expect(find.bySemanticsLabel('아침 건너뜀 0 kcal 20:31에 건너뛰었어요, 열기'), findsOneWidget);
       expect(find.text('반영 3/4'), findsOneWidget, reason: '아침(건너뜀)·점심·걸음');
       expect(find.bySemanticsLabel(RegExp('아침 건너뜀, 점심 확정')), findsOneWidget, reason: '머리글 읽기 이름');
     });
@@ -74,7 +74,7 @@ void main() {
       ]);
       expect(find.text('건너뜀'), findsOneWidget);
       final sub = c.read(todayResultProvider).intake.substituteFor(MealSlot.breakfast);
-      expect(find.textContaining('한도 초과 · 대체 ${fmtM(sub)}'), findsOneWidget);
+      expect(find.text('한도를 넘어 대체 ${fmtM(sub)} 적용'), findsOneWidget);
       expect(find.text('반영 2/4'), findsOneWidget);
       final row = tester.widget<DayTimelineRow>(find.byWidgetPredicate((w) => w is DayTimelineRow && w.meal.slot == MealSlot.breakfast));
       expect(row.overLimitSkip, isTrue);

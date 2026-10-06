@@ -191,6 +191,6 @@ void main() {
       container: c,
       child: MaterialApp(theme: buildTheme(Brightness.light), home: Scaffold(body: DayTimelineRow(meal: lunch))),
     ));
-    expect(find.textContaining('업로드 대기 · 연결되면 보낼게요'), findsOneWidget);
+    expect(find.text('12:20 · 연결되면 보낼게요'), findsOneWidget);
   });
 }

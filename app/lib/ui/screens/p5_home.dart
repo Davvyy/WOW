@@ -83,9 +83,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onTap: isToday ? camera : null,
           actionHint: snack ? '추가' : '찍기',
           trailing: isToday
+              // 빈 끼니 칸은 '찍기'(빠진 끼니의 주 동작), 간식은 다른 칸과 같은 '+' 아이콘
               ? RowAction(
                   label: snack ? '추가' : '찍기',
                   icon: snack ? Icons.add_rounded : Icons.photo_camera_rounded,
+                  iconOnly: snack,
                   semanticsLabel: '$label ${snack ? '추가' : '찍기'}',
                   onTap: camera,
                 )
@@ -299,7 +301,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (row != null && row.check) const ChChip('점검 기간 · 누적 미반영', icon: Icons.fact_check_rounded),
       ]);
     } else {
-      statusChip = ChChip('잠정 · ${act.syncTime} 동기화 · ${act.source}', icon: Icons.schedule_rounded);
+      // 출처 이름은 활동 탭에서
+      statusChip = ChChip('잠정 점수 · ${act.syncTime} 동기화', icon: Icons.schedule_rounded);
     }
 
     final dayStart = (day - 4).clamp(1, 4);
@@ -404,28 +407,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    // ---- 누적·순위 한 줄(카드 없이) ----
+    // ---- 누적·순위(카드 없이): 굵은 누적 점수 한 줄 + 아래 짧은 순위 문구. 오른쪽에 '점수 계산 보기' ----
+    // 내 점검 기간(점검 시작 + check_days 전)에는 누적 대신 첫 반영일 안내 한 줄
+    final cs = currentSession.checkStart;
+    final firstCounted = cs == null ? null : DateTime(cs.year, cs.month, cs.day + engine.rules.checkDays);
+    final t0 = ch.today;
+    final inCheck = firstCounted != null && DateTime(t0.year, t0.month, t0.day).isBefore(firstCounted);
+    Widget scoreLine(String lead, double score) => Text.rich(TextSpan(children: [
+          TextSpan(text: lead, style: T.body(c, size: 15, w: FontWeight.w600)),
+          TextSpan(text: fmtK1(score), style: T.num(c.fg, size: 17, w: FontWeight.w700)),
+          TextSpan(text: '점', style: T.body(c, size: 15, w: FontWeight.w600)),
+        ]));
     final rankRow = lifecycle && phase != ChallengePhase.published
         ? null
         : Row(children: [
             Expanded(
               child: phase == ChallengePhase.published
-                  ? Text.rich(TextSpan(children: [
-                      TextSpan(text: '최종 누적 ', style: T.body(c, size: 15)),
-                      TextSpan(text: fmtK1(myFinal.score ?? 0), style: T.num(c.fg, size: 17, w: FontWeight.w700)),
-                      TextSpan(
-                          text: '점 · 최종 ${myFinal.rank == 0 ? '순위 제외' : '${myFinal.rank}위'} · ${finalRows.where((r) => !r.aggregating).length}명',
-                          style: T.body(c, size: 15)),
-                    ]))
-                  : Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
-                      Text.rich(TextSpan(children: [
-                        TextSpan(text: '누적 ', style: T.body(c, size: 15)),
-                        TextSpan(text: fmtK1(cumulative), style: T.num(c.fg, size: 17, w: FontWeight.w700)),
-                        TextSpan(text: '점 · ', style: T.body(c, size: 15)),
-                      ])),
-                      Txt(cumMe.rank == 0 ? '순위 제외 · 점수만 보여요' : '잠정 ${cumMe.rank}위'),
-                      if (cumMe.delta > 0) Semantics(label: '${cumMe.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${cumMe.delta}', color: c.good))),
-                      if (reviewing) Txt('· 검토 중', color: c.fg2),
+                  ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      scoreLine('최종 누적 ', myFinal.score ?? 0),
+                      Txt.cap('${myFinal.rank == 0 ? '순위에는 들어가지 않아요' : '최종 ${myFinal.rank}위'} · ${finalRows.where((r) => !r.aggregating).length}명'),
+                    ])
+                  : inCheck
+                  ? Txt('점검 기간이에요 · 누적은 ${fmtMd(firstCounted)}부터 반영돼요', size: 14, color: c.fg2)
+                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      scoreLine('누적 ', cumulative),
+                      Row(children: [
+                        Flexible(
+                          child: Txt.cap(cumMe.rank == 0 ? '순위에는 들어가지 않아요' : '잠정 ${cumMe.rank}위${reviewing ? ' · 검토 중' : ''}', maxLines: 1),
+                        ),
+                        if (cumMe.delta > 0) ...[
+                          const SizedBox(width: 4),
+                          Semantics(label: '${cumMe.delta}계단 상승', child: ExcludeSemantics(child: Txt('▲${cumMe.delta}', size: 13, color: c.good))),
+                        ],
+                      ]),
                     ]),
             ),
             ChLink('점수 계산 보기', onTap: () => context.push('${R.ledger}?day=$day')),

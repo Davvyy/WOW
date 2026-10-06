@@ -133,9 +133,49 @@ void main() {
     testWidgets("간식 칸: '찍은 만큼 더해져요' + '+ 추가'는 간식으로 촬영", (tester) async {
       await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(_skippedBreakfast()))]);
       expect(find.text('찍은 만큼 더해져요'), findsOneWidget);
+      // 간식 빈 칸도 다른 칸과 같은 '+' 아이콘 버튼(채운 '+ 추가' 알약 없음)
+      final add = tester.widget<RowAction>(find.byWidgetPredicate((w) => w is RowAction && w.semanticsLabel == '간식 추가'));
+      expect(add.iconOnly, isTrue);
+      expect(find.text('추가'), findsNothing);
+      expect(find.byTooltip('간식 추가'), findsOneWidget);
       await _openCamera(tester, '간식 추가');
       expect(tester.widget<CameraScreen>(find.byType(CameraScreen)).initialSlot, MealSlot.snack);
     });
+  });
+
+  group('가운데점 줄이기', () {
+    testWidgets("상태 칩은 '잠정 점수 · HH:mm 동기화'(출처 이름 없음)", (tester) async {
+      final c = await pumpApp(tester);
+      final act = c.read(activityProvider);
+      expect(find.text('잠정 점수 · ${act.syncTime} 동기화'), findsOneWidget);
+      expect(find.textContaining('동기화 · ${act.source}'), findsNothing);
+    });
+
+    testWidgets('누적 줄: 굵은 누적 점수 + 아래 줄 짧은 순위 문구 · 점수 계산 보기', (tester) async {
+      await pumpApp(tester);
+      expect(find.text('누적 312.6점'), findsOneWidget);
+      expect(find.text('잠정 4위'), findsOneWidget);
+      expect(find.text('점수 계산 보기'), findsOneWidget);
+      expect(find.textContaining('점검 기간이에요'), findsNothing, reason: '점검 기간이 끝났다');
+    });
+
+    testWidgets("건너뛴 줄 부제는 'HH:mm에 건너뛰었어요'", (tester) async {
+      await pumpApp(tester, overrides: [mealsProvider.overrideWith(() => MealsNotifier(_skippedBreakfast()))]);
+      expect(find.text('20:31에 건너뛰었어요'), findsOneWidget);
+      expect(find.text('11:36 · 확정'), findsOneWidget, reason: '시각·상태 두 낱말은 그대로');
+    });
+  });
+
+  testWidgets('점검 기간이면 누적 줄 대신 첫 반영일 안내', (tester) async {
+    final today = mockChallenge.today;
+    final api = MockChalloryApi();
+    api.sessions[0] = ChallengeSession(challenge: mockChallenge, me: mockMe, rules: EngineRules.defaults, status: 'running',
+        challengeId: 'mock-challenge', participantId: 'mock-p', checkStart: today);
+    await pumpApp(tester, overrides: [apiProvider.overrideWithValue(api)]);
+    final first = DateTime(today.year, today.month, today.day + EngineRules.defaults.checkDays);
+    expect(find.text('점검 기간이에요 · 누적은 ${fmtMd(first)}부터 반영돼요'), findsOneWidget);
+    expect(find.textContaining('누적 312.6'), findsNothing);
+    expect(find.text('점수 계산 보기'), findsOneWidget);
   });
 
   testWidgets('활동 한 줄: 걸음 · 활동 kcal, 누르면 활동 탭', (tester) async {
