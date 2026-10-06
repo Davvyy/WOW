@@ -173,7 +173,7 @@ void main() {
         challengeId: 'mock-challenge', participantId: 'mock-p', checkStart: today);
     await pumpApp(tester, overrides: [apiProvider.overrideWithValue(api)]);
     final first = DateTime(today.year, today.month, today.day + EngineRules.defaults.checkDays);
-    expect(find.text('점검 기간이에요 · 누적은 ${fmtMd(first)}부터 반영돼요'), findsOneWidget);
+    expect(find.text('점검 기간 · ${fmtMd(first)}부터 누적 반영'), findsOneWidget);
     expect(find.textContaining('누적 312.6'), findsNothing);
     expect(find.text('점수 계산 보기'), findsOneWidget);
   });

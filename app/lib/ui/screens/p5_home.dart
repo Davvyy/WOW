@@ -428,7 +428,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Txt.cap('${myFinal.rank == 0 ? '순위에는 들어가지 않아요' : '최종 ${myFinal.rank}위'} · ${finalRows.where((r) => !r.aggregating).length}명'),
                     ])
                   : inCheck
-                  ? Txt('점검 기간이에요 · 누적은 ${fmtMd(firstCounted)}부터 반영돼요', size: 14, color: c.fg2)
+                  ? Txt('점검 기간 · ${fmtMd(firstCounted)}부터 누적 반영', size: 14, color: c.fg2, maxLines: 1)
                   : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       scoreLine('누적 ', cumulative),
                       Row(children: [
