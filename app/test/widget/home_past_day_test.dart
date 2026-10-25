@@ -4,14 +4,12 @@ import 'package:challory/core/engine/engine.dart';
 import 'package:challory/core/format.dart';
 import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/data/models.dart';
-import 'package:challory/router.dart';
 import 'package:challory/services/api/challory_api.dart';
 import 'package:challory/services/api/mock_api.dart';
 import 'package:challory/services/api/server_mapping.dart';
 import 'package:challory/services/auth/auth_service.dart';
 import 'package:challory/state/app_state.dart';
 import 'package:challory/state/session.dart';
-import 'package:challory/ui/screens/p5_home.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

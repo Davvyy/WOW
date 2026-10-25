@@ -91,6 +91,14 @@ class SupabaseChalloryApi implements ChalloryApi {
       .select('local_date, as_of, is_final, rows').eq('challenge_id', challengeId).eq('scope', scope)
       .order('as_of', ascending: false).limit(1).maybeSingle();
 
+  /// 마지막 확정 누적 스냅샷의 날짜(확정 배치가 만든 is_final 스냅샷). 아직 없으면 null
+  Future<DateTime?> _lastFinalCumulativeDate(String challengeId) async {
+    final row = await _client.from('leaderboard_snapshots').select('local_date').eq('challenge_id', challengeId).eq('scope', 'cumulative')
+        .eq('is_final', true).order('local_date', ascending: false).limit(1).maybeSingle();
+    final d = row?['local_date'] as String?;
+    return d == null ? null : DateTime.parse(d);
+  }
+
   @override
   Future<ChallengeSession?> fetchSession() async {
     final j = await _rpc('my_challenge_summary', const {});
@@ -280,6 +288,7 @@ class SupabaseChalloryApi implements ChalloryApi {
       final cid = me['challenge_id'] as String;
       final today = await _latestSnapshot(cid, 'today');
       final cum = await _latestSnapshot(cid, 'cumulative');
+      final finalDate = await _lastFinalCumulativeDate(cid);
       final scores = await _client.from('daily_scores').select('local_date, s_d, under_review').eq('participant_id', me['id']);
       final todayDate = today?['local_date'] as String?;
       double? myToday;
@@ -307,6 +316,7 @@ class SupabaseChalloryApi implements ChalloryApi {
         myRankEligible: me['rank_eligible'] == true && me['leaderboard_visible'] == true,
         todayFinal: today?['is_final'] as bool? ?? false,
         asOf: today?['as_of'] == null ? null : DateTime.parse(today!['as_of'] as String),
+        cumulativeFinalDate: finalDate,
       );
     } on ApiException {
       rethrow;

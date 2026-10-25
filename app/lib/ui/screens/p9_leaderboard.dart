@@ -118,7 +118,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     final third = lb.thirdScore;
     // 메뉴의 '익명으로 신고' 대상: 이 탭 목록의 첫 다른 참가자(집계 중·순위 대기 제외)
     final reportTarget = list.where((r) => !r.me && !r.aggregating && !r.pending).firstOrNull;
-    final weekly = weeklyFrom(watchLedger(ref) ?? const []);
+    final ledger = watchLedger(ref);
+    final weekly = weeklyFrom(ledger ?? const []);
+    // 누적이 마지막으로 확정된 날: 서버 확정 스냅샷 날짜, 없으면 내 장부의 마지막 확정일
+    final cumFinalDate = lb.cumulativeFinalDate ?? lastFinalDate(ledger, ch.start);
     String rankText(int rank) => rank == 0 ? '—' : '$rank';
 
     Widget rowW(LeaderRow r, {bool pinned = false}) {
@@ -320,9 +323,11 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         final pinMe = !me.pending && cumState == null;
         if (today) {
           addBox(const InlineNote(Icons.schedule_rounded, '잠정 순위예요. 매시간 바뀌고 내일 09:00에 확정돼요.'));
-        } else if (ranked.isNotEmpty) {
-          // 확정 칩은 순위에 든 행이 하나라도 있을 때만
-          addBox(Align(alignment: Alignment.centerLeft, child: ChChip('확정 · ${ch.today.month}.${ch.today.day} 09:00', tone: Tone.good, icon: Icons.check_rounded)));
+        } else if (ranked.isNotEmpty && cumFinalDate != null) {
+          // 확정 칩은 순위에 든 행이 있고 확정된 날을 알 때만: 마지막 확정일의 다음 날 확정 시각
+          addBox(Align(
+              alignment: Alignment.centerLeft,
+              child: ChChip(pastDayChipText(cumFinalDate, isFinal: true, finalizeTime: currentSession.finalizeTime), tone: Tone.good, icon: Icons.check_rounded)));
         }
         addBox(podium(top3, showAvg: !today));
         if (cumState != null) {

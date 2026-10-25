@@ -58,3 +58,10 @@ String roParticle(String s) {
 
 /// 날짜 "10.6" (월.일, 06 §6 표기)
 String fmtMd(DateTime d) => '${d.month}.${d.day}';
+
+/// 날짜의 확정 칩(홈 지난 날 · 순위 누적): 그날 점수는 다음 날 [finalizeTime] 에 확정된다. 확정됐으면 '확정 · M.D HH:MM', 아직이면 '확정 예정 · …'.
+/// 다음 날은 달력 날짜로 더한다(10.31 → 11.1).
+String pastDayChipText(DateTime date, {required bool isFinal, required String finalizeTime}) {
+  final next = DateTime(date.year, date.month, date.day + 1);
+  return '${isFinal ? '확정' : '확정 예정'} · ${fmtMd(next)} $finalizeTime';
+}

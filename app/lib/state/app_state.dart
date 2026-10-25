@@ -195,6 +195,19 @@ SimulateResult resultFromLedgerRow(LedgerRow r) => SimulateResult(
       score: ScoreResult(fP: r.f, floorApplied: r.floorApplied, dD: r.dd, sD: r.s, ratio: r.dd / engine.rules.t),
     );
 
+/// 장부에서 마지막으로 확정된 날(잠정 행 제외). 확정된 날이 없으면 null.
+/// 서버 행은 local_date, 모의 행은 챌린지 시작일 + (D − 1).
+DateTime? lastFinalDate(List<LedgerRow>? ledger, DateTime start) {
+  DateTime? last;
+  for (final r in ledger ?? const <LedgerRow>[]) {
+    if (r.provisional) continue;
+    final ld = r.localDate;
+    final d = ld != null ? DateTime.parse(ld) : DateTime(start.year, start.month, start.day + r.d - 1);
+    if (last == null || d.isAfter(last)) last = d;
+  }
+  return last;
+}
+
 /// 장부 확정분으로 계산한 주간 피드백(06 P9: 하드코딩 금지)
 WeeklyFeedback? weeklyFrom(List<LedgerRow> ledger) {
   final rows = ledger.where((x) => !x.check && !x.provisional).toList();

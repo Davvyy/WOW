@@ -263,7 +263,7 @@ double get mockCumulative => round1(mockLedger.where((x) => !x.check && !x.provi
 
 // ---------- 리더보드 ----------
 class Leaderboard {
-  const Leaderboard({required this.total, required this.cumulative, required this.today, this.todayFinal = false, this.asOf});
+  const Leaderboard({required this.total, required this.cumulative, required this.today, this.todayFinal = false, this.asOf, this.cumulativeFinalDate});
   final int total;
   final List<LeaderRow> cumulative;
   final List<LeaderRow> today;
@@ -273,6 +273,9 @@ class Leaderboard {
 
   /// 스냅샷 시각(서버). 모의는 null
   final DateTime? asOf;
+
+  /// 마지막으로 확정된 날(서버 확정 누적 스냅샷의 local_date). 그 다음 날 확정 시각에 누적이 확정됐다. 모르면 null
+  final DateTime? cumulativeFinalDate;
 
   /// 내 행이 없으면 null(기록 모드·순위 비공개 등)
   LeaderRow? meIn(List<LeaderRow> list) {

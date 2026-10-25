@@ -37,6 +37,7 @@ int _stateCards() => [for (final t in _stateTitles) find.text(t).evaluate().leng
 
 void main() {
   tearDown(resetSession);
+  finalChipTests();
 
   testWidgets('점검 기간: 카드 하나 "점검 기간이에요" · 첫 반영일 · 확정 칩·전체 N명 없음', (tester) async {
     final today = mockChallenge.today;
@@ -78,5 +79,33 @@ void main() {
     expect(_stateCards(), 1);
     expect(find.textContaining('확정 · '), findsNothing);
     expect(find.textContaining('전체 '), findsNothing);
+  });
+}
+
+/// 누적 확정 칩(전수 점검 #20): 오늘 날짜가 아니라 마지막으로 확정된 날의 다음 날 09:00
+class _FinalDateApi extends MockChalloryApi {
+  _FinalDateApi({this.finalDate, this.ledger});
+  final DateTime? finalDate;
+  final List<LedgerRow>? ledger;
+
+  @override
+  Future<Leaderboard> fetchLeaderboard() async =>
+      Leaderboard(total: mockLeaderboard.total, today: mockLeaderboard.today, cumulative: mockLeaderboard.cumulative, cumulativeFinalDate: finalDate);
+
+  @override
+  Future<List<LedgerRow>> fetchLedger() async => ledger ?? await super.fetchLedger();
+}
+
+void finalChipTests() {
+  testWidgets('#20 누적 확정 칩: 서버의 마지막 확정 스냅샷 날짜(10.11) → "확정 · 10.12 09:00"', (tester) async {
+    await _openCumulative(tester, _FinalDateApi(finalDate: DateTime(2026, 10, 11)));
+    expect(find.text('확정 · 10.12 09:00'), findsOneWidget);
+    expect(find.text('확정 · ${fmtMd(mockChallenge.today)} 09:00'), findsNothing);
+  });
+
+  testWidgets('#20 스냅샷 날짜가 없으면 내 장부의 마지막 확정일(10.10) → "확정 · 10.11 09:00"', (tester) async {
+    final rows = [for (final r in mockLedger) if (r.d <= 5) r];
+    await _openCumulative(tester, _FinalDateApi(ledger: rows));
+    expect(find.text('확정 · 10.11 09:00'), findsOneWidget);
   });
 }

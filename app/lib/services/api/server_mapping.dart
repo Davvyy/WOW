@@ -143,6 +143,7 @@ Leaderboard leaderboardFromServer({
   bool myRankEligible = true,
   bool todayFinal = false,
   DateTime? asOf,
+  DateTime? cumulativeFinalDate,
   bool myPending = false,
   double? myAvg,
   double? myRate,
@@ -155,7 +156,8 @@ Leaderboard leaderboardFromServer({
   final cum = leaderRowsFromSnapshot(cumulativeRows, myParticipantId: myParticipantId, myNickname: myNickname, myScore: myCumulative,
       myUnderReview: myUnderReview, myRankEligible: myRankEligible, myPending: myPending, myAvg: myAvg, myRate: myRate, myDays: myDays,
       myMinDays: myMinDays);
-  return Leaderboard(total: cumulativeRows.length, today: today, cumulative: cum, todayFinal: todayFinal, asOf: asOf);
+  return Leaderboard(total: cumulativeRows.length, today: today, cumulative: cum, todayFinal: todayFinal, asOf: asOf,
+      cumulativeFinalDate: cumulativeFinalDate);
 }
 
 String _hhmm(Object? t) {
