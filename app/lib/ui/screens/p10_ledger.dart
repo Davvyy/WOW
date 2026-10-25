@@ -400,6 +400,18 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     }
 
     final revised = ledger.where((r) => r.history.isNotEmpty).toList().reversed.toList();
+    // 표 아래 안내: 점검 기간은 내 점검 시작일부터 check_days 일, 누를 수 있는 날은 오늘·정정된 날(행의 tappable 과 같은 기준)
+    String checkNote() {
+      final n = engine.rules.checkDays;
+      final cs = currentSession.checkStart;
+      if (cs == null) return '첫 $n일은 점검 기간으로 누적에 들어가지 않아요.';
+      return '첫 $n일(${fmtMd(cs)}~${fmtMd(DateTime(cs.year, cs.month, cs.day + n - 1))})은 점검 기간으로 누적에 들어가지 않아요.';
+    }
+
+    String tapNote() {
+      final days = [for (final r in ledger) if (r.hasRevision && !r.provisional) r.date];
+      return days.isEmpty ? '오늘 행을 누르면 그날 홈으로 이동해요.' : '오늘·정정된 날(${days.join(', ')}) 행을 누르면 그날 홈으로 이동해요.';
+    }
     final history = remote
         ? ChCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -463,7 +475,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
             if (ledger.isEmpty) const Txt.cap('아직 기록된 날이 없어요'),
             for (final r in ledger) tableRow(live(r)),
             const SizedBox(height: 6),
-            const Txt.cap('첫 3일(10.6~10.8)은 점검 기간으로 누적에 들어가지 않아요. 오늘·정정된 날(10.12) 행을 누르면 그날 홈으로 이동해요.'),
+            Txt.cap('${checkNote()} ${tapNote()}'),
           ]),
         ),
         history,
