@@ -7,6 +7,8 @@ insert into challenges (id, name, status, start_date, end_date, capacity, invite
 values ('00000000-0000-4000-a000-0000000000c1', '겨울 챌린지', 'recruiting', '2026-12-01', '2026-12-28', 30, 'WINTER',
   (select operator_id from challenges where invite_code = 'K7Q2MD'));
 insert into challenge_rules (challenge_id) values ('00000000-0000-4000-a000-0000000000c1');
+-- 소명은 검토 기한(sla_due_at) 안에만 된다(now() 기준) — 시드의 고정 날짜가 지나도 돌도록 지금부터 72시간으로
+update reviews set sla_due_at = now() + interval '72 hours' where participant_id = tests.pid('지수') and status = 'open';
 
 -- ---------------- 참가자(지수)
 select tests.login(tests.uid('지수'));

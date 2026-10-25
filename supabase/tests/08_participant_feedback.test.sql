@@ -1,5 +1,7 @@
 -- 참가자 쓰기: 응원(1일 1회) · 소명(1회·72h) · 결과 이의(발표 후 7일·1회)
 begin;
+-- 소명은 검토 기한(sla_due_at) 안에만 된다(now() 기준) — 시드의 고정 날짜가 지나도 돌도록 지금부터 72시간으로
+update reviews set sla_due_at = now() + interval '72 hours' where participant_id = tests.pid('지수') and status = 'open';
 select tests.login(tests.uid('지수'));
 set local role authenticated;
 do $$
