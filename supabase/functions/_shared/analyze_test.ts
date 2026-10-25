@@ -349,15 +349,20 @@ Deno.test('프롬프트: 달걀·과일·빵처럼 1개 단위로 세는 음식�
 
 // 조각 수 가드(D73): 음식 항목인데 count ≥ 3 이고 항목 kcal 이 1,500 을 넘으면 조각 수를 그릇 수로 낸 것으로 보고
 // count 1 · 배수 = count × 배수 ÷ 10(1인분 ≈ 10조각, 0.1~3.0, 0.1 단위)로 바꾸고 확인 필요 + piece_guard
-const PIECE_DB: Record<string, [string, number]> = { 초밥_광어: ['D000700', 453], 삶은달걀: ['D000710', 80], 갈비찜: ['D000720', 900] };
+// [food_code, 1인분 kcal, 1인분 g, 분류] — 가드는 접시 크기(1인분 ≥ 200 g)이거나 이름·분류가 조각 음식일 때만
+const PIECE_DB: Record<string, [string, number, number, string]> = {
+  초밥_광어: ['D000700', 453, 300, '밥류'], 삶은달걀: ['D000710', 80, 50, '난류'], 갈비찜: ['D000720', 900, 400, '찜류'],
+  찐빵: ['D000730', 300, 90, '빵 및 과자류'], 만두_고기: ['D000740', 350, 120, '만두류'], 송편: ['D000750', 400, 100, '떡류'],
+};
 function pieceDeps(items: unknown[], saved: { items: Record<string, unknown>[] }[] = []): AnalyzeDeps {
   return {
     ...deps(new MockAdapter({ is_food: true, items })),
     mapFood: (cands: string[]): Promise<FoodMatch> => {
       const hit = cands.find((c) => PIECE_DB[c]);
       if (!hit) return mapFood(cands);
-      const [code, kcal] = PIECE_DB[hit];
-      return Promise.resolve({ match: 'auto', food_code: code, kcal, score: 0.9, chips: [{ food_code: code, name: hit, kcal, score: 0.9 }] });
+      const [code, kcal, serving_g, category] = PIECE_DB[hit];
+      return Promise.resolve({ match: 'auto', food_code: code, kcal, serving_g, category, score: 0.9,
+        chips: [{ food_code: code, name: hit, kcal, score: 0.9, serving_g, category }] });
     },
     saveDraft: (_id, r) => { saved.push(r as unknown as { items: Record<string, unknown>[] }); return Promise.resolve(); },
   };
@@ -389,4 +394,31 @@ Deno.test('조각 수 가드: 배수는 0.1~3.0 으로(40조각 → 3.0), 포장
   const out = await analyzeMeal('m1', pieceDeps([dish('초밥_광어', 40), dish('초밥_광어', 5, { packaged: true })]));
   if (out.status !== 'draft') throw new Error('expected draft');
   assertEquals(out.items.map((i) => [i.count, i.portion_multiplier, i.ai_kcal, i.piece_guard]), [[1, 3, 1359, true], [5, 1, 2265, false]]);
+});
+
+Deno.test('조각 수 가드는 접시 크기·조각 음식만: 찐빵 6개(300 kcal, 90 g)는 그대로', async () => {
+  const out = await analyzeMeal('m1', pieceDeps([dish('찐빵', 6)]));
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals([out.items[0].count, out.items[0].portion_multiplier, out.items[0].ai_kcal, out.items[0].piece_guard], [6, 1, 1800, false]);
+});
+
+Deno.test('조각 수 가드: 만두는 1인분이 작아도(120 g) 이름으로, 송편은 분류(떡류)로, 큰 접시(갈비찜 400 g)는 무게로', async () => {
+  const out = await analyzeMeal('m1', pieceDeps([dish('만두_고기', 5), dish('송편', 4), dish('갈비찜', 3)]));
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals(out.items.map((i) => [i.count, i.portion_multiplier, i.ai_kcal, i.piece_guard]), [
+    [1, 0.5, 175, true],
+    [1, 0.4, 160, true],
+    [1, 0.3, 270, true],
+  ]);
+});
+
+Deno.test('조각 수 가드: 후보 칩으로 고른 음식도 그 칩의 무게·분류로 본다(작은 1인분 · 조각 아님 → 그대로)', async () => {
+  const d: AnalyzeDeps = {
+    ...pieceDeps([dish('호빵', 6)]),
+    mapFood: () => Promise.resolve({ match: 'chips', food_code: null, kcal: null, score: 0.3,
+      chips: [{ food_code: 'D000730', name: '찐빵', kcal: 300, score: 0.3, serving_g: 90, category: '빵 및 과자류' }] }),
+  };
+  const out = await analyzeMeal('m1', d);
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals([out.items[0].count, out.items[0].ai_kcal, out.items[0].piece_guard], [6, 1800, false]);
 });

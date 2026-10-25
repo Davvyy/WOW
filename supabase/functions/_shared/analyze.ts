@@ -17,8 +17,10 @@ export interface FoodMatch {
   match: 'auto' | 'chips' | 'none'; // ≥0.45 자동 / 0.25~0.45 후보 칩 / <0.25 미매칭 (04 §4.2)
   food_code: string | null;
   kcal: number | null; // 1인분 kcal
+  serving_g?: number | null; // 1인분 g(자동 매칭일 때, D73 조각 수 가드)
+  category?: string | null; // 식약처 분류(자동 매칭일 때)
   score: number | null;
-  chips: { food_code: string; name: string; kcal: number; score: number }[];
+  chips: { food_code: string; name: string; kcal: number; score: number; serving_g?: number | null; category?: string | null }[];
 }
 
 /** 상품 1개(낱개) 단위: 포장 크기 ÷ 개입 수, kcal 은 소수 1자리(서버 product_piece_kcal) */
@@ -74,9 +76,27 @@ export const PIECE_GUARD_KCAL = 1500;
 /** 1인분 ≈ 10조각으로 보고 개수를 인분으로 바꾼다 */
 export const PIECES_PER_SERVING = 10;
 
-/** 조각 수를 그릇·접시 수로 낸 것으로 보이면 count 1 · 배수 = count × 배수 ÷ 10(0.1~3.0, 0.1 단위)로. 아니면 null */
-export function pieceGuard(serving: number, mult: number, count: number, packaged: boolean): { count: 1; mult: number } | null {
+/** 가드는 1인분이 한 접시 크기(≥ 200 g)이거나 이름·분류가 조각으로 세는 음식일 때만(찐빵·달걀 같은 1개 단위 음식은 빼려고) */
+export const PLATE_SERVING_G = 200;
+export const PIECE_FOOD = /초밥|스시|김밥|만두|교자|떡|전$|부침|쿠키|치킨|롤/;
+
+export interface PieceFood {
+  name: string; // 고른 음식 이름(미매칭이면 AI 이름)
+  serving_g?: number | null;
+  category?: string | null;
+}
+
+/** 접시 크기이거나 조각 음식인지 */
+export function plateOrPieceFood(f: PieceFood): boolean {
+  if (f.serving_g != null && Number(f.serving_g) >= PLATE_SERVING_G) return true;
+  return PIECE_FOOD.test(f.name) || (f.category != null && PIECE_FOOD.test(f.category));
+}
+
+/** 조각 수를 그릇·접시 수로 낸 것으로 보이면 count 1 · 배수 = count × 배수 ÷ 10(0.1~3.0, 0.1 단위)로. 아니면 null.
+ * 포장 상품은 보지 않는다. 접시 크기·조각 음식이 아니면(찐빵 6개 같은 1개 단위 음식) 그대로. */
+export function pieceGuard(serving: number, mult: number, count: number, packaged: boolean, food: PieceFood): { count: 1; mult: number } | null {
   if (packaged || count < PIECE_GUARD_MIN_COUNT || serving * mult * count <= PIECE_GUARD_KCAL) return null;
+  if (!plateOrPieceFood(food)) return null;
   const m = Math.min(SERVINGS_MAX, Math.max(SERVINGS_MIN, Math.round((count * mult) / PIECES_PER_SERVING * 10) / 10));
   return { count: 1, mult: m };
 }
@@ -113,15 +133,21 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
     let serving: number;
     let chosen = it.name_candidates[0];
     let needsCheck = it.confidence !== 'high';
+    let servingG: number | null = null;
+    let category: string | null = null;
     if (m.match === 'auto' && m.kcal != null) {
       food_code = m.food_code;
       serving = m.kcal;
       const chip = m.chips.find((c) => c.food_code === m.food_code);
       if (chip) chosen = chip.name;
+      servingG = m.serving_g ?? chip?.serving_g ?? null;
+      category = m.category ?? chip?.category ?? null;
     } else if (m.match === 'chips' && m.chips.length > 0) {
       food_code = m.chips[0].food_code; // 후보 칩 1순위를 임시 선택, 확인 필요
       serving = m.chips[0].kcal;
       chosen = m.chips[0].name;
+      servingG = m.chips[0].serving_g ?? null;
+      category = m.chips[0].category ?? null;
       needsCheck = true;
     } else {
       serving = deps.unmatchedKcal ?? 200; // 미매칭 → 임시값 + 확인 필요
@@ -131,7 +157,7 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
     let count = it.count;
     let bucket = it.portion_bucket;
     // 초밥 12점 → 1인분 × 11 처럼 조각 수가 그릇 수로 오면 인분으로 바꾸고 확인을 받는다(D73)
-    const guard = pieceGuard(serving, mult, count, it.packaged);
+    const guard = pieceGuard(serving, mult, count, it.packaged, { name: chosen, serving_g: servingG, category });
     if (guard) {
       ({ count, mult } = guard);
       bucket = bucketOf(mult);
