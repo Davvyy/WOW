@@ -327,3 +327,22 @@ Deno.test('낱개 포장 한 개로 본 포장 상품: 초안 항목에 single_p
   assertEquals(saved[0].items.map((i) => i.single_piece), [true, false]);
   assertEquals([out.items[0].serving_kcal, out.items[0].ai_kcal], [150.3, 150.3], 'kcal 은 그대로(1회분) — 앱이 묻는다');
 });
+
+// 조각 음식(D73): count 는 따로 담겨 나온 그릇·접시 수. 초밥 12점은 count 11 이 아니라 count 1 · servings 1.2(실제 사례: 1인분 × 11 = 4,983 kcal)
+Deno.test('프롬프트: 음식의 count 는 그릇·접시 수(보통 1), 조각 음식은 count=1 · 양은 servings 로', () => {
+  assertEquals(MEAL_PROMPT.includes('포장 상품이 아닌 음식의 count 는 따로 담겨 나온 그릇·접시·공기 수(보통 1)'), true);
+  assertEquals(MEAL_PROMPT.includes('조각 수를 count 에 넣지 말고 count=1'), true);
+  for (const food of ['초밥', '김밥', '만두', '떡', '전', '쿠키', '치킨']) assertEquals(MEAL_PROMPT.includes(food), true, food);
+  assertEquals(MEAL_PROMPT.includes('초밥 12점 → count 1, servings 1.2'), true);
+  assertEquals(MEAL_PROMPT.includes('만두 20개 한 접시 → count 1, servings 2.0'), true);
+  assertEquals(MEAL_PROMPT.includes('김밥 3줄 → count 1, servings 3.0'), true);
+});
+
+Deno.test('프롬프트: 달걀·과일·빵처럼 1개 단위로 세는 음식은 개수를 count 에(예 2~3개)', () => {
+  assertEquals(MEAL_PROMPT.includes('1개 단위로 세는 음식은 개수를 count 에 그대로'), true);
+  assertEquals(MEAL_PROMPT.includes('삶은 달걀 3개 → count 3'), true);
+  assertEquals(MEAL_PROMPT.includes('사과 2개 → count 2'), true);
+  assertEquals(MEAL_PROMPT.includes('찐빵 2개 → count 2'), true);
+  // 포장 상품 규칙(D63·D67)은 그대로
+  assertEquals(MEAL_PROMPT.includes('포장 상품의 count 는 따로 보이는 봉지·포장 수'), true);
+});

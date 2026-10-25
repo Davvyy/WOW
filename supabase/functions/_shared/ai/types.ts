@@ -16,7 +16,7 @@ export type Confidence = 'high' | 'mid' | 'low';
 
 export interface MealItemDraft {
   name_candidates: [string, string, string] | string[]; // 한국어 표준 음식명 top-3(확신 순)
-  count: number; // ≥1
+  count: number; // ≥1. 음식은 따로 담긴 그릇·접시 수(조각 음식은 1, 양은 servings), 1개 단위 음식(달걀·과일·빵)은 개수, 포장 상품은 포장 수(D73)
   servings: number; // 1인분 대비 먹은 양, 0.1 단위 0.1~3.0
   portion_bucket: PortionBucket; // servings 의 요약
   has_broth: boolean;
@@ -46,6 +46,11 @@ export const MEAL_PROMPT = [
   '각 항목마다 가능성 높은 이름 3개(name_candidates), 개수(count),',
   '보통 1인분 대비 사진 속 양(servings: 0.1~3.0, 0.1 단위. 예: 반 그릇 0.5, 1인분 1.0, 조금 많음 1.2, 곱빼기 1.5, 2인분 2.0),',
   '국물 음식 여부(has_broth), 확신도(confidence: high/mid/low), 포장 상품 여부(packaged)를 내세요.',
+  '포장 상품이 아닌 음식의 count 는 따로 담겨 나온 그릇·접시·공기 수(보통 1)입니다. 1인분은 보통 한 접시 기준이라',
+  '초밥·김밥·만두·떡·전·쿠키·치킨 조각처럼 조각으로 세는 음식은 조각 수를 count 에 넣지 말고 count=1 로 하고, 양은 보통 1인분 대비 servings 로 내세요',
+  '(예: 초밥 12점 → count 1, servings 1.2 / 만두 20개 한 접시 → count 1, servings 2.0 / 김밥 3줄 → count 1, servings 3.0).',
+  '다만 달걀·과일·빵처럼 1개 단위로 세는 음식은 개수를 count 에 그대로 넣고 servings 는 1개 크기로 하세요',
+  '(예: 삶은 달걀 3개 → count 3, 사과 2개 → count 2, 찐빵 2개 → count 2).',
   '봉지·캔·병·상자에 든 포장 상품(과자·음료·아이스크림·컵라면 등)이면 packaged=true 로 하고, name_candidates 에 포장에 적힌 브랜드와 상품명을 그대로',
   '(예: "롯데 칙촉", "칙촉", 마지막은 일반 음식명 "초코칩쿠키") 넣되 용량·중량 숫자는 빼세요.',
   '상품명에는 포장에 적힌 맛·종류도 그대로 붙이세요(예: "홈런볼 초코", "칙촉 오리지널").',
