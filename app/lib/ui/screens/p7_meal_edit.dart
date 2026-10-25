@@ -486,7 +486,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           InfoBanner(
             tone: Tone.brand,
             icon: Icons.search_rounded,
-            child: boldThen(context, '사진 없이 기록해요.', ' 음식 이름으로 검색하거나 직접 입력해 주세요.', color: c.brand),
+            child: boldThen(context, '사진 없이 기록해요.', ' 음식 이름으로 검색하거나 직접 입력해 주세요. 확정하기 전까지는 $sub kcal로 잠정 계산돼요.', color: c.brand),
           )
         else
           InfoBanner(
