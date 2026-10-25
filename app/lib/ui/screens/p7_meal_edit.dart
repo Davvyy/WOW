@@ -545,7 +545,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
           // 보기만 하는 지난 날 끼니는 항목을 바꿀 수 없다
           IgnorePointer(
             ignoring: !canEdit,
-            child: _ItemCard(item: _items[i], onChange: (f) => _update(i, f), onSearch: () => _openSearch(replaceIndex: i), onRemove: () => setState(() => _items = [..._items]..removeAt(i)),
+            child: _ItemCard(item: _items[i], readOnly: !canEdit, onChange: (f) => _update(i, f), onSearch: () => _openSearch(replaceIndex: i), onRemove: () => setState(() => _items = [..._items]..removeAt(i)),
                 onPieces: () => _editPieces(i),
                 prompt: piecesPrompts && !_piecesPromptOff.contains(_items[i].id) ? _items[i].piecesPrompt : PiecesPrompt.none,
                 onDismissPrompt: () => setState(() => _piecesPromptOff.add(_items[i].id))),
@@ -687,8 +687,12 @@ const bigItemKcal = 1500;
 
 class _ItemCard extends StatelessWidget {
   const _ItemCard({required this.item, required this.onChange, required this.onSearch, required this.onRemove, required this.onPieces,
-      this.prompt = PiecesPrompt.none, this.onDismissPrompt});
+      this.prompt = PiecesPrompt.none, this.onDismissPrompt, this.readOnly = false});
   final MealItem item;
+
+  /// 보기만 하는 끼니(수정 기한이 지난 지난 날): 체크는 꺼진 모양, 후보 칩·검색·먹은 양 스테퍼·국물·개수는 그리지 않는다.
+  /// 먹은 양은 '가정 분량' 한 줄로 보인다.
+  final bool readOnly;
 
   /// 상품 항목의 '낱개로 계산'(몇 개입) 창을 연다
   final VoidCallback onPieces;
@@ -755,7 +759,10 @@ class _ItemCard extends StatelessWidget {
     return ChCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ChCheck(value: it.checked, onChanged: (v) => onChange((i) => i.copyWith(checked: v)), label: '${it.name} 먹었어요'),
+          Opacity(
+            opacity: readOnly ? 0.45 : 1,
+            child: ChCheck(value: it.checked, onChanged: readOnly ? null : (v) => onChange((i) => i.copyWith(checked: v)), label: '${it.name} 먹었어요'),
+          ),
           const SizedBox(width: 2),
           Expanded(
             child: Padding(
@@ -771,22 +778,22 @@ class _ItemCard extends StatelessWidget {
           ),
           Padding(padding: const EdgeInsets.only(top: 10), child: NumText(fmtInt(it.rawKcal), size: 21, weight: FontWeight.w700, color: off ? c.fg2 : c.fg, unit: 'kcal')),
         ]),
-        // 1,500 kcal 넘는 항목: 확정은 막지 않고 양만 한 번 더 보게 한다(D73)
-        if (!off && it.rawKcal > bigItemKcal)
+        // 1,500 kcal 넘는 항목: 확정은 막지 않고 양만 한 번 더 보게 한다(D73). 고칠 수 없는 끼니에는 묻지 않는다.
+        if (!readOnly && !off && it.rawKcal > bigItemKcal)
           Row(children: [
             Icon(Icons.info_rounded, size: 14, color: c.warn),
             const SizedBox(width: 4),
             Expanded(child: Txt.cap('한 항목이 1,500 kcal 넘어요 · 양을 확인해 주세요', color: c.warn)),
           ]),
         // 서버가 조각 수를 그릇 수로 낸 것으로 보고 양을 인분으로 바꾼 항목(초밥 12점 → 1.2인분, D73)
-        if (it.aiPieceGuard && !off)
+        if (!readOnly && it.aiPieceGuard && !off)
           InfoBanner(
             tone: Tone.warn,
             icon: Icons.restaurant_rounded,
             child: boldThen(context, '조각 수로 보여 양을 인분으로 바꿨어요.', ' 실제로 먹은 양이 맞는지 확인해 주세요.', color: c.warn),
           ),
         // AI 가 낱개 포장 하나로 본 상품: 1회분으로 잡혀 크게 잡히지 않게 몇 개입인지 먼저 묻는다(D67)
-        if (prompt == PiecesPrompt.banner && !off)
+        if (!readOnly && prompt == PiecesPrompt.banner && !off)
           InfoBanner(
             tone: Tone.brand,
             icon: Icons.inventory_2_rounded,
@@ -797,6 +804,8 @@ class _ItemCard extends StatelessWidget {
               ChButton('몇 개입인지 넣기', small: true, expand: false, onPressed: onPieces),
             ]),
           ),
+        // 편집 도구(후보 칩·검색·먹은 양·국물·개수): 보기만 하는 끼니에는 없다
+        if (!readOnly)
         Opacity(
           opacity: off ? 0.5 : 1,
           child: IgnorePointer(
