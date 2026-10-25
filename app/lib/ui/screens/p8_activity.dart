@@ -150,7 +150,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     ];
     final maxA = week.fold<double>(1, (m, w) => w.$2 > m ? w.$2 : m);
 
-    final platformRef = ios ? act.platformActiveKcal : null;
+    // 참고값(순위 미반영): Android 도 Health Connect 가 활동 칼로리를 주면 보여 준다(D74)
+    final platformRef = act.platformActiveKcal;
+    final platformName = ios ? 'Apple 건강' : 'Health Connect';
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -216,7 +218,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                     outline: true,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
                       const Row(children: [Expanded(child: Txt.title('플랫폼 활동 칼로리')), ChChip('참고값 · 순위 미반영', icon: Icons.info_rounded)]),
-                      Txt(platformRef != null ? 'Apple 건강 활동 ${fmtInt(platformRef)} kcal' : '삼성헬스 활동 칼로리 — 제공 안 됨'),
+                      Txt(platformRef != null ? '$platformName 활동 ${fmtInt(platformRef)} kcal' : '$platformName 활동 칼로리 — 받은 값 없음'),
                       const Txt.cap('폰이든 워치든 순위는 같은 공식(MET 엔진)으로 계산해요.'),
                     ], gap: 6)),
                   ),
