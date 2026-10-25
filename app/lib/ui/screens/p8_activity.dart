@@ -158,9 +158,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     // 서버 장부는 최신순일 수 있어 날짜 순으로 정렬(왼쪽 오래된 날 → 오른쪽 오늘)
     final ledger = [...?watchLedger(ref)]..sort((x, y) => x.d.compareTo(y.d));
     final todayIdx = curChallenge.dayIndex;
+    // (일, 활동 kcal, 오늘인지, 읽기 라벨의 'M월 D일') — 날짜는 장부 행의 'M.D'
     final week = [
       for (final r in ledger.skip(ledger.length > 7 ? ledger.length - 7 : 0))
-        (r.date.split('.').last, r.d == todayIdx ? a.aD : r.a, r.d == todayIdx),
+        (r.date.split('.').last, r.d == todayIdx ? a.aD : r.a, r.d == todayIdx, r.date.replaceFirst('.', '월 ')),
     ];
     final maxA = week.fold<double>(1, (m, w) => w.$2 > m ? w.$2 : m);
 
@@ -207,7 +208,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                       const Row(children: [Expanded(child: Txt.title('최근 7일 활동 kcal')), Txt.cap('추정 · 상한 1,000')]),
                       const SizedBox(height: 6),
                       Semantics(
-                        label: '최근 7일 활동 칼로리: ${week.map((w) => '10월 ${w.$1}일 ${fmtInt(w.$2)}').join(', ')}',
+                        label: '최근 7일 활동 칼로리: ${week.map((w) => '${w.$4}일 ${fmtInt(w.$2)}').join(', ')}',
                         child: ExcludeSemantics(
                           child: SizedBox(
                             height: 110,
