@@ -229,25 +229,11 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     });
   }
 
+  /// 직접 입력(이름·kcal). 입력 칸 컨트롤러는 창 안의 State 가 갖는다: 창이 닫히는 애니메이션 동안에도 칸이 다시 그려지므로
+  /// 여기서 만들어 창이 닫히자마자 dispose 하면 'used after being disposed' 가 난다.
   Future<void> _manualEntry() async {
-    final name = TextEditingController();
-    final kcal = TextEditingController();
-    final ok = await showChDialog<bool>(
-      context,
-      title: '직접 입력',
-      body: Column(children: spaced([
-        ChInput(controller: name, numeric: false, label: '음식 이름', hint: '예: 엄마표 김밥'),
-        ChInput(controller: kcal, label: 'kcal (추정)', unit: 'kcal', hint: '350', maxLength: 5),
-      ], gap: 10)),
-      actions: [
-        Builder(builder: (ctx) => ChButton('취소', kind: BtnKind.quiet, onPressed: () => Navigator.of(ctx).pop(false))),
-        Builder(builder: (ctx) => ChButton('추가', onPressed: () => Navigator.of(ctx).pop(true))),
-      ],
-    );
-    final k = int.tryParse(kcal.text);
-    if (ok == true && name.text.trim().isNotEmpty && k != null && k > 0) _addFood(name.text.trim(), k);
-    name.dispose();
-    kcal.dispose();
+    final picked = await showChDialog<(String, int)>(context, title: '직접 입력', body: const _ManualEntryForm(), actions: const []);
+    if (picked != null && mounted) _addFood(picked.$1, picked.$2);
   }
 
   Future<void> _confirm() async {
@@ -619,6 +605,45 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
 }
 
 /// '몇 개입' 입력(2~200). 저장하면 개수, '1회분 기준으로 되돌리기'면 [reset], 취소면 null 로 창을 닫는다.
+/// '직접 입력' 창 본문. 올바른 이름·kcal 이면 (이름, kcal) 로, 아니면(취소·빈 값) null 로 닫는다.
+class _ManualEntryForm extends StatefulWidget {
+  const _ManualEntryForm();
+
+  @override
+  State<_ManualEntryForm> createState() => _ManualEntryFormState();
+}
+
+class _ManualEntryFormState extends State<_ManualEntryForm> {
+  final _name = TextEditingController();
+  final _kcal = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _kcal.dispose();
+    super.dispose();
+  }
+
+  void _add() {
+    final name = _name.text.trim(), k = int.tryParse(_kcal.text);
+    Navigator.of(context).pop(name.isNotEmpty && k != null && k > 0 ? (name, k) : null);
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ...spaced([
+          ChInput(controller: _name, numeric: false, label: '음식 이름', hint: '예: 엄마표 김밥'),
+          ChInput(controller: _kcal, label: 'kcal (추정)', unit: 'kcal', hint: '350', maxLength: 5),
+        ], gap: 10),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: ChButton('취소', kind: BtnKind.quiet, onPressed: () => Navigator.of(context).pop())),
+          const SizedBox(width: 8),
+          Expanded(child: ChButton('추가', onPressed: _add)),
+        ]),
+      ]);
+}
+
 class _PiecesForm extends StatefulWidget {
   const _PiecesForm({this.initial});
 
