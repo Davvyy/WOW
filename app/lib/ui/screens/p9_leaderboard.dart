@@ -116,6 +116,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     // 검토 중: 서버는 내 장부의 under_review, 모의는 걸음 급증 시나리오
     final reviewMe = remote ? me.underReview : act.stepsTotal > AppConfig.stepsSpikeAbs;
     final third = lb.thirdScore;
+    // 메뉴의 '익명으로 신고' 대상: 이 탭 목록의 첫 다른 참가자(집계 중·순위 대기 제외)
+    final reportTarget = list.where((r) => !r.me && !r.aggregating && !r.pending).firstOrNull;
     final weekly = weeklyFrom(watchLedger(ref) ?? const []);
     String rankText(int rank) => rank == 0 ? '—' : '$rank';
 
@@ -375,11 +377,11 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                       _leave();
                       return;
                     }
-                    final target = list.where((r) => !r.me && !r.aggregating && !r.pending).firstOrNull;
-                    if (target != null) _report(target);
+                    if (reportTarget != null) _report(reportTarget);
                   },
                   itemBuilder: (_) => [
-                    if (today && visible) const PopupMenuItem(value: 'report', child: Text('익명으로 신고')),
+                    // 신고할 다른 참가자가 있을 때만(나 혼자면 메뉴에 없다)
+                    if (today && visible && reportTarget != null) const PopupMenuItem(value: 'report', child: Text('익명으로 신고')),
                     const PopupMenuItem(value: 'leave', child: Text('챌린지 나가기')),
                   ],
                 ),
@@ -448,7 +450,8 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
           constraints: const BoxConstraints(minHeight: 48),
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(border: Border.all(color: c.borderStrong), borderRadius: BorderRadius.circular(12)),
-          child: Row(children: [_Avatar(widget.target, size: 28), const SizedBox(width: 8), Txt('${widget.target} · 10.12 저녁', weight: FontWeight.w600)]),
+          // 신고는 참가자 단위(서버에 날짜·끼니를 보내지 않음) — 닉네임만 보인다
+          child: Row(children: [_Avatar(widget.target, size: 28), const SizedBox(width: 8), Flexible(child: Txt(widget.target, weight: FontWeight.w600, maxLines: 1))]),
         ),
       ]),
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
