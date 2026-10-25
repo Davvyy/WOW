@@ -109,33 +109,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _openDelete() async {
-    final ctrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
-        final c = ctx.c;
-        return Dialog(
-          backgroundColor: c.bg,
-          surfaceTintColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
-              Txt.title('계정을 삭제할까요?', color: c.critical),
-              const Txt('사진·식사·걸음·체중 기록이 즉시 삭제돼요. 일별 점수는 닉네임 없이 익명으로 챌린지 종료까지만 남아요. 되돌릴 수 없어요.'),
-              ChInput(label: '확인을 위해 "삭제"를 입력해 주세요', controller: ctrl, numeric: false, hint: '삭제', onChanged: (_) => setD(() {})),
-              Row(children: [
-                Expanded(child: ChButton('취소', kind: BtnKind.quiet, onPressed: () => Navigator.of(ctx).pop(false))),
-                const SizedBox(width: 8),
-                Expanded(child: ChButton('계정 삭제', kind: BtnKind.critical, onPressed: ctrl.text.trim() == '삭제' ? () => Navigator.of(ctx).pop(true) : null)),
-              ]),
-            ], gap: 12)),
-          ),
-        );
-      }),
-    );
-    ctrl.dispose();
+    // 입력 칸 컨트롤러는 창 안의 위젯이 가진다 — 닫히는 애니메이션 동안에도 살아 있어야 해서(P7 직접 입력 창과 같은 방식)
+    final ok = await showDialog<bool>(context: context, builder: (_) => const _DeleteConfirm());
     if (ok == true && mounted) {
       try {
         // 서버: 기록 즉시 삭제 · 일별 점수만 익명 보존 · 로그인 차단(05 API #22)
@@ -269,6 +244,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // 설치된 버전(이름 + 빌드 번호). 못 읽었으면 이름만
         Disclaimer('챌로리${switch (ref.watch(appVersionProvider)) { final v? => ' $v', _ => '' }} · 모든 수치는 추정이에요'),
       ],
+    );
+  }
+}
+
+/// 계정 삭제 확인 창. "삭제"를 입력해야 버튼이 켜진다. 삭제하면 true.
+class _DeleteConfirm extends StatefulWidget {
+  const _DeleteConfirm();
+
+  @override
+  State<_DeleteConfirm> createState() => _DeleteConfirmState();
+}
+
+class _DeleteConfirmState extends State<_DeleteConfirm> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Dialog(
+      backgroundColor: c.bg,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
+          Txt.title('계정을 삭제할까요?', color: c.critical),
+          const Txt('사진·식사·걸음·체중 기록이 즉시 삭제돼요. 일별 점수는 닉네임 없이 익명으로 챌린지 종료까지만 남아요. 되돌릴 수 없어요.'),
+          ChInput(label: '확인을 위해 "삭제"를 입력해 주세요', controller: _ctrl, numeric: false, hint: '삭제', onChanged: (_) => setState(() {})),
+          Row(children: [
+            Expanded(child: ChButton('취소', kind: BtnKind.quiet, onPressed: () => Navigator.of(context).pop(false))),
+            const SizedBox(width: 8),
+            Expanded(child: ChButton('계정 삭제', kind: BtnKind.critical, onPressed: _ctrl.text.trim() == '삭제' ? () => Navigator.of(context).pop(true) : null)),
+          ]),
+        ], gap: 12)),
+      ),
     );
   }
 }
