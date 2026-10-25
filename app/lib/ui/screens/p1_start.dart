@@ -12,7 +12,18 @@ import '../../services/api/challory_api.dart';
 import '../../services/auth/auth_service.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
-import '../../state/session.dart';
+
+/// 클립보드 글에서 초대코드(영문·숫자 6자리)를 찾는다. 글 전체가 6자리면 그대로(대문자로),
+/// 문장 속이면 앞뒤가 영문·숫자가 아닌 6자리 대문자·숫자 묶음 중 숫자가 하나 이상 있는 첫 묶음. 없으면 null.
+String? inviteCodeIn(String? text) {
+  final t = text?.trim() ?? '';
+  if (RegExp(r'^[A-Za-z0-9]{6}$').hasMatch(t)) return t.toUpperCase();
+  for (final m in RegExp(r'(?<![A-Za-z0-9/])[A-Z0-9]{6}(?![A-Za-z0-9])').allMatches(t)) {
+    final code = m.group(0)!;
+    if (RegExp(r'\d').hasMatch(code)) return code;
+  }
+  return null;
+}
 
 /// P1 시작·이번 달 챌린지·초대코드·로그인.
 /// 기본은 "이번 달 챌린지 참가하기"(코드 없이). 초대코드가 있으면 아래 접힘 영역을 펼쳐 입력한다.
@@ -31,6 +42,9 @@ class _StartScreenState extends ConsumerState<StartScreen> {
   final _ctrl = TextEditingController();
   final _focus = FocusNode();
   bool _clipboardBanner = true;
+
+  /// 초대코드 영역을 펼칠 때 클립보드에서 찾은 코드(없으면 배너를 보이지 않는다)
+  String? _clipCode;
   bool _showCode = false;
   bool _monthlyChosen = false;
   _CodeState _st = _CodeState.empty;
@@ -161,9 +175,26 @@ class _StartScreenState extends ConsumerState<StartScreen> {
     _continueIfSignedIn();
   }
 
+  /// 초대코드 영역을 펼칠 때 한 번 클립보드를 읽어 6자리 코드가 있으면 붙여넣기 배너를 띄운다
+  Future<void> _readClipboard() async {
+    String? code;
+    try {
+      code = inviteCodeIn((await Clipboard.getData(Clipboard.kTextPlain))?.text);
+    } catch (_) {} // 읽지 못하면 배너 없이 직접 입력
+    if (mounted) setState(() => _clipCode = code);
+  }
+
+  void _openCode() {
+    if (_showCode) return;
+    setState(() => _showCode = true);
+    _readClipboard();
+  }
+
   void _paste() {
+    final code = _clipCode;
+    if (code == null) return;
     setState(() {
-      _ctrl.text = curChallenge.code;
+      _ctrl.text = code;
       _clipboardBanner = false;
     });
     _lookup();
@@ -210,16 +241,16 @@ class _StartScreenState extends ConsumerState<StartScreen> {
             const SizedBox(height: 24),
             ChButton('이번 달 챌린지 참가하기', onPressed: _chooseMonthly),
             const SizedBox(height: 4),
-            Center(child: ChLink('초대코드가 있어요', onTap: () => setState(() => _showCode = true))),
+            Center(child: ChLink('초대코드가 있어요', onTap: _openCode)),
             const SizedBox(height: 16),
             if (_showCode) ...[
-              if (_clipboardBanner && _code.isEmpty) ...[
+              if (_clipboardBanner && _code.isEmpty && _clipCode != null) ...[
                 InfoBanner(
                   tone: Tone.brand,
                   icon: Icons.content_paste_rounded,
                   action: ChButton('붙여넣기', small: true, kind: BtnKind.quiet, onPressed: _paste),
                   onClose: () => setState(() => _clipboardBanner = false),
-                  child: boldThen(context, '복사한 초대코드 ${curChallenge.code}를 붙여넣을까요?', '', color: c.brand),
+                  child: boldThen(context, '복사한 초대코드 $_clipCode를 붙여넣을까요?', '', color: c.brand),
                 ),
                 const SizedBox(height: 12),
               ],
