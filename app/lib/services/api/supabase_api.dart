@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:io' show HttpClient;
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show consolidateHttpClientResponseBytes, defaultTargetPlatform, TargetPlatform;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/engine/engine.dart';
@@ -376,6 +377,39 @@ class SupabaseChalloryApi implements ChalloryApi {
       throw ApiException(int.tryParse(e.statusCode ?? '') ?? 0, e.message);
     } catch (e) {
       throw ApiException(0, e.toString());
+    }
+  }
+
+  /// photo-url → 서명 다운로드 URL(300초) → GET. 404(사진 없음·파기·남의 끼니)와 객체가 없어진 서명 URL(400·404)은 null.
+  @override
+  Future<Uint8List?> fetchMealPhoto(String mealId) async {
+    final Map<String, dynamic> j;
+    try {
+      j = await _fn('photo-url', {'meal_id': mealId});
+    } on ApiException catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
+    final url = j['signed_url'];
+    if (url is! String || url.isEmpty) return null;
+    final http = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+    try {
+      final res = await (await http.getUrl(Uri.parse(url))).close().timeout(const Duration(seconds: 20));
+      if (res.statusCode == 400 || res.statusCode == 404) {
+        await res.drain<void>();
+        return null;
+      }
+      if (res.statusCode != 200) {
+        await res.drain<void>();
+        throw ApiException(res.statusCode, 'photo download');
+      }
+      return await consolidateHttpClientResponseBytes(res).timeout(const Duration(seconds: 20));
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(0, e.toString());
+    } finally {
+      http.close();
     }
   }
 

@@ -252,6 +252,10 @@ class MockChalloryApi implements ChalloryApi {
   @override
   Future<void> uploadPhoto(PhotoUploadTicket t, Uint8List bytes) async => _maybeFail('upload');
 
+  /// 모의 모드는 서버 사본이 없다(사진은 이 폰의 보관본만)
+  @override
+  Future<Uint8List?> fetchMealPhoto(String mealId) async => null;
+
   @override
   Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, MealSlot? slot}) async {
     _maybeFail('meals');

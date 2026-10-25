@@ -21,6 +21,7 @@ import '../services/api/mock_api.dart';
 import '../services/api/supabase_api.dart';
 import '../services/auth/auth_service.dart';
 import '../services/photo/meal_uploader.dart';
+import '../services/photo/server_photo_cache.dart';
 import '../services/share/meal_share.dart';
 import '../services/photo/photo_prep.dart';
 import '../services/score_simulator.dart';
@@ -239,6 +240,40 @@ final mealPhotoProvider = FutureProvider.autoDispose.family<Uint8List?, String>(
     return null; // 보관 사진을 못 읽어도 카드는 아이콘으로 보인다
   }
 });
+
+/// 서버에 있는 내 끼니 사진(Edge photo-url)의 세션 메모리 캐시. 모의 모드는 서버에 묻지 않는다.
+final serverPhotoCacheProvider = Provider<ServerPhotoCache>((ref) {
+  final api = ref.watch(apiProvider);
+  return ServerPhotoCache(api.isRemote ? api.fetchMealPhoto : (_) async => null);
+});
+
+/// 서버 끼니 id 의 서버 사본(세션 메모리 캐시에서). 이 폰에 보관본이 없고 사진이 있는 끼니만 읽는다([watchMealPhoto]).
+final serverMealPhotoProvider = FutureProvider.autoDispose.family<Uint8List?, String>(
+    (ref, serverId) => ref.watch(serverPhotoCacheProvider).get(serverId));
+
+/// 끼니 사진: 이 폰의 공유용 보관본, 없으면(사진이 있는 서버 끼니) 서버 사본. 없거나 읽는 중이면 null.
+/// 사진 없이 기록한 끼니(photoless, 서버 photo_id 없음)는 서버에 묻지 않는다.
+Uint8List? watchMealPhoto(WidgetRef ref, MealRecord m) {
+  final id = m.serverId;
+  if (id == null) return null;
+  final local = ref.watch(mealPhotoProvider(id));
+  if (!local.hasValue) return null; // 보관본을 읽는 중
+  final bytes = local.value;
+  if (bytes != null || m.photoless) return bytes;
+  return ref.watch(serverMealPhotoProvider(id)).value;
+}
+
+/// [watchMealPhoto] 를 한 번 읽는 판(P7 사진 칸)
+Future<Uint8List?> readMealPhoto(WidgetRef ref, MealRecord m) async {
+  final id = m.serverId;
+  if (id == null) return null;
+  Uint8List? bytes;
+  try {
+    bytes = await ref.read(sharePhotoStoreProvider).get(id);
+  } catch (_) {}
+  if (bytes != null || m.photoless) return bytes;
+  return ref.read(serverPhotoCacheProvider).get(id);
+}
 
 /// 폰 기본 공유 창
 final mealSharerProvider = Provider<MealSharer>((ref) => const SystemMealSharer());
@@ -835,8 +870,10 @@ List<MealRecord> mealRecordsFromServer(List<ServerMeal> rows, {Map<String, Strin
   return next;
 }
 
-/// 지운 끼니의 공유용 사진(이 폰 7일 보관본)도 지운다
+/// 지운 끼니의 공유용 사진(이 폰 7일 보관본)과 서버 사본(메모리)도 지운다
 Future<void> forgetMealPhoto(Ref ref, String mealId) async {
+  // 서버 사본(메모리)은 잊기만 한다: 그 끼니 줄은 이미 목록에서 빠졌다(다시 읽게 invalidate 하면 지운 끼니를 또 묻는다)
+  ref.read(serverPhotoCacheProvider).forget(mealId);
   try {
     await ref.read(sharePhotoStoreProvider).remove(mealId);
   } catch (_) {}

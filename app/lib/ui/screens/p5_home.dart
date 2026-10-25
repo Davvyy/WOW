@@ -56,11 +56,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  /// 오늘 끼니의 보관 사진(이 폰, 서버 끼니 id 기준). 없으면 null → 아이콘 썸네일
-  Uint8List? _photoOf(MealRecord m) {
-    final id = m.serverId;
-    return id == null ? null : ref.watch(mealPhotoProvider(id)).value;
-  }
+  /// 끼니 사진(이 폰 보관본, 없으면 서버 사본). 없으면 null → 아이콘 썸네일
+  Uint8List? _photoOf(MealRecord m) => watchMealPhoto(ref, m);
 
   /// '오늘 기록' 목록에서 한 슬롯의 줄들. 기록이 없으면 빈 칸 한 줄(오늘은 '찍기'·간식은 '+ 추가'),
   /// 있으면 끼니마다 한 줄(오늘은 마지막 줄 끝에 '+'). 누르면 그 끼니의 P7(지난 날은 그 날짜의 P7).

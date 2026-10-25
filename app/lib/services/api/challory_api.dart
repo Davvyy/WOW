@@ -86,6 +86,11 @@ abstract class ChalloryApi {
   /// 서명 URL 로 이미지 PUT
   Future<void> uploadPhoto(PhotoUploadTicket ticket, Uint8List bytes);
 
+  /// 내 끼니 사진을 서버에서 받는다(Edge photo-url 의 300초 서명 다운로드 URL → GET).
+  /// 이 폰에 공유용 보관본이 없을 때(다시 설치·7일 지남·다른 폰) 쓴다.
+  /// 사진 없음·파기·남의 끼니(404)면 null. 연결 오류는 [ApiException].
+  Future<Uint8List?> fetchMealPhoto(String mealId);
+
   /// API #9 끼니 생성(서버 재검증 · 슬롯 태그 · 지연 업로드 규칙)
   /// [slot] 은 촬영 화면에서 고른 끼니: 그 슬롯으로 저장한다(D58). 없으면 서버 시각으로 슬롯을 정한다.
   Future<CreatedMeal> createMeal(String photoId, {required bool queued, required String idempotencyKey, MealSlot? slot});

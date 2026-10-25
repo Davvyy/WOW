@@ -61,7 +61,7 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
   /// 분석이 음식을 찾지 못함 → 검색으로 확정
   bool _searchFallback = false;
 
-  /// 이 폰에 보관된 사진(공유용 7일 보관본). 없으면 색 배경
+  /// 끼니 사진(이 폰의 공유용 7일 보관본, 없으면 서버 사본). 없으면 색 배경
   Uint8List? _photo;
 
   /// 사진 칸 비율([photoBoxAspect])
@@ -108,10 +108,9 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     _loadPhoto();
   }
 
+  /// 이 폰의 공유용 보관본, 없으면(사진이 있는 서버 끼니) 서버 사본(세션 메모리 캐시)
   Future<void> _loadPhoto() async {
-    final id = _origin.serverId;
-    if (id == null) return;
-    final bytes = await ref.read(sharePhotoStoreProvider).get(id);
+    final bytes = await readMealPhoto(ref, _origin);
     if (mounted && bytes != null) {
       setState(() {
         _photo = bytes;

@@ -103,6 +103,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _logout() async {
     await ref.read(pushControllerProvider).stop();
     await ref.read(sharePhotoStoreProvider).clear(); // 공유용 사진도 이 기기에서 지움
+    ref.read(serverPhotoCacheProvider).clear(); // 받아 둔 서버 사진(메모리)도
     await ref.read(authServiceProvider).signOut();
     if (mounted) context.go(R.p1);
   }
@@ -141,6 +142,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         await ref.read(apiProvider).deleteAccount('삭제');
         await ref.read(pushControllerProvider).stop(); // 기기 행은 서버가 지움, 저장해 둔 id 만 정리
         await ref.read(sharePhotoStoreProvider).clear();
+        ref.read(serverPhotoCacheProvider).clear();
         if (!mounted) return;
         showToast(context, '계정을 삭제했어요');
         context.go(R.p1);
