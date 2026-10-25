@@ -299,12 +299,14 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     final remote = ref.read(apiProvider).isRemote;
     final loaded = watchLedger(ref);
     if (loaded == null) return _loading(context);
-    final ledger = loaded;
+    // 서버 장부는 최신순으로 올 수 있다: 날짜 순(첫날 → 오늘)으로 맞춘다
+    final ledger = [...loaded]..sort((x, y) => x.d.compareTo(y.d));
     final cumulative = round1(ledger.where((x) => !x.check && !x.provisional).fold(0.0, (a, x) => a + x.s));
 
-    // 서버 모드: 선택한 날(없으면 오늘 잠정 행)을 서버 값 그대로 보여준다. 모의: 엔진으로 다시 계산(라이브 반영)
-    final dayRow = widget.day == null ? null : ledger.where((r) => r.d == widget.day).firstOrNull;
-    final pastRow = remote ? (dayRow ?? ledger.lastOrNull) : ((dayRow != null && !dayRow.provisional) ? dayRow : null);
+    // 서버 모드: 선택한 날(없으면 오늘 잠정 행)을 서버 값 그대로 보여준다. 오늘 행이 아직 없으면 오늘 계산.
+    // 모의: 엔진으로 다시 계산(라이브 반영). '오늘'은 목록 순서가 아니라 날짜(D+n)로 찾는다.
+    final dayRow = ledger.where((r) => r.d == (widget.day ?? curChallenge.dayIndex)).firstOrNull;
+    final pastRow = remote ? dayRow : ((dayRow != null && !dayRow.provisional) ? dayRow : null);
     final SimulateResult t = remote && pastRow != null
         ? resultFromLedgerRow(pastRow)
         : pastRow != null

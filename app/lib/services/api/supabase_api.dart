@@ -312,10 +312,10 @@ class SupabaseChalloryApi implements ChalloryApi {
       final start = DateTime.parse((me['challenges'] as Map)['start_date'] as String);
       final rows = await _client.from('daily_scores')
           .select('id, local_date, bmr, a_d, i_d, f_p, d_d, s_d, is_counted, is_final, finalized_at, under_review, breakdown')
-          .eq('participant_id', me['id']).order('local_date');
+          .eq('participant_id', me['id']).order('local_date', ascending: true); // 날짜 순(order 기본은 내림차순)
       final ids = [for (final r in rows) r['id'] as String];
       final revs = ids.isEmpty ? <Map<String, dynamic>>[] : await _client.from('score_revisions')
-          .select('daily_score_id, prev_s_d, new_s_d, reason, review_id, created_at').inFilter('daily_score_id', ids).order('created_at');
+          .select('daily_score_id, prev_s_d, new_s_d, reason, review_id, created_at').inFilter('daily_score_id', ids).order('created_at', ascending: true);
       final reviewIds = {for (final r in revs) if (r['review_id'] != null) r['review_id'] as String};
       final types = <String, String>{};
       if (reviewIds.isNotEmpty) {
@@ -383,7 +383,7 @@ class SupabaseChalloryApi implements ChalloryApi {
   Future<List<ServerMeal>> fetchMealsOn(String localDate) async {
     try {
       final rows = await _client.from('meals').select(_mealCols).eq('local_date', localDate).eq('counted', true)
-          .neq('status', 'void').order('captured_at');
+          .neq('status', 'void').order('captured_at', ascending: true);
       return [for (final r in rows) ServerMeal.fromJson(r)];
     } catch (e) {
       throw ApiException(0, e.toString());
