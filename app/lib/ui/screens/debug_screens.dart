@@ -89,8 +89,8 @@ class DebugScreenList extends ConsumerWidget {
           scenario('Galaxy 9,000', () => act.set(mockTodayActivity)),
           scenario('iPhone 변형', () => act.set(mockTodayActivityIos)),
           scenario('걸음 0', () => act.set(const TodayActivity(stepsTotal: 0))),
-          scenario('걸음 26,000(검토)', () => act.set(const TodayActivity(stepsTotal: reviewStepsCase))),
-          scenario('수동 출처(Android)', () => act.set(const TodayActivity(stepsTotal: 9000, hasManualSource: true))),
+          scenario('걸음 26,000(검토)', () => act.set(const TodayActivity(stepsTotal: reviewStepsCase, source: '삼성헬스', syncTime: '21:10'))),
+          scenario('수동 출처(Android)', () => act.set(const TodayActivity(stepsTotal: 9000, hasManualSource: true, source: '삼성헬스', syncTime: '21:10'))),
         ]),
         const SectionTitle('챌린지 생명주기'),
         Wrap(spacing: 8, runSpacing: 8, children: [

@@ -25,8 +25,9 @@ class _Health implements HealthSource {
   _Health({this.days = const [], this.error});
   List<HealthDay> days;
   Object? error;
+  String label = 'Health Connect';
   @override
-  String get platformLabel => 'Health Connect';
+  String get platformLabel => label;
   @override
   Future<HealthAvailability> availability() async => HealthAvailability.ready;
   @override
@@ -91,6 +92,33 @@ void main() {
     h.error = StateError('권한 철회');
     expect(await c.read(activityProvider.notifier).refresh(), isFalse);
     _expectEmpty(c.read(activityProvider));
+  });
+
+  group('출처 이름(D77): 안드로이드를 모두 삼성헬스로 부르지 않는다', () {
+    Future<String> sourceOf(List<HealthOrigin> sources, {String platform = 'Health Connect'}) async {
+      final h = _Health(days: [HealthDay(localDate: '2026-10-13', stepsTotal: 5000, sources: sources)])..label = platform;
+      final c = remote(health: h);
+      await c.read(activityProvider.notifier).refresh();
+      return c.read(activityProvider).source;
+    }
+
+    HealthOrigin o(String origin, int? steps, [RecordMethod m = RecordMethod.automatic]) => HealthOrigin(origin: origin, method: m, steps: steps);
+
+    test('걸음이 가장 많은 출처의 앱 이름', () async {
+      expect(await sourceOf([o('com.sec.android.app.shealth', 4000)]), '삼성헬스');
+      expect(await sourceOf([o('com.android.healthconnect.phone.a1', 300), o('com.google.android.apps.fitness', 4700)]), 'Google 피트니스');
+      expect(await sourceOf([o('com.android.healthconnect.phone.a1', 5000)]), '휴대폰 센서');
+    });
+
+    test('모르는 출처·출처 없음은 플랫폼 이름', () async {
+      expect(await sourceOf([o('com.example.stepper', 5000)]), 'Health Connect');
+      expect(await sourceOf(const []), 'Health Connect');
+      expect(await sourceOf(const [], platform: 'Apple 건강'), 'Apple 건강');
+    });
+
+    test('수동 입력 출처는 이름으로 쓰지 않는다', () async {
+      expect(await sourceOf([o('manual', 9000, RecordMethod.manual), o('com.sec.android.app.shealth', 1000)]), '삼성헬스');
+    });
   });
 
   test('로그아웃하면 걸음을 비운다(다른 계정에 남지 않게)', () async {

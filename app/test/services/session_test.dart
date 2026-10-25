@@ -97,5 +97,17 @@ void main() {
     expect(sourceDisplayName('com.sec.android.app.shealth'), '삼성헬스');
     expect(sourceDisplayName('com.google.android.apps.healthdata'), 'Health Connect');
     expect(sourceDisplayName('com.example.stepper'), 'com.example.stepper');
+    expect(sourceDisplayName('com.google.android.apps.fitness'), 'Google 피트니스');
+  });
+
+  test('화면용 출처 이름: 아는 앱이면 앱 이름, 모르거나 없으면 플랫폼 이름(D77)', () {
+    expect(sourceLabelFor('com.sec.android.app.shealth', platform: 'Health Connect'), '삼성헬스');
+    expect(sourceLabelFor('com.google.android.apps.fitness', platform: 'Health Connect'), 'Google 피트니스');
+    expect(sourceLabelFor('com.android.healthconnect.phone.a1', platform: 'Health Connect'), '휴대폰 센서');
+    expect(sourceLabelFor('com.garmin.android.apps.connectmobile', platform: 'Health Connect'), 'Garmin');
+    expect(sourceLabelFor('com.apple.health.8F2A', platform: 'Apple 건강'), 'Apple 건강');
+    expect(sourceLabelFor('com.example.stepper', platform: 'Health Connect'), 'Health Connect');
+    expect(sourceLabelFor(null, platform: 'Apple 건강'), 'Apple 건강');
+    expect(sourceLabelFor('manual', platform: 'Health Connect'), 'Health Connect', reason: '수동 입력은 출처 앱이 아님');
   });
 }

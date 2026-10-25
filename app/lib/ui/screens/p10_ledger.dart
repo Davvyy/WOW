@@ -198,7 +198,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               maxLines: 6,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                hintText: '예: 북한산 등산을 다녀왔어요. 삼성헬스 운동 기록 캡처를 함께 보냅니다.',
+                hintText: '예: 북한산 등산을 다녀왔어요. 운동 기록 화면 캡처를 함께 보냅니다.',
                 filled: true,
                 fillColor: c.bg,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -250,7 +250,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           maxLines: 6,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: '예: 북한산 등산을 다녀왔어요. 삼성헬스 운동 기록 캡처를 함께 보냅니다.',
+            hintText: '예: 북한산 등산을 다녀왔어요. 운동 기록 화면 캡처를 함께 보냅니다.',
             filled: true,
             fillColor: c.bg,
             counterText: '${_appeal.text.length} / 500',

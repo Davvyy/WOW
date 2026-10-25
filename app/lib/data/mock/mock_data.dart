@@ -133,8 +133,8 @@ class TodayActivity {
     this.sessions = const [],
     this.platformActiveKcal,
     this.hasManualSource = false,
-    this.source = '삼성헬스',
-    this.syncTime = '21:10',
+    this.source = '',
+    this.syncTime = '',
   });
   final int stepsTotal;
   final int? stepsRecorded;
@@ -147,11 +147,12 @@ class TodayActivity {
   final String syncTime;
 }
 
-const mockTodayActivity = TodayActivity(stepsTotal: 9000, stepsRecorded: 9000);
+/// 출처·동기화 시각은 값을 준 경우만(기본은 비어 있음 = 아직 못 읽음). 프로토타입 활동은 삼성헬스 · 21:10.
+const mockTodayActivity = TodayActivity(stepsTotal: 9000, stepsRecorded: 9000, source: '삼성헬스', syncTime: '21:10');
 
 /// 오늘 걸음을 아직 못 읽음(서버 모드 시작값 · 읽기 오류 · 로그아웃 뒤). 출처·동기화 시각은 비워 둔다.
 const noTodayActivity = TodayActivity(stepsTotal: 0, source: '', syncTime: '');
-const mockTodayActivityIos = TodayActivity(stepsTotal: 9000, stepsRecorded: 9340, stepsManual: 340, platformActiveKcal: 310, source: 'Apple 건강');
+const mockTodayActivityIos = TodayActivity(stepsTotal: 9000, stepsRecorded: 9340, stepsManual: 340, platformActiveKcal: 310, source: 'Apple 건강', syncTime: '21:10');
 const reviewStepsCase = 26000;
 
 // ---------- 워치 예시 참가자 ----------

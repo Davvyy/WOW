@@ -428,7 +428,7 @@ class ActivityNotifier extends Notifier<TodayActivity> {
       ],
       platformActiveKcal: d.platformActiveKcal,
       hasManualSource: d.hasManualSource,
-      source: src.platformLabel == 'Apple 건강' ? 'Apple 건강' : '삼성헬스',
+      source: todaySourceLabel(d, platform: src.platformLabel),
       syncTime: '${two(wall.hour)}:${two(wall.minute)}',
     );
     return synced;
@@ -436,6 +436,16 @@ class ActivityNotifier extends Notifier<TodayActivity> {
 }
 
 final activityProvider = NotifierProvider<ActivityNotifier, TodayActivity>(ActivityNotifier.new);
+
+/// 오늘 걸음의 출처 이름(D77): 수동 입력이 아닌 출처 중 걸음이 가장 많은 것의 앱 이름, 모르면 플랫폼 이름
+String todaySourceLabel(HealthDay d, {required String platform}) {
+  HealthOrigin? best;
+  for (final o in d.sources) {
+    if (o.method == RecordMethod.manual || o.origin == 'manual') continue;
+    if (best == null || (o.steps ?? 0) > (best.steps ?? 0)) best = o;
+  }
+  return sourceLabelFor(best?.origin, platform: platform);
+}
 
 // ---------- 끼니 ----------
 /// 이번 주(오늘 전 날짜) 인정된 건너뜀 수. 오늘 건너뜀은 오늘 끼니 목록으로 따로 센다.

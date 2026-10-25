@@ -209,7 +209,10 @@ ChallengeSession sessionFromSummary(Map<String, dynamic> j, {String platformLabe
       today: DateTime(now.year, now.month, now.day),
       dayIndex: dayIndex,
       syncTime: synced == null ? '—' : '${two(synced.hour)}:${two(synced.minute)}',
-      source: _sourceLabel(p['last_sync_source'] as String?),
+      source: switch (p['last_sync_source'] as String?) {
+        null => '—',
+        final o => sourceLabelFor(o, platform: platformLabel),
+      },
       platform: platformLabel,
       noticeTitle: (notice?['title'] as String?) ?? '',
       noticeBody: (notice?['body'] as String?) ?? '',
@@ -247,17 +250,6 @@ ChallengeSession sessionFromSummary(Map<String, dynamic> j, {String platformLabe
     rankEligible: p['rank_eligible'] as bool? ?? true,
   );
 }
-
-/// 출처(dataOrigin/HKSource) → 화면 이름
-String _sourceLabel(String? origin) => switch (origin) {
-      null => '—',
-      'com.sec.android.app.shealth' => '삼성헬스',
-      'com.apple.health' || 'com.apple.health.watch' => 'Apple 건강',
-      'com.google.android.apps.healthdata' || 'android' => 'Health Connect',
-      'com.garmin.android.apps.connectmobile' => 'Garmin',
-      'com.fitbit.FitbitMobile' => 'Fitbit',
-      _ => origin,
-    };
 
 /// notifications 행(N-03) → 공지
 Notice noticeFromServer(Map<String, dynamic> r) => Notice(

@@ -465,14 +465,31 @@ class MyReview {
   bool get decided => status == 'decided';
 }
 
-/// 걸음 출처 패키지명 → 화면 이름. 휴대폰 자체 센서는 Health Connect 가 기기값을 붙여 'com.android.healthconnect.phone.<기기값>'.
-String sourceDisplayName(String origin) => switch (origin) {
+/// 아는 걸음 출처 패키지명(dataOrigin · HealthKit 출처) → 앱 이름. 모르면 null.
+/// 휴대폰 자체 센서는 Health Connect 가 기기값을 붙여 'com.android.healthconnect.phone.<기기값>'(D72),
+/// iPhone·Apple Watch 는 'com.apple.health.<기기 UUID>'.
+String? knownSourceName(String origin) => switch (origin) {
       _ when origin.startsWith('com.android.healthconnect.phone.') => '휴대폰 센서',
+      _ when origin == 'com.apple.health' || origin.startsWith('com.apple.health.') => 'Apple 건강',
       'com.sec.android.app.shealth' => '삼성헬스',
-      'com.google.android.apps.healthdata' => 'Health Connect',
-      'manual' => '수동 입력',
-      _ => origin,
+      'com.google.android.apps.fitness' => 'Google 피트니스',
+      'com.google.android.apps.healthdata' || 'android' => 'Health Connect',
+      'com.garmin.android.apps.connectmobile' => 'Garmin',
+      'com.fitbit.FitbitMobile' => 'Fitbit',
+      'com.xiaomi.wearable' => 'Mi Fitness',
+      'com.huami.watch.hmwatchmanager' => 'Zepp',
+      _ => null,
     };
+
+/// 검토 상세용 출처 이름: 아는 앱 이름, 수동 입력, 아니면 패키지명 그대로(운영자 확인용)
+String sourceDisplayName(String origin) => origin == 'manual' ? '수동 입력' : (knownSourceName(origin) ?? origin);
+
+/// 화면용 출처 이름(D77): 아는 앱이면 앱 이름, 모르거나 없으면 플랫폼 이름(Health Connect · Apple 건강).
+/// 안드로이드라고 삼성헬스로 부르지 않는다.
+String sourceLabelFor(String? origin, {required String platform}) => origin == null ? platform : (knownSourceName(origin) ?? platform);
+
+/// 삼성헬스에서 온 걸음인지(갤럭시 전용 안내를 보일지)
+bool isSamsungSource(String label) => label == '삼성헬스';
 
 /// 미확인 출처 검토의 상세 한 줄: '휴대폰 센서 · 09:12–21:40 · 3,200보'(KST). 시각·걸음이 없으면 출처 이름만.
 /// 미확인 출처 검토가 아니거나 출처를 모르면 null.
