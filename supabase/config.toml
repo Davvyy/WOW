@@ -434,6 +434,12 @@ import_map = "./functions/deno.json"
 entrypoint = "./functions/photo-upload-url/index.ts"
 
 # 참가자 JWT
+[functions.photo-url]
+verify_jwt = true
+import_map = "./functions/deno.json"
+entrypoint = "./functions/photo-url/index.ts"
+
+# 참가자 JWT
 [functions.meals]
 verify_jwt = true
 import_map = "./functions/deno.json"

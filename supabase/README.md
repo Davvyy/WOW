@@ -21,7 +21,7 @@ supabase/
 │   └── 20261001001500_create_challenge.sql  새 챌린지(RPC create_challenge: 운영자만 · 기간 7~30일 · 정원 30~100명 · 초안 + 기본 규칙 행)
 ├── functions/                           Edge Functions(Deno)
 │   ├── _shared/                         AI 어댑터(Gemini·Claude·모의) · 분석 파이프라인 · 멱등성 · 배치 검증 · 푸시 · CSV
-│   ├── photo-upload-url/  meals/  meal-manual/  meal-confirm/  meal-delete/  meal-skip/  analyze-meal/  sync-activity/  reports/  account/
+│   ├── photo-upload-url/  photo-url/  meals/  meal-manual/  meal-confirm/  meal-delete/  meal-skip/  analyze-meal/  sync-activity/  reports/  account/
 │   ├── verdict/  notify/  announce/  export/  purge-photos/  purge-due/
 │   └── deno.json                        deno task check / deno task test
 ├── seed/generate_seed.mjs               seed.sql 생성기(프로토타입 예시 → 원천 값만)
@@ -75,7 +75,7 @@ deno task test    # 단위 테스트(모의 어댑터, 네트워크·키 불필�
 supabase link --project-ref <ref>
 supabase db push                      # migrations/ 적용
 supabase db query --linked -f supabase/seed.sql   # (선택) 프로토타입 예시 데이터(psql 없이 Management API 로). psql 이 있으면 psql "$DATABASE_URL" -f 도 같음
-supabase functions deploy --use-api photo-upload-url meals meal-manual meal-confirm meal-delete meal-skip analyze-meal sync-activity reports account \
+supabase functions deploy --use-api photo-upload-url photo-url meals meal-manual meal-confirm meal-delete meal-skip analyze-meal sync-activity reports account \
   verdict notify announce export purge-photos purge-due   # --use-api: Docker 없이 서버에서 번들
 supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
   AI_ENGINE=gemini VERTEX_PROJECT=... VERTEX_LOCATION=asia-northeast3 VERTEX_ACCESS_TOKEN=...   # 또는 GEMINI_API_KEY
@@ -126,6 +126,7 @@ supabase secrets set INTERNAL_SECRET=... CRON_SECRET=... \
                                      → 국외 AI 동의자만 analyze-meal 백그라운드 호출, 즉시 201 반환
  4. analyze-meal → 초안(draft) + N-04  →  5. POST meal-confirm (If-Match: version)
 사진 없이: POST meal-manual {slot, items}  (하루 3건 이상 manual_input_burst)
+다시 보기: POST photo-url {meal_id}  → 내 끼니 사진의 서명 다운로드 URL(300초). 남의 끼니·사진 없음·파기(purged_at)는 404
 ```
 
 지연 업로드(queued=true, 단말 촬영 시각 기준): 30분 이내 → 서버 시각 / 단말 날짜가 이미 확정 → 끼니 미인정(사진·해시만) / 30분~12시간 → 단말 시각 + late_upload / 12시간 초과 → 서버 시각 + late_upload.
