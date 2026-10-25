@@ -1,7 +1,7 @@
 name: challory
 description: "챌로리(Challory) 참가자 앱 — 다이어트 챌린지"
 publish_to: 'none'
-version: 1.0.11+12
+version: 1.0.12+13
 
 environment:
   sdk: ^3.13.4
