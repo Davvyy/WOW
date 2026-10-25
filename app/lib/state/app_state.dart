@@ -357,25 +357,52 @@ final phaseProvider = NotifierProvider<PhaseNotifier, ChallengePhase>(PhaseNotif
 
 // ---------- 활동 ----------
 class ActivityNotifier extends Notifier<TodayActivity> {
+  /// 지금 값이 누구의 걸음인지(로그인 사용자). 바뀌면 비운다.
+  String? _userId;
+
+  /// 서버 모드는 '아직 못 읽음'으로 시작한다(프로토타입 9,000보를 보이거나 점수에 쓰지 않게). 모의 모드는 프로토타입 활동.
+  TodayActivity get _startValue => ref.read(apiProvider).isRemote ? noTodayActivity : mockTodayActivity;
+
   @override
-  TodayActivity build() => mockTodayActivity;
+  TodayActivity build() {
+    _userId = ref.read(authServiceProvider).userId;
+    // 로그아웃·계정 전환: 이전 계정의 걸음을 남기지 않는다
+    ref.listen(authChangesProvider, (_, _) {
+      final uid = ref.read(authServiceProvider).userId;
+      if (uid == _userId) return;
+      _userId = uid;
+      state = _startValue;
+    });
+    return _startValue;
+  }
 
   void set(TodayActivity a) => state = a;
 
   /// 3일 재조회(앱 실행·포그라운드 복귀·당겨서 새로고침·N-02 동기화 리마인드). 모의 원천은 덮어쓰지 않는다.
-  /// 서버에 올렸으면 true.
+  /// 서버에 올렸으면 true. 못 읽으면(권한 없음·Health Connect 없음·읽은 날 없음) 서버 모드는 '못 읽음'으로 둔다
+  /// (어제 읽은 값이 오늘 걸음으로 남지 않게).
   Future<bool> refresh() async {
     final src = ref.read(healthSourceProvider);
     if (src is MockHealthSource) return false;
-    final days = await src.fetchDays();
-    if (!ref.mounted || days.isEmpty) return false;
+    final who = _userId;
+    List<HealthDay> days;
+    try {
+      days = await src.fetchDays();
+    } catch (_) {
+      days = const [];
+    }
+    if (!ref.mounted || who != _userId) return false; // 그새 로그아웃·계정 전환
+    if (days.isEmpty) {
+      if (ref.read(apiProvider).isRemote) state = noTodayActivity;
+      return false;
+    }
     // 서버 업로드(05 API #6): 보내지 못해도 화면 값은 갱신하고 다음 새로고침 때 다시 보낸다
     var synced = false;
     try {
       await ref.read(apiProvider).syncActivity(buildSyncBatch(days));
       synced = true;
     } on ApiException catch (_) {}
-    if (!ref.mounted) return synced;
+    if (!ref.mounted || who != _userId) return synced;
     final d = days.first;
     final wall = toKstWall(DateTime.now());
     String two(int n) => n.toString().padLeft(2, '0');

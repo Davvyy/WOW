@@ -306,7 +306,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ]);
     } else {
       // 출처 이름은 활동 탭에서
-      statusChip = ChChip('잠정 점수 · ${act.syncTime} 동기화', icon: Icons.schedule_rounded);
+      // 걸음을 아직 못 읽었으면 동기화 시각 없이
+      statusChip = ChChip(act.syncTime.isEmpty ? '잠정 점수' : '잠정 점수 · ${act.syncTime} 동기화', icon: Icons.schedule_rounded);
     }
 
     // 7칸 창: 고른 날이 5번째 칸에 오되, 오늘(마지막 날을 넘지 않게)에서 끝난다 — 고를 수 없는 미래 칸은 넣지 않는다

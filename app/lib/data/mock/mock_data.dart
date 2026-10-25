@@ -148,6 +148,9 @@ class TodayActivity {
 }
 
 const mockTodayActivity = TodayActivity(stepsTotal: 9000, stepsRecorded: 9000);
+
+/// 오늘 걸음을 아직 못 읽음(서버 모드 시작값 · 읽기 오류 · 로그아웃 뒤). 출처·동기화 시각은 비워 둔다.
+const noTodayActivity = TodayActivity(stepsTotal: 0, source: '', syncTime: '');
 const mockTodayActivityIos = TodayActivity(stepsTotal: 9000, stepsRecorded: 9340, stepsManual: 340, platformActiveKcal: 310, source: 'Apple 건강');
 const reviewStepsCase = 26000;
 
