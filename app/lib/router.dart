@@ -32,6 +32,9 @@ class R {
   static const p2 = '/p2';
   static const p3 = '/p3';
   static const p4 = '/p4';
+
+  /// 앱 안(설정 연결 줄·활동 탭 연결 진단)에서 여는 건강 연결 화면: 온보딩 버튼 대신 권한 다시 확인·돌아가기
+  static String p4Check({required bool ok}) => '$p4?state=${ok ? 'ok' : 'zero'}&from=app';
   static const home = '/home';
   static const rank = '/rank';
   static const activity = '/activity';
@@ -76,7 +79,7 @@ GoRouter buildRouter({String initialLocation = R.p1, AuthService? auth}) {
       GoRoute(path: R.p1, builder: (_, _) => const StartScreen()),
       GoRoute(path: R.p2, builder: (_, _) => const ProfileScreen()),
       GoRoute(path: R.p3, builder: (_, _) => const ConsentScreen()),
-      GoRoute(path: R.p4, builder: (_, s) => HealthConnectScreen(initialState: s.uri.queryParameters['state'])),
+      GoRoute(path: R.p4, builder: (_, s) => HealthConnectScreen(initialState: s.uri.queryParameters['state'], inApp: s.uri.queryParameters['from'] == 'app')),
       // 프로토타입 화면 번호 별칭
       GoRoute(path: '/p5', redirect: (_, _) => R.home),
       GoRoute(path: '/p8', redirect: (_, _) => R.activity),

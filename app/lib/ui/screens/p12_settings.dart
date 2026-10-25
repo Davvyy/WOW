@@ -210,10 +210,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SectionTitle('연결'),
             // 오늘 걸음을 아직 못 읽었으면(동기화 시각 없음) 읽은 것처럼 보이지 않게 연결 확인 줄로
             if (_connected && act.syncTime.isNotEmpty)
-              li(Icons.sync_rounded, '${act.source} · ${act.syncTime} 동기화', sub: '오늘 ${fmtInt(act.stepsTotal)}걸음 ✓ · ${ch.platform}', onTap: () => context.push('${R.p4}?state=ok'))
+              li(Icons.sync_rounded, '${act.source} · ${act.syncTime} 동기화', sub: '오늘 ${fmtInt(act.stepsTotal)}걸음 ✓ · ${ch.platform}', onTap: () => context.push(R.p4Check(ok: true)))
             else
+              // 마지막 동기화는 이 기기에서 실제로 읽은 시각만(없으면 '못 읽었어요'만)
               li(Icons.sync_problem_rounded, act.source.isEmpty ? '${ch.platform} · 걸음 미확인' : '${act.source} · 연결 끊김',
-                  sub: act.syncTime.isEmpty ? '오늘 걸음을 못 읽었어요' : '마지막 동기화 10.12 22:40 · 오늘 걸음을 못 읽었어요', trailing: const Row(mainAxisSize: MainAxisSize.min, children: [ChChip('연결 확인', tone: Tone.critical), Icon(Icons.chevron_right_rounded)]), onTap: () => context.push('${R.p4}?state=zero')),
+                  sub: act.syncTime.isEmpty ? '오늘 걸음을 못 읽었어요' : '마지막 동기화 ${act.syncTime} · 오늘 걸음을 못 읽었어요', trailing: const Row(mainAxisSize: MainAxisSize.min, children: [ChChip('연결 확인', tone: Tone.critical), Icon(Icons.chevron_right_rounded)]), onTap: () => context.push(R.p4Check(ok: false))),
           ]),
         ),
         ChCard(

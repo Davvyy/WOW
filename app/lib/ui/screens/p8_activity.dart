@@ -34,6 +34,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     final weightKg = curMe.weightKg;
     final steps = act.stepsTotal;
     final src = act.source;
+    // 삼성헬스 출처(이 기기에서 읽은 오늘 출처 또는 서버의 마지막 동기화 출처)일 때만 갤럭시 안내
+    final samsung = isSamsungSource(src) || isSamsungSource(ch.source);
+    final iosPlatform = ch.platform == 'Apple 건강';
     final ios = act.stepsManual > 0;
     final manualSource = act.hasManualSource && !ios;
     final zero = steps == 0;
@@ -59,11 +62,20 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
             const Row(children: [Expanded(child: Txt.title('걸음')), ChChip('0', tone: Tone.critical)]),
             const Txt('걸음이 0이에요', weight: FontWeight.w600),
-            const Txt.cap('1. 삼성헬스 → 설정 → Health Connect 동기화 켜기\n2. Health Connect 권한에서 챌로리 "걸음" 허용\n3. 챌로리를 다시 열거나 당겨서 새로고침', color: null),
+            // 갤럭시 전용 안내는 삼성헬스 출처일 때만, iPhone 은 건강 앱 권한, 그 외 안드로이드는 일반 안내(D77)
+            Txt.cap(
+                samsung
+                    ? '1. 삼성헬스 → 설정 → Health Connect 동기화 켜기\n2. Health Connect 권한에서 챌로리 "걸음" 허용\n3. 챌로리를 다시 열거나 당겨서 새로고침'
+                    : iosPlatform
+                    ? '1. 설정 → 건강 → 데이터 접근 및 기기 → 챌로리\n2. "걸음" 읽기 허용\n3. 챌로리를 다시 열거나 당겨서 새로고침'
+                    : '1. 걸음을 기록하는 앱에서 Health Connect 로 보내기 켜기\n2. Health Connect 권한에서 챌로리 "걸음" 허용\n3. 챌로리를 다시 열거나 당겨서 새로고침',
+                color: null),
             Row(children: [
-              ChButton('삼성헬스 열기', small: true, kind: BtnKind.quiet, onPressed: () => showToast(context, '삼성헬스 앱에서 동기화를 켜 주세요')),
-              const SizedBox(width: 8),
-              ChButton('연결 진단', small: true, kind: BtnKind.quiet, onPressed: () => context.push('${R.p4}?state=zero')),
+              if (samsung) ...[
+                ChButton('삼성헬스 열기', small: true, kind: BtnKind.quiet, onPressed: () => showToast(context, '삼성헬스 앱에서 동기화를 켜 주세요')),
+                const SizedBox(width: 8),
+              ],
+              ChButton('연결 진단', small: true, kind: BtnKind.quiet, onPressed: () => context.push(R.p4Check(ok: false))),
             ]),
           ], gap: 8)),
         );
