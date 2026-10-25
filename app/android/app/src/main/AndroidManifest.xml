@@ -4,14 +4,13 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
-    <!-- Health Connect 읽기 전용 권한(P4 교육 카드 5항목 + 체중은 P12 최초 탭 시 요청) -->
+    <!-- Health Connect 읽기 전용 권한(P4 교육 카드 5항목 + 백그라운드 읽기). 체중은 읽지 않는다(D76) -->
     <uses-permission android:name="android.permission.health.READ_STEPS"/>
     <uses-permission android:name="android.permission.health.READ_DISTANCE"/>
     <uses-permission android:name="android.permission.health.READ_FLOORS_CLIMBED"/>
     <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
     <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED"/>
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"/>
-    <uses-permission android:name="android.permission.health.READ_WEIGHT"/>
 
     <application
         android:label="챌로리"

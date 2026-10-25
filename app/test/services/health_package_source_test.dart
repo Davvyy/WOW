@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:challory/services/health/health_models.dart';
 import 'package:challory/services/health/health_package_source.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +12,22 @@ class _FakeHealth implements Health {
 
   final int aggregate;
   final List<HealthDataPoint> records;
+
+  /// 권한 요청·확인과 기록 읽기에 들어온 항목 전부
+  final requested = <HealthDataType>[];
+  final read = <HealthDataType>[];
+
+  @override
+  Future<bool> requestAuthorization(List<HealthDataType> types, {List<HealthDataAccess>? permissions}) async {
+    requested.addAll(types);
+    return true;
+  }
+
+  @override
+  Future<bool?> hasPermissions(List<HealthDataType> types, {List<HealthDataAccess>? permissions}) async {
+    requested.addAll(types);
+    return true;
+  }
 
   int get rawExcludingManual => records
       .where((p) => p.type == HealthDataType.STEPS && p.recordingMethod != RecordingMethod.manual)
@@ -29,11 +47,13 @@ class _FakeHealth implements Health {
     required DateTime startTime,
     required DateTime endTime,
     List<RecordingMethod> recordingMethodsToFilter = const [],
-  }) async =>
-      [
+  }) async {
+    read.addAll(types);
+    return [
         for (final p in records)
           if (types.contains(p.type) && !recordingMethodsToFilter.contains(p.recordingMethod)) p,
       ];
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -161,5 +181,47 @@ void main() {
 
   test('HealthOrigin: 걸음·시각이 없으면 origin·method 만', () {
     expect(const HealthOrigin(origin: 'x', method: RecordMethod.automatic).toJson(), {'origin': 'x', 'method': 'AUTOMATICALLY_RECORDED'});
+  });
+
+  group('읽는 항목은 P4 교육 카드 5개뿐(체중 없음)', () {
+    const five = {
+      HealthDataType.STEPS,
+      HealthDataType.DISTANCE_DELTA,
+      HealthDataType.FLIGHTS_CLIMBED,
+      HealthDataType.WORKOUT,
+      HealthDataType.ACTIVE_ENERGY_BURNED,
+    };
+
+    for (final android in [true, false]) {
+      test('${android ? 'Android' : 'iOS'}: 권한 확인·요청·읽기에 체중이 없다', () async {
+        final health = _FakeHealth(aggregate: 0, records: const []);
+        final src = HealthPackageSource(health: health, isAndroid: android);
+        await src.permissionStatus();
+        await src.requestPermissions();
+        await src.fetchDays(now: now);
+        expect(health.requested.toSet(), five);
+        expect(health.read, isNot(contains(HealthDataType.WEIGHT)));
+        expect(five, containsAll(health.read.toSet()));
+      });
+    }
+
+    test('AndroidManifest: 체중(READ_WEIGHT) 권한이 없고 읽기 권한은 5항목 + 백그라운드', () {
+      final xml = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+      final perms = RegExp(r'android\.permission\.health\.(\w+)').allMatches(xml).map((m) => m.group(1)).toSet();
+      expect(perms, {
+        'READ_STEPS',
+        'READ_DISTANCE',
+        'READ_FLOORS_CLIMBED',
+        'READ_EXERCISE',
+        'READ_ACTIVE_CALORIES_BURNED',
+        'READ_HEALTH_DATA_IN_BACKGROUND',
+      });
+    });
+
+    test('iOS 권한 안내 문구는 5항목만 말한다(체중 없음)', () {
+      final plist = File('ios/Runner/Info.plist').readAsStringSync();
+      expect(plist, isNot(contains('체중')));
+      expect(plist, contains('걸음·거리·층수·운동 세션·활동 칼로리(참고)'));
+    });
   });
 }

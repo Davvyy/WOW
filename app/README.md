@@ -103,9 +103,9 @@ lib/
 
 ### Android
 - `MainActivity`는 `FlutterFragmentActivity`(Android 14 Health Connect 권한 화면 필요), `minSdk 26`.
-- 권한: `READ_STEPS`, `READ_DISTANCE`, `READ_FLOORS_CLIMBED`, `READ_EXERCISE`, `READ_ACTIVE_CALORIES_BURNED`, `READ_HEALTH_DATA_IN_BACKGROUND`, `READ_WEIGHT`, `CAMERA`, `INTERNET`.
+- 권한: `READ_STEPS`, `READ_DISTANCE`, `READ_FLOORS_CLIMBED`, `READ_EXERCISE`, `READ_ACTIVE_CALORIES_BURNED`, `READ_HEALTH_DATA_IN_BACKGROUND`, `CAMERA`, `INTERNET`.
 - Health Connect 권한 사용 목적 화면: `ACTION_SHOW_PERMISSIONS_RATIONALE` intent-filter(Android 13 이하)와 `ViewPermissionUsageActivity` activity-alias(Android 14+). 스토어 제출 시 해당 화면이 개인정보 처리방침을 보여 주도록 연결해야 합니다.
-- 체중(`READ_WEIGHT`)은 P12 "건강 앱에서 읽기"를 처음 누를 때 따로 요청합니다.
+- 체중은 읽지 않습니다(`READ_WEIGHT` 없음, iOS bodyMass 읽기 없음). 설정의 체중 기록 카드는 저장 기능이 없어 숨겼습니다(D76).
 
 ### iOS
 - `Info.plist`: `NSHealthShareUsageDescription`(읽기 전용 설명), `NSHealthUpdateUsageDescription`(쓰지 않음을 명시), `NSCameraUsageDescription`(한국어).

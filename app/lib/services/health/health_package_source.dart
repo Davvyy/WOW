@@ -35,11 +35,8 @@ class HealthPackageSource implements HealthSource {
     HealthDataType.ACTIVE_ENERGY_BURNED,
   ];
 
-  /// 모든 항목 읽기 전용(권한 시트 항목 = P4 교육 카드 5개)
+  /// 모든 항목 읽기 전용(권한 시트 항목 = P4 교육 카드 5개). 체중(bodyMass/WeightRecord)은 읽지 않는다.
   static final _access = List<HealthDataAccess>.filled(_types.length, HealthDataAccess.READ);
-
-  /// 체중은 P12 "건강 앱에서 읽기" 최초 탭 시점에 별도 요청한다. 체중 기록 카드를 숨긴 동안(D76)은 부르는 곳이 없다.
-  static const weightType = HealthDataType.WEIGHT;
 
   @override
   String get platformLabel => _isAndroid ? 'Health Connect' : 'Apple 건강';
@@ -74,25 +71,6 @@ class HealthPackageSource implements HealthSource {
     await _ensureConfigured();
     final granted = await _health.requestAuthorization(_types, permissions: _access);
     return granted ? PermissionResult.granted : PermissionResult.denied;
-  }
-
-  /// P12 "건강 앱에서 읽기": 체중(bodyMass / WeightRecord) 별도 권한 후 최근 값 1건. 참고용·BMR 미반영.
-  /// 체중 기록 카드(D76)를 저장 기능과 함께 되살릴 때 쓴다. 지금은 부르는 곳이 없다.
-  Future<double?> readLatestWeightKg({DateTime? now}) async {
-    await _ensureConfigured();
-    final ok = await _health.requestAuthorization([weightType], permissions: [HealthDataAccess.READ]);
-    if (!ok) return null;
-    final end = now ?? DateTime.now();
-    final pts = await _health.getHealthDataFromTypes(
-      types: [weightType],
-      startTime: end.subtract(const Duration(days: 14)),
-      endTime: end,
-      recordingMethodsToFilter: const [],
-    );
-    if (pts.isEmpty) return null;
-    pts.sort((a, b) => b.dateTo.compareTo(a.dateTo));
-    final v = pts.first.value;
-    return v is NumericHealthValue ? v.numericValue.toDouble() : null;
   }
 
   @override
