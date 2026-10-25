@@ -33,6 +33,14 @@ Map<String, dynamic> mealItemToWire(MealItem it) {
   };
 }
 
+/// 이름이 밥 한 그릇(공기)인 음식인지: '밥'으로 끝나되 초밥·김밥·주먹밥(조각·줄·개로 먹는 밥, D73)은 아니다.
+/// 밥이면 먹은 양을 '공기'로, 아니면 '인분'으로 보인다(kcal 계산은 같다).
+bool isRiceBowlName(String name) {
+  final n = name.trim();
+  if (!n.endsWith('밥')) return false;
+  return !(n.endsWith('초밥') || n.endsWith('김밥') || n.endsWith('주먹밥'));
+}
+
 /// 서버 초안 항목 → P7 편집 항목. 개수와 배수를 모두 살려 서버와 같은 kcal 로 연다.
 MealItem mealItemFromServer(ServerMealItem s, int index) {
   final name = s.candidates[s.chosen];
@@ -45,7 +53,7 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
       : null;
   final unit = base?.withPieces(base.piecesOf(serving, saved: s.pieces));
   final split = unit?.pieces != null;
-  final riceOrSoup = s.hasBroth || (product == null && name.endsWith('밥'));
+  final riceOrSoup = s.hasBroth || (product == null && isRiceBowlName(name));
   // 밥·국이 개수 2 이상이면 개수를 먹은 양 배수로 접는다(2 × 1.5 → 3.0공기).
   // 3.0 을 넘어 줄이면 kcal 이 바뀌는 행과 그 밖의 개수 2 이상 행(옛 반찬 젓가락 수 포함)은 개수 항목.
   final foldedTenths = (s.portionMultiplier * s.count * 10).round();
