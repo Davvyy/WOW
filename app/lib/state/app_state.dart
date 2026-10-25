@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' show max;
+import 'dart:math' show max, min;
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -437,10 +437,34 @@ class ActivityNotifier extends Notifier<TodayActivity> {
 final activityProvider = NotifierProvider<ActivityNotifier, TodayActivity>(ActivityNotifier.new);
 
 // ---------- 끼니 ----------
+/// 이번 주(오늘 전 날짜) 인정된 건너뜀 수. 오늘 건너뜀은 오늘 끼니 목록으로 따로 센다.
+/// 서버 모드는 내 장부의 건너뜀 끼니로 센다([skipsUsedThisWeek]). 장부를 아직 못 읽었거나 못 읽으면 0 에서 시작하고,
+/// 한도를 넘었는지는 건너뜀 응답(over_limit)이 알려 준다. 모의 모드는 프로토타입 시나리오(이번 주 1회 사용, 남은 2회).
 class SkipsNotifier extends Notifier<int> {
   @override
-  int build() => 1; // 이번 주 이미 1회 사용(남은 2회)
+  int build() {
+    if (!ref.read(apiProvider).isRemote) return 1;
+    ref.watch(sessionProvider); // 규칙·오늘 날짜
+    final rows = ref.watch(ledgerProvider).value;
+    return rows == null ? 0 : skipsUsedThisWeek(rows, today: curChallenge.today, rules: engine.rules);
+  }
+
   void set(int v) => state = v;
+}
+
+/// 서버 skips_used_before 와 같은 규칙(D3): 같은 주(월~일, KST)에서 [today] 전 날짜의 건너뜀(간식 제외)을
+/// 하루 최대 skip_per_day 까지 세고, 합은 skip_per_week 를 넘지 않는다. 날짜가 없는 행(모의 장부)은 건너뛴다.
+int skipsUsedThisWeek(Iterable<LedgerRow> rows, {required DateTime today, required EngineRules rules}) {
+  final day = DateTime(today.year, today.month, today.day);
+  final monday = day.subtract(Duration(days: day.weekday - DateTime.monday));
+  var used = 0;
+  for (final r in rows) {
+    final d = DateTime.tryParse(r.localDate ?? '');
+    if (d == null || d.isBefore(monday) || !d.isBefore(day)) continue;
+    final n = r.meals.where((m) => m.status == MealStatus.skipped && m.slot != MealSlot.snack).length;
+    used += min(n, rules.skipPerDay);
+  }
+  return min(used, rules.skipPerWeek);
 }
 
 final skipsUsedProvider = NotifierProvider<SkipsNotifier, int>(SkipsNotifier.new);
