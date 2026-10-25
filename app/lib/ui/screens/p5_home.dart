@@ -192,9 +192,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final date = _dateOf(day);
     final appTitle = ch.name;
     // 참가 챌린지가 하나면 카드 대신 앱바에 남은 날을 붙인다. 여럿이면 카드 목록(전환)이 위에 그대로 있다.
+    // 앱바는 늘 오늘의 진행(D+오늘/일수 · 남은 날)이다. 고른 날은 날짜 띠와 'M.D 기록' 머리글이 보여 준다(D78).
     final sessionCount = (ref.watch(sessionsProvider).value ?? const <ChallengeSession>[]).length;
     final multi = sessionCount > 1;
-    final meta = lifecycle ? null : 'D+$day/${ch.days}${sessionCount == 1 ? ' · ${ChallengeCards.leftText(ch)}' : ''}';
+    final meta = lifecycle ? null : 'D+${ch.dayIndex}/${ch.days}${sessionCount == 1 ? ' · ${ChallengeCards.leftText(ch)}' : ''}';
 
     final lb = watchLeaderboard(ref);
     final finalRows = watchFinalRows(ref);
@@ -242,18 +243,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 한도를 넘은 건너뜀: 대체값이 들어간 칸(반영 아님)
     bool overLimitSkip(MealSlot s) => (slotSkipped[s] ?? false) && inn.substituteValues.containsKey(s);
 
+    // 끼니를 채운 확정 끼니 수: 지난 날은 장부 값과 그날 끼니 목록 중 큰 값(장부가 옛 행이거나 끼니 입력이 빠져도)
+    final mainMeals = isToday ? inn.mainMealCount : math.max(inn.mainMealCount, engine.intake(bmr: sim.bmr, meals: [for (final m in dayMeals) m.toInput()]).mainMealCount);
     // 건강 안내(확정 섭취, 대체값 제외 < 남 1,500 / 여 1,200)
     final confirmedKcal = dayMeals.where(confirmed).fold<double>(0, (a, m) => a + m.kcal);
     final nudgeMin = curMe.sex == Sex.m ? engine.rules.nudgeMinM : engine.rules.nudgeMinF;
     // 오늘은 하루가 거의 끝났을 때만(저녁을 기록했거나 건너뜀, 또는 KST 21시 이후). 지난 날은 그대로.
     final dinnerDone = mealsIn(dayMeals, MealSlot.dinner).any((m) => confirmed(m) || m.status == MealStatus.skipped);
     final lateEnough = toKstWall(ref.watch(clockProvider)()).hour >= 21;
-    final showNudge = !lifecycle && inn.mainMealCount > 0 && confirmedKcal < nudgeMin && (!isToday || dinnerDone || lateEnough);
+    final showNudge = !lifecycle && mainMeals > 0 && confirmedKcal < nudgeMin && (!isToday || dinnerDone || lateEnough);
 
     final d = sim.score.dD;
     // 소비·활동 kcal: 활동 탭과 같은 계산·같은 반올림(정수)
     final burn = BurnFigures.of(sim);
-    final zeroMeal = inn.mainMealCount == 0;
+    final zeroMeal = mainMeals == 0;
 
     // ---- 링 ----
     Widget ringCenter;
@@ -279,7 +282,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ringLabel = '끼니를 1개 이상 확정하면 점수가 생겨요';
       ringCenter = Txt('끼니를 1개 이상\n확정하면\n점수가 생겨요', size: 15, weight: FontWeight.w600, color: c.fg, align: TextAlign.center, height: 1.3);
     } else {
-      ringLabel = '오늘 순적자 ${fmtInt(d.abs())} kcal, 목표의 ${fmtPct(d / engine.rules.t)}';
+      ringLabel = '${isToday ? '오늘' : '이날'} 순적자 ${fmtInt(d.abs())} kcal, 목표의 ${fmtPct(d / engine.rules.t)}';
       ringCenter = Column(mainAxisSize: MainAxisSize.min, children: [
         NumText('${d < 0 ? '+' : '−'}${fmtInt(d.abs())}', size: 44, weight: FontWeight.w700, unit: 'kcal'),
         Txt.cap(d >= 0 ? '목표 −${fmtInt(engine.rules.t)}의 ${fmtPct(d / engine.rules.t)}' : '목표보다 섭취가 많아요 · 0점'),
@@ -300,7 +303,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       statusChip = const ChChip('검토 중', tone: Tone.review, icon: Icons.policy_rounded);
     } else if (!isToday) {
       statusChip = Wrap(spacing: 6, children: [
-        ChChip('확정 · ${date.month}.${date.day + 1} 09:00', tone: Tone.good, icon: Icons.check_rounded),
+        // 그날 장부 행이 확정(is_final)일 때만 '확정', 아직이면 '확정 예정'
+        if (row != null && !row.provisional)
+          ChChip(pastDayChipText(date, isFinal: true, finalizeTime: currentSession.finalizeTime), tone: Tone.good, icon: Icons.check_rounded)
+        else
+          ChChip(pastDayChipText(date, isFinal: false, finalizeTime: currentSession.finalizeTime), icon: Icons.schedule_rounded),
         if (row != null && row.hasRevision) const ChChip('정정됨 · 저녁 무효', tone: Tone.warn, icon: Icons.history_rounded),
         if (row != null && row.check) const ChChip('점검 기간 · 누적 미반영', icon: Icons.fact_check_rounded),
       ]);
@@ -320,7 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final dt = _dateOf(dd);
             final future = dd > ch.dayIndex || dd < firstSelectableDay; // 오늘 이후·참가 이전은 고를 수 없다
             final sel = dd == day;
-            final wk = weekdayKo(dt.month, dt.day);
+            final wk = weekdayKo(dt);
             return Semantics(
               button: !future,
               selected: sel,
@@ -356,7 +363,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ChallengePhase.recruiting => ChCard(
                 color: c.brandSoft,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
-                  Txt.title('${ch.start.month}월 ${ch.start.day}일 ${weekdayKo(ch.start.month, ch.start.day, year: ch.start.year)}요일에 시작해요'),
+                  Txt.title('${ch.start.month}월 ${ch.start.day}일 ${weekdayKo(ch.start)}요일에 시작해요'),
                   const Txt.cap('첫 3일은 점검 기간이라 누적에 들어가지 않아요. 지금 연결 상태를 확인해 두면 첫날부터 걸음이 반영돼요.'),
                   ChLink('연결 상태 확인', onTap: () => context.push(R.p4)),
                 ], gap: 6)),
@@ -805,6 +812,13 @@ class _NoticeSheet extends StatelessWidget {
         Txt.cap(date),
         ChButton('닫기', kind: BtnKind.quiet, onPressed: () => Navigator.of(context).pop()),
       ]));
+}
+
+/// 지난 날 칩: 그날 점수는 다음 날 [finalizeTime] 에 확정된다. 확정됐으면 '확정 · M.D HH:MM', 아직이면 '확정 예정 · …'.
+/// 다음 날은 달력 날짜로 더한다(10.31 → 11.1).
+String pastDayChipText(DateTime date, {required bool isFinal, required String finalizeTime}) {
+  final next = DateTime(date.year, date.month, date.day + 1);
+  return '${isFinal ? '확정' : '확정 예정'} · ${fmtMd(next)} $finalizeTime';
 }
 
 /// 최종 순위표에 내 행이 없을 때(순위 제외)

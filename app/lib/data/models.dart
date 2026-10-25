@@ -339,9 +339,13 @@ class LedgerRow {
     this.localDate,
     this.finalizedAt,
     this.substituteValues = const {},
+    this.mainMealCount,
   });
   final int d;
   final String date;
+
+  /// 그날 끼니 슬롯을 채운 확정 끼니 수(서버 breakdown.intake.main_meal_count). 0 이면 점수 0. 모르면 null.
+  final int? mainMealCount;
 
   /// 대체값을 더한 칸 → 쓴 값(서버 breakdown.intake.substitute_values, D61). 없으면 M_p 로 본다.
   final Map<MealSlot, double> substituteValues;

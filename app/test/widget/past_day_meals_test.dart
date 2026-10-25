@@ -130,7 +130,7 @@ void main() {
     final api = _PastApi(isFinal: false);
     final c = await _pump(tester, api);
     await _pickPastDay(tester, c);
-    expect(find.text('D+7/28'), findsOneWidget);
+    expect(find.text('D+8/28'), findsOneWidget, reason: '앱바는 늘 오늘 진행(D78)');
     expect(_rowsOf(MealSlot.breakfast), findsNWidgets(2));
     expect(find.text('계란토스트'), findsOneWidget);
     expect(find.bySemanticsLabel('아침 추가'), findsNothing, reason: '지난 날에는 새로 찍지 않는다');
@@ -205,7 +205,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.deletedMeals, ['b-2']);
     expect(find.text('기록을 지웠어요'), findsOneWidget);
-    expect(find.text('D+7/28'), findsOneWidget, reason: '고른 날짜 그대로 홈');
+    expect(find.text('10.12 기록'), findsOneWidget, reason: '고른 날짜 그대로 홈');
     expect(_rowsOf(MealSlot.breakfast), findsOneWidget);
   });
 

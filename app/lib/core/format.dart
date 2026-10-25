@@ -36,8 +36,8 @@ String fmtPct(num ratio) => '${(ratio * 100 + 0.5).floor()}%';
 /// 소수점 최대 4자리(0.0327 kcal/보 등), 불필요한 0 제거 없이 고정.
 String fmtFixed(num n, int digits) => n.toStringAsFixed(digits);
 
-String weekdayKo(int month, int day, {int year = 2026}) =>
-    const ['월', '화', '수', '목', '금', '토', '일'][DateTime(year, month, day).weekday - 1];
+/// 요일 한 글자('월'~'일'). 날짜의 실제 연도로 계산한다.
+String weekdayKo(DateTime date) => const ['월', '화', '수', '목', '금', '토', '일'][DateTime(date.year, date.month, date.day).weekday - 1];
 
 /// 대체값 M_p 표기: 742.5 → 743 (프로토타입 Math.ceil)
 String fmtM(double m) => fmtInt(m.ceil());

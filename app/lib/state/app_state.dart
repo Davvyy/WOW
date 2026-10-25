@@ -184,12 +184,13 @@ List<LeaderRow> watchFinalRows(WidgetRef ref) =>
 /// 최종 결과의 내 행(순위 제외면 null)
 LeaderRow? myFinalRow(List<LeaderRow> rows) => rows.where((r) => r.me).firstOrNull;
 
-/// 서버 장부 한 줄 → 화면용 결과(분해값은 서버 값 그대로, M_p 는 BMR 로 계산)
+/// 서버 장부 한 줄 → 화면용 결과(분해값은 서버 값 그대로, M_p 는 BMR 로 계산).
+/// 끼니 수는 서버 값(breakdown), 없으면(옛 행) 그날 끼니 입력으로 센다 — 홈 링의 '끼니를 1개 이상' 안내가 이 값을 본다.
 SimulateResult resultFromLedgerRow(LedgerRow r) => SimulateResult(
       bmr: r.bmr,
       bmrRaw: null,
       activity: ActivityResult(stepsOut: r.steps, stepsNetKcal: 0, sessionsNetKcal: 0, floorsKcal: 0, aRaw: r.a, aD: r.a, aCapped: false, sessionMets: const []),
-      intake: IntakeResult(iD: r.i, mP: engine.m(r.bmr), mainMealCount: 0, snackCount: 0, substituteSlots: r.substituted, draftSlots: const [],
+      intake: IntakeResult(iD: r.i, mP: engine.m(r.bmr), mainMealCount: r.mainMealCount ?? engine.intake(bmr: r.bmr, meals: r.meals).mainMealCount, snackCount: 0, substituteSlots: r.substituted, draftSlots: const [],
           pendingSlots: const [], skipsToday: 0, skipOver: false, substituteValues: r.substituteValues),
       score: ScoreResult(fP: r.f, floorApplied: r.floorApplied, dD: r.dd, sD: r.s, ratio: r.dd / engine.rules.t),
     );

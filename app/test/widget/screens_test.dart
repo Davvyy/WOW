@@ -91,7 +91,8 @@ void main() {
       await pumpApp(tester);
       await tester.fling(find.byType(CalorieRing), const Offset(300, 0), 1200);
       await tester.pumpAndSettle();
-      expect(find.text('D+7/28'), findsOneWidget);
+      expect(find.text('10.12 기록'), findsOneWidget);
+      expect(find.text('D+8/28'), findsOneWidget, reason: '앱바는 늘 오늘 진행(D78)');
       expect(find.textContaining('저녁 무효'), findsWidgets);
     });
 

@@ -66,6 +66,7 @@ LedgerRow ledgerRowFromServer(Map<String, dynamic> row, DateTime start,
       for (final e in (intake['substitute_values'] as Map? ?? const {}).entries)
         ?_slot(e.key): _d(e.value),
     },
+    mainMealCount: ((intake['main_meal_count'] ?? row['main_meal_count']) as num?)?.toInt(),
   );
 }
 
