@@ -182,7 +182,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                     const Txt('순위 점수 = 일평균 × (1 + 참여율)'),
                     const Txt('참여율 = 참여일 ÷ 반영 가능 일수'),
                     Txt('참여일을 $minRankDays일 채우면 순위에 들어가요(그 전에는 순위 대기)'),
-                    const Txt('참가한 날부터 3일은 점검 기간(점수는 계산되지만 순위에 안 들어가요)'),
+                    Txt('참가한 날부터 ${r.checkDays}일은 점검 기간(점수는 계산되지만 순위에 안 들어가요)'),
                     const Txt('챌린지를 나가면 순위에서 빠지고 기록은 보관돼요'),
                     if (ss.monthly) const Txt('매달 1일에 새 챌린지가 열려요'),
                     const Txt.cap('예) 28일 참여·평균 40점 → 80점, 14일 참여·평균 60점 → 90점'),

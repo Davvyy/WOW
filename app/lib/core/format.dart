@@ -31,6 +31,12 @@ String fmtSigned(num n) {
   return r > 0 ? '+$s' : (r < 0 ? '−$s' : s);
 }
 
+/// 규칙 배율·계수: 소수 둘째 자리까지, 끝의 0은 뺀다(2.5 → '2.5', 3 → '3', 1.30 → '1.3').
+String fmtRatio(num n) {
+  final r = (n * 100).round() / 100;
+  return r == r.truncateToDouble() ? r.toInt().toString() : r.toString();
+}
+
 String fmtPct(num ratio) => '${(ratio * 100 + 0.5).floor()}%';
 
 /// 소수점 최대 4자리(0.0327 kcal/보 등), 불필요한 0 제거 없이 고정.

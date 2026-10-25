@@ -543,13 +543,14 @@ MyReview? openReviewOn(List<MyReview>? reviews, DateTime day) {
 /// 홈·활동 화면 검토 배너가 보여줄 사유. 걸음 급증이면 [spike] 가 true(화면이 걸음 수를 넣어 기존 문구를 쓴다).
 /// 모의 모드는 걸음 급증 시나리오만 있어 항상 급증. 서버 모드는 그날 열린 검토 [review] 의 종류를 따른다.
 /// 종류를 모르거나 검토 목록을 아직 못 받았으면 일반 문구.
-({bool spike, String lead, String rest}) reviewBannerText({required bool remote, MyReview? review}) {
+/// [appealHours] 는 지금 챌린지의 소명 기한(challenge_rules.appeal_window).
+({bool spike, String lead, String rest}) reviewBannerText({required bool remote, MyReview? review, int appealHours = 72}) {
   if (!remote) return (spike: true, lead: '', rest: '');
   final key = review?.reasonTemplate ?? review?.type;
   if (key == 'steps_spike') return (spike: true, lead: '', rest: '');
   final reason = reasonText[key];
   if (reason == null) return (spike: false, lead: reviewReasonFallback, rest: '');
-  return (spike: false, lead: reason, rest: '. 72시간 안에 설명을 남길 수 있어요.');
+  return (spike: false, lead: reason, rest: '. $appealHours시간 안에 설명을 남길 수 있어요.');
 }
 
 /// 음식 검색·최근 음식 한 건(1인분 kcal). 서버: food_search(식약처 DB, pg_trgm) / recent_foods(30일 확정)

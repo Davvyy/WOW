@@ -213,6 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final reviewBanner = reviewBannerText(
       remote: remote,
       review: remote && reviewing ? openReviewOn(ref.watch(myReviewsProvider).value, ch.today) : null,
+      appealHours: currentSession.appealHours,
     );
 
     String? caption;
@@ -361,7 +362,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: c.brandSoft,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
                   Txt.title('${ch.start.month}월 ${ch.start.day}일 ${weekdayKo(ch.start)}요일에 시작해요'),
-                  const Txt.cap('첫 3일은 점검 기간이라 누적에 들어가지 않아요. 지금 연결 상태를 확인해 두면 첫날부터 걸음이 반영돼요.'),
+                  Txt.cap('첫 ${engine.rules.checkDays}일은 점검 기간이라 누적에 들어가지 않아요. 지금 연결 상태를 확인해 두면 첫날부터 걸음이 반영돼요.'),
                   ChLink('연결 상태 확인', onTap: () => context.push(R.p4)),
                 ], gap: 6)),
               ),
@@ -369,7 +370,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: c.reviewSoft,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: spaced([
                   Txt.title('최종 집계 중 · 운영자 확인 후 발표돼요', color: c.review),
-                  Txt.cap('마지막 날 기록은 ${fmtMd(ch.end.add(const Duration(days: 1)))} 09:00에 확정됐어요. 미결 검토가 끝나면 결과가 발표되고 7일 이의 기간이 시작돼요.'),
+                  Txt.cap('마지막 날 기록은 ${fmtMd(ch.end.add(const Duration(days: 1)))} ${currentSession.finalizeTime}에 확정됐어요. 미결 검토가 끝나면 결과가 발표되고 7일 이의 기간이 시작돼요.'),
                 ], gap: 6)),
               ),
             _ => ChCard(
@@ -382,7 +383,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
           };
       final ringAndNums = Column(children: [
-        Center(child: CalorieRing(ratio: ringRatio, provisional: provisional, empty: ringEmpty, center: ringCenter, semanticsLabel: ringLabel)),
+        Center(child: CalorieRing(ratio: ringRatio, provisional: provisional, empty: ringEmpty, center: ringCenter, semanticsLabel: ringLabel, targetLabel: '−${fmtInt(engine.rules.t)}')),
         if (!lifecycle) ...[const SizedBox(height: 6), threeNums],
       ]);
       return GestureDetector(
@@ -456,7 +457,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // ---- 안내 한 줄(검토 → 섭취 적음 → 분석 완료 → 공지). 하나만 보이고 나머지는 '외 n건' 뒤에 ----
     final latestNotice = ref.watch(noticesProvider).value?.firstOrNull;
     final fullReview = reviewBanner.spike
-        ? '걸음 ${fmtInt(steps)}이 평소의 2.5배를 넘어 검토 중이에요. 순위는 잠정으로 유지되고, 72시간 안에 설명을 남길 수 있어요.'
+        ? '걸음 ${fmtInt(steps)}이 평소의 ${fmtRatio(currentSession.stepsSpikeRatio)}배를 넘어 검토 중이에요. 순위는 잠정으로 유지되고, ${currentSession.appealHours}시간 안에 설명을 남길 수 있어요.'
         : '${reviewBanner.lead}${reviewBanner.rest}';
     // 걸음 급증·출처 미확인은 '운동 기록', 그 밖의 사유는 그 사유 문장(짧은 한 줄)
     final reviewLine = reviewBanner.spike || reviewBanner.lead == reasonText['source_unknown'] ? '운동 기록을 확인 중이에요' : reviewBanner.lead;

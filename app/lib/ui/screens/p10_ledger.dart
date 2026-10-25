@@ -237,8 +237,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Txt('걸음 ${fmtInt(reviewStepsCase)}이 평소의 2.5배를 넘어 검토 중이에요', weight: FontWeight.w600, color: c.review),
-              Txt.cap('72시간 안에 설명을 남길 수 있어요(1회). 순위는 잠정으로 유지되고, 다른 참가자에게는 "집계 중"으로만 보여요.', color: c.review),
+              Txt('걸음 ${fmtInt(reviewStepsCase)}이 평소의 ${fmtRatio(currentSession.stepsSpikeRatio)}배를 넘어 검토 중이에요', weight: FontWeight.w600, color: c.review),
+              Txt.cap('${currentSession.appealHours}시간 안에 설명을 남길 수 있어요(1회). 순위는 잠정으로 유지되고, 다른 참가자에게는 "집계 중"으로만 보여요.', color: c.review),
             ]),
           ),
         ]),
@@ -480,7 +480,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           ]),
         ),
         history,
-        const Disclaimer('모든 수치는 추정이에요. 점수는 매시간 잠정으로 바뀌고 다음 날 09:00에 확정돼요.\n이후 변경은 "정정"으로 기록돼요.'),
+        Disclaimer('모든 수치는 추정이에요. 점수는 매시간 잠정으로 바뀌고 다음 날 ${currentSession.finalizeTime}에 확정돼요.\n이후 변경은 "정정"으로 기록돼요.'),
       ],
     );
   }

@@ -280,10 +280,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
 
     switch (phase) {
       case ChallengePhase.recruiting:
-        addBox(centerCard(Icons.event_rounded, '${ch.start.month}월 ${ch.start.day}일에 시작해요', '첫 3일(점검 기간) 점수는 누적에 들어가지 않아요.', extra: ChLink('규칙 미리 보기', onTap: () => context.go(R.rules))));
+        addBox(centerCard(Icons.event_rounded, '${ch.start.month}월 ${ch.start.day}일에 시작해요', '첫 ${engine.rules.checkDays}일(점검 기간) 점수는 누적에 들어가지 않아요.', extra: ChLink('규칙 미리 보기', onTap: () => context.go(R.rules))));
       case ChallengePhase.closing:
         addBox(Align(alignment: Alignment.centerLeft, child: const ChChip('최종 집계 중 · 운영자 확인 후 발표돼요', tone: Tone.review, icon: Icons.hourglass_top_rounded)));
-        addBox(centerCard(Icons.hourglass_top_rounded, '최종 집계 중', '${fmtMd(ch.end.add(const Duration(days: 1)))} 09:00 확정 · 미결 검토가 끝나면 발표돼요. 발표 뒤 7일 동안 이의를 남길 수 있어요.'));
+        addBox(centerCard(Icons.hourglass_top_rounded, '최종 집계 중', '${fmtMd(ch.end.add(const Duration(days: 1)))} ${currentSession.finalizeTime} 확정 · 미결 검토가 끝나면 발표돼요. 발표 뒤 7일 동안 이의를 남길 수 있어요.'));
       case ChallengePhase.published:
         addBox(Align(alignment: Alignment.centerLeft, child: ChChip('최종 결과 · 이의 기간 ~${ch.objectionUntil}', tone: Tone.good, icon: Icons.verified_rounded)));
         final fin = watchFinalRows(ref);
@@ -317,12 +317,12 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             ? centerCard(Icons.hourglass_top_rounded, '순위 대기', '참여 $days/$minDays일 · $minDays일 채우면 순위에 들어가요.')
             // 나 혼자 참가해도 내 누적 점수가 있으면 내 행을 보인다 — 점수 있는 행이 하나도 없을 때만 빈 화면
             : !list.any((r) => r.score != null && !r.pending)
-            ? centerCard(Icons.hourglass_empty_rounded, '아직 확정된 점수가 없어요', '점검 기간이 끝나고 첫 확정(다음 날 09:00) 뒤에 순위가 보여요.')
+            ? centerCard(Icons.hourglass_empty_rounded, '아직 확정된 점수가 없어요', '점검 기간이 끝나고 첫 확정(다음 날 ${currentSession.finalizeTime}) 뒤에 순위가 보여요.')
             : null;
         // 내 행: 순위 대기·점검 기간(누적 탭)에는 고정하지 않는다
         final pinMe = !me.pending && cumState == null;
         if (today) {
-          addBox(const InlineNote(Icons.schedule_rounded, '잠정 순위예요. 매시간 바뀌고 내일 09:00에 확정돼요.'));
+          addBox(InlineNote(Icons.schedule_rounded, '잠정 순위예요. 매시간 바뀌고 내일 ${currentSession.finalizeTime}에 확정돼요.'));
         } else if (ranked.isNotEmpty && cumFinalDate != null) {
           // 확정 칩은 순위에 든 행이 있고 확정된 날을 알 때만: 마지막 확정일의 다음 날 확정 시각
           addBox(Align(
@@ -359,7 +359,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           ), bottom: 4);
         } else if (today && (list.isEmpty || list.every((r) => r.me))) {
           // 오늘(잠정) 탭은 위에 내 잠정 행이 있어 빈 화면 대신 한 줄 안내(누적 탭의 빈 화면은 위 상태 카드 하나로)
-          addBox(const Center(child: Txt.cap('확정 순위는 점검 기간이 끝난 다음 날 09:00부터 보여요', align: TextAlign.center)), bottom: 10);
+          addBox(Center(child: Txt.cap('확정 순위는 점검 기간이 끝난 다음 날 ${currentSession.finalizeTime}부터 보여요', align: TextAlign.center)), bottom: 10);
         }
         addBox(const Disclaimer('점수는 추정 kcal 기준이에요 · 의료 조언이 아니에요'), bottom: 0);
     }

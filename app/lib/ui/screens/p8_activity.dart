@@ -47,6 +47,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     final reviewBanner = reviewBannerText(
       remote: remote,
       review: remote && reviewing ? openReviewOn(ref.watch(myReviewsProvider).value, ch.today) : null,
+      appealHours: currentSession.appealHours,
     );
     final perStep = engine.kcalPerStep(weightKg);
 
@@ -107,7 +108,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           if (reviewing)
             Txt.cap(
               reviewBanner.spike
-                  ? '걸음 ${fmtInt(steps)}이 평소 중앙값의 2.5배를 넘어 검토 중이에요 · 잠정 점수에는 반영돼요'
+                  ? '걸음 ${fmtInt(steps)}이 평소 중앙값의 ${fmtRatio(currentSession.stepsSpikeRatio)}배를 넘어 검토 중이에요 · 잠정 점수에는 반영돼요'
                   : '${reviewBanner.lead}${reviewBanner.rest}',
               color: c.review,
             )
@@ -205,7 +206,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   sessionsCard(),
                   ChCard(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      const Row(children: [Expanded(child: Txt.title('최근 7일 활동 kcal')), Txt.cap('추정 · 상한 1,000')]),
+                      Row(children: [const Expanded(child: Txt.title('최근 7일 활동 kcal')), Txt.cap('추정 · 상한 ${fmtInt(engine.rules.c)}')]),
                       const SizedBox(height: 6),
                       Semantics(
                         label: '최근 7일 활동 칼로리: ${week.map((w) => '${w.$4}일 ${fmtInt(w.$2)}').join(', ')}',

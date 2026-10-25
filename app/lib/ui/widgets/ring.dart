@@ -14,7 +14,7 @@ class CalorieRing extends StatelessWidget {
     required this.semanticsLabel,
     this.provisional = true,
     this.empty = false,
-    this.targetLabel = '−500',
+    required this.targetLabel,
   });
 
   /// D/T, 0~1.5
@@ -23,6 +23,7 @@ class CalorieRing extends StatelessWidget {
   final String semanticsLabel;
   final bool provisional;
   final bool empty;
+  /// 오른쪽 아래 목표 표시('−T', 지금 챌린지 규칙의 목표 순적자)
   final String targetLabel;
 
   @override

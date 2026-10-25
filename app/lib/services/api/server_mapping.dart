@@ -250,6 +250,7 @@ ChallengeSession sessionFromSummary(Map<String, dynamic> j, {String platformLabe
     finalizeTime: _hhmm(rulesJson['finalize_time'] ?? '09:00'),
     editWindowHours: _hours(rulesJson['edit_window'], 48),
     appealHours: _hours(rulesJson['appeal_window'], 72),
+    stepsSpikeRatio: (rulesJson['steps_spike_ratio'] as num?)?.toDouble() ?? 2.5,
     rankEligible: p['rank_eligible'] as bool? ?? true,
     skipsUsedThisWeek: (j['skips_used_this_week'] as num?)?.toInt(),
   );

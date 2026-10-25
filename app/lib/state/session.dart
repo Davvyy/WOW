@@ -19,6 +19,7 @@ class ChallengeSession {
     this.finalizeTime = '09:00',
     this.editWindowHours = 48,
     this.appealHours = 72,
+    this.stepsSpikeRatio = 2.5,
     this.rankEligible = true,
     this.kind = 'operator',
     this.checkStart,
@@ -44,6 +45,9 @@ class ChallengeSession {
   final String finalizeTime;
   final int editWindowHours;
   final int appealHours;
+
+  /// 걸음 급증 검토 배율(challenge_rules.steps_spike_ratio): 평소 중앙값의 몇 배를 넘으면 검토하는지
+  final double stepsSpikeRatio;
   final bool rankEligible;
 
   /// challenges.kind: 'operator'(코드로 참가) · 'monthly'(월간, 코드 없이 참가)

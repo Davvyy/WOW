@@ -305,7 +305,7 @@ class _StartScreenState extends ConsumerState<StartScreen> {
               const SizedBox(height: 6),
               Semantics(
                 liveRegion: true,
-                child: Txt.cap(err ?? '초대코드 6자리 · 카카오톡 링크로 들어오면 자동으로 채워져요', color: err != null ? c.critical : null),
+                child: Txt.cap(err ?? '받은 초대코드 6자리를 넣어 주세요', color: err != null ? c.critical : null),
               ),
               const SizedBox(height: 16),
               if (valid)

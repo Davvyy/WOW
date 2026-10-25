@@ -10,6 +10,7 @@ import '../core/engine/engine.dart' show MealSlot;
 import '../services/push/push_service.dart';
 import 'app_state.dart';
 import 'app_version.dart';
+import 'session.dart';
 
 /// 푸시 수신 계층. main 에서 FCM 이 준비되면 [FirebasePushService] 로 바꿔 끼운다.
 final pushServiceProvider = Provider<PushService>((_) => NoPushService());
@@ -207,13 +208,13 @@ class PushController {
         _emit(Reminder(kind, m.body ?? '사진이 확정을 기다려요', slot: m.slot, opened: opened));
       }
     } else if (m.isDailyResult) {
-      // 09:00 확정 배치가 어제 점수·누적·순위 스냅샷을 확정했으므로 잠정 값을 버린다
+      // 확정 시각(규칙 finalize_time, 기본 09:00) 배치가 어제 점수·누적·순위 스냅샷을 확정했으므로 잠정 값을 버린다
       _ref.invalidate(ledgerProvider);
       _ref.invalidate(leaderboardProvider);
       _emit(DailyResult(m.localDate, m.body ?? '어제 결과가 확정됐어요', opened: opened));
     } else if (m.isReviewNotice) {
       _refreshReviews();
-      _emit(ReviewNotice(m.reviewId, m.body ?? '기록을 확인 중이에요. 72시간 안에 설명을 남길 수 있어요', opened: opened));
+      _emit(ReviewNotice(m.reviewId, m.body ?? '기록을 확인 중이에요. ${currentSession.appealHours}시간 안에 설명을 남길 수 있어요', opened: opened));
     } else if (m.isVerdict) {
       _applyVerdict(m.verdict);
       _emit(VerdictReady(m.reviewId!, m.body ?? '판정 결과가 나왔어요', verdict: m.verdict, opened: opened));

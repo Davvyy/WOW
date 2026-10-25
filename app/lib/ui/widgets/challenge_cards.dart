@@ -28,8 +28,9 @@ class ChallengeCards extends ConsumerWidget {
   static String statusLine(ChallengeSession s, DateTime today) {
     final cs = s.checkStart;
     if (cs != null && today.isBefore(cs)) return '';
-    if (cs != null && today.isBefore(cs.add(const Duration(days: 3)))) {
-      return '점검 기간 ${today.difference(cs).inDays + 1}/3일';
+    final n = s.rules.checkDays;
+    if (cs != null && today.isBefore(DateTime(cs.year, cs.month, cs.day + n))) {
+      return '점검 기간 ${today.difference(cs).inDays + 1}/$n일';
     }
     final st = s.stats;
     if (st == null) return '';
