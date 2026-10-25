@@ -327,13 +327,13 @@ class MockChalloryApi implements ChalloryApi {
     if (confirm != '삭제') throw const ApiException(422, '확인을 위해 "삭제"를 입력해 주세요');
   }
   /// 등록된 기기(id → 토큰·권한). 테스트가 확인한다.
-  final devices = <String, ({String platform, String? token, String permission})>{};
+  final devices = <String, ({String platform, String? token, String permission, String? appVersion})>{};
 
   @override
   Future<String> registerDevice({String? deviceId, required String platform, String? token, required String permission, String? appVersion}) async {
     _maybeFail('register_device');
     final id = deviceId != null && devices.containsKey(deviceId) ? deviceId : 'mock-device-${++_seq}';
-    devices[id] = (platform: platform, token: token, permission: permission);
+    devices[id] = (platform: platform, token: token, permission: permission, appVersion: appVersion);
     return id;
   }
 

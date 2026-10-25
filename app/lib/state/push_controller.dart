@@ -9,6 +9,7 @@ import '../core/config.dart';
 import '../core/engine/engine.dart' show MealSlot;
 import '../services/push/push_service.dart';
 import 'app_state.dart';
+import 'app_version.dart';
 
 /// 푸시 수신 계층. main 에서 FCM 이 준비되면 [FirebasePushService] 로 바꿔 끼운다.
 final pushServiceProvider = Provider<PushService>((_) => NoPushService());
@@ -173,7 +174,7 @@ class PushController {
     final store = _ref.read(deviceIdStoreProvider);
     try {
       final id = await _ref.read(apiProvider).registerDevice(
-          deviceId: await store.read(), platform: platform, token: t, permission: p.wire);
+          deviceId: await store.read(), platform: platform, token: t, permission: p.wire, appVersion: _ref.read(appVersionProvider));
       _lastToken = t;
       await store.write(id);
     } catch (e) {

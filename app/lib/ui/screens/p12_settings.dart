@@ -7,6 +7,7 @@ import '../../data/models.dart';
 import '../../router.dart';
 import '../../services/health/health_package_source.dart';
 import '../../state/app_state.dart';
+import '../../state/app_version.dart';
 import '../../services/push/push_service.dart' show PushPermission;
 import '../../state/push_controller.dart';
 import '../widgets/common.dart';
@@ -289,7 +290,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             li(Icons.delete_forever_rounded, '계정 삭제', sub: '사진·건강 기록이 즉시 삭제돼요', titleColor: c.critical, onTap: _openDelete),
           ]),
         ),
-        const Disclaimer('챌로리 1.0 · 모든 수치는 추정이에요'),
+        // 설치된 버전(이름 + 빌드 번호). 못 읽었으면 이름만
+        Disclaimer('챌로리${switch (ref.watch(appVersionProvider)) { final v? => ' $v', _ => '' }} · 모든 수치는 추정이에요'),
       ],
     );
   }
