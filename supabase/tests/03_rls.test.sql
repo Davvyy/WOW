@@ -99,7 +99,7 @@ begin
   update participants set status = 'kicked', block_rejoin = true where id = tests.pid('한강러너');
   perform tests.eq((select rank_eligible from participants where id = tests.pid('한강러너')), false, '운영자: 강퇴 → 순위 제외');
   perform tests.ok(exists (select 1 from audit_logs where action = 'participant_status'), '운영자: 상태 변경 감사 로그');
-  perform tests.throws(format('update participants set nickname = ''x'' where id = %L', tests.pid('지수')), 'PT403', '운영자: 참가자 닉네임 변경 불가');
+  perform tests.throws(format('update participants set nickname = ''x'' where id = %L', tests.pid('지수')), '42501', '운영자: 참가자 닉네임 변경 불가(닉네임은 서버 함수로만, D81)');
   perform tests.throws('insert into audit_logs (actor_role, action) values (''operator'', ''x'')', '42501', '운영자: 감사 로그 직접 쓰기 불가');
 end $$;
 -- 새 챌린지(OP0): 초안 + 기본 규칙 행, 초대코드는 모집 시작 때
