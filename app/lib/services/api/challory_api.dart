@@ -266,7 +266,7 @@ class ServerMealItem {
   const ServerMealItem({required this.candidates, required this.candidateKcal, required this.candidateFoodCodes, required this.count,
       required this.portionMultiplier, required this.hasBroth, required this.needsCheck, required this.aiKcal,
       this.chosen = 0, this.eaten = true, this.brothOff = false, this.unitLabel, this.unitKcal, this.servingG, this.packageG, this.pieces,
-      this.aiSinglePiece = false});
+      this.aiSinglePiece = false, this.aiPieceGuard = false});
   final List<String> candidates;
   final List<double> candidateKcal;
   final List<String?> candidateFoodCodes;
@@ -294,6 +294,9 @@ class ServerMealItem {
 
   /// AI 가 낱개 포장 하나로 본 포장 상품(meal_items.ai_single_piece, D67). 확정한 항목은 false.
   final bool aiSinglePiece;
+
+  /// 조각 수를 그릇 수로 낸 것으로 보고 서버가 양을 인분으로 바꾼 음식 항목(meal_items.ai_piece_guard, D73). 확정한 항목은 false.
+  final bool aiPieceGuard;
 
   factory ServerMealItem.fromJson(Map<String, dynamic> j) {
     final ai = (j['ai_kcal'] as num?)?.toDouble() ?? 0;
@@ -338,6 +341,7 @@ class ServerMealItem {
         _ => null,
       },
       aiSinglePiece: j['ai_single_piece'] as bool? ?? false,
+      aiPieceGuard: j['ai_piece_guard'] as bool? ?? false,
     );
   }
 }

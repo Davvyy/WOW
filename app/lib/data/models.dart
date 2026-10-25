@@ -33,6 +33,7 @@ class MealItem {
     this.unitLabels = const [],
     this.products = const [],
     this.aiSinglePiece = false,
+    this.aiPieceGuard = false,
     this.aiKcal,
     this.aiUnits,
   });
@@ -41,6 +42,9 @@ class MealItem {
 
   /// AI 가 이 포장 상품을 여러 개입 상자의 낱개 포장 하나로 봤는지(서버 meal_items.ai_single_piece, D67) → '몇 개입' 배너
   final bool aiSinglePiece;
+
+  /// 서버가 조각 수를 그릇 수로 낸 것으로 보고 양을 인분으로 바꾼 항목(meal_items.ai_piece_guard, D73) → 카드 안내 배너
+  final bool aiPieceGuard;
 
   /// 이 항목의 AI 초안 kcal(끼니 AI 합계 중 이 항목 몫)과 그때의 양(AI 개수 × 배수). 서버 AI 초안 항목만, 그 밖은 null.
   /// '몇 개입'으로 단위를 바꾸면 이 몫을 같은 단위로 다시 계산한다(단위 정정은 AI 대비 하향 수정이 아니다).
@@ -145,6 +149,7 @@ class MealItem {
         unitLabels: unitLabels ?? this.unitLabels,
         products: products ?? this.products,
         aiSinglePiece: aiSinglePiece,
+        aiPieceGuard: aiPieceGuard,
         aiKcal: aiKcal ?? this.aiKcal,
         aiUnits: aiUnits,
       );

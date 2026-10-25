@@ -76,6 +76,7 @@ MealItem mealItemFromServer(ServerMealItem s, int index) {
     checked: s.eaten,
     brothOff: kind == ItemKind.soup && s.brothOff,
     aiSinglePiece: s.aiSinglePiece,
+    aiPieceGuard: s.aiPieceGuard,
     // AI 초안 몫과 그때의 양: '몇 개입'으로 단위를 바꾸면 같은 단위로 다시 계산한다(확정한 항목은 AI kcal 이 없어 null)
     aiKcal: s.aiKcal > 0 ? s.aiKcal : null,
     aiUnits: s.aiKcal > 0 ? s.count * s.portionMultiplier : null,

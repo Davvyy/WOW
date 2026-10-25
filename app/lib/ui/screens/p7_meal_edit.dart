@@ -672,6 +672,9 @@ class _Tag extends StatelessWidget {
       );
 }
 
+/// 이 kcal 을 넘는 항목은 카드에 양 확인 한 줄을 띄운다(D73, 확정은 막지 않음)
+const bigItemKcal = 1500;
+
 class _ItemCard extends StatelessWidget {
   const _ItemCard({required this.item, required this.onChange, required this.onSearch, required this.onRemove, required this.onPieces,
       this.prompt = PiecesPrompt.none, this.onDismissPrompt});
@@ -758,6 +761,20 @@ class _ItemCard extends StatelessWidget {
           ),
           Padding(padding: const EdgeInsets.only(top: 10), child: NumText(fmtInt(it.rawKcal), size: 21, weight: FontWeight.w700, color: off ? c.fg2 : c.fg, unit: 'kcal')),
         ]),
+        // 1,500 kcal 넘는 항목: 확정은 막지 않고 양만 한 번 더 보게 한다(D73)
+        if (!off && it.rawKcal > bigItemKcal)
+          Row(children: [
+            Icon(Icons.info_rounded, size: 14, color: c.warn),
+            const SizedBox(width: 4),
+            Expanded(child: Txt.cap('한 항목이 1,500 kcal 넘어요 · 양을 확인해 주세요', color: c.warn)),
+          ]),
+        // 서버가 조각 수를 그릇 수로 낸 것으로 보고 양을 인분으로 바꾼 항목(초밥 12점 → 1.2인분, D73)
+        if (it.aiPieceGuard && !off)
+          InfoBanner(
+            tone: Tone.warn,
+            icon: Icons.restaurant_rounded,
+            child: boldThen(context, '조각 수로 보여 양을 인분으로 바꿨어요.', ' 실제로 먹은 양이 맞는지 확인해 주세요.', color: c.warn),
+          ),
         // AI 가 낱개 포장 하나로 본 상품: 1회분으로 잡혀 크게 잡히지 않게 몇 개입인지 먼저 묻는다(D67)
         if (prompt == PiecesPrompt.banner && !off)
           InfoBanner(
