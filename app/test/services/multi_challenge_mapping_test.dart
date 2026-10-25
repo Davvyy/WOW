@@ -32,6 +32,25 @@ void main() {
     expect(s.stats!.score, isNull);
   });
 
+  test('세션: 이번 주 건너뜀 사용 수(서버 계산), 이전 서버는 null', () {
+    expect(sessionFromSummary({...summary(), 'skips_used_this_week': 2}).skipsUsedThisWeek, 2);
+    expect(sessionFromSummary(summary()).skipsUsedThisWeek, isNull);
+  });
+
+  test('세션: 마지막 동기화 출처는 아는 앱 이름, 모르면 플랫폼 이름', () {
+    String src(String? origin) {
+      final j = summary();
+      (j['participant'] as Map)['last_sync_source'] = origin;
+      return sessionFromSummary(j, platformLabel: 'Health Connect').challenge.source;
+    }
+
+    expect(src('com.sec.android.app.shealth'), '삼성헬스');
+    expect(src('com.google.android.apps.fitness'), 'Google 피트니스');
+    expect(src('com.android.healthconnect.phone.abc123'), '휴대폰 센서');
+    expect(src('com.example.unknown.tracker'), 'Health Connect');
+    expect(src(null), '—');
+  });
+
   test('세션: 이전 서버(kind·stats 없음)는 운영자 챌린지·통계 없음', () {
     final j = summary()..remove('stats');
     (j['challenge'] as Map).remove('kind');

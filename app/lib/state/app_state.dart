@@ -455,7 +455,9 @@ class SkipsNotifier extends Notifier<int> {
   @override
   int build() {
     if (!ref.read(apiProvider).isRemote) return 1;
-    ref.watch(sessionProvider); // 규칙·오늘 날짜
+    // 서버가 세션에 준 값(점수 계산과 같은 skips_used_before)이 있으면 그대로. 이전 서버는 장부로 센다
+    final fromServer = ref.watch(sessionProvider).value?.skipsUsedThisWeek;
+    if (fromServer != null) return fromServer;
     final rows = ref.watch(ledgerProvider).value;
     return rows == null ? 0 : skipsUsedThisWeek(rows, today: curChallenge.today, rules: engine.rules);
   }

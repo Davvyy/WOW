@@ -24,6 +24,7 @@ class ChallengeSession {
     this.checkStart,
     this.stats,
     this.joinOpen = true,
+    this.skipsUsedThisWeek,
   });
 
   final ChallengeInfo challenge;
@@ -56,6 +57,9 @@ class ChallengeSession {
 
   /// 참가 접수 중인지(challenges.join_open)
   final bool joinOpen;
+
+  /// 이번 주(월~일) 오늘 전 인정된 건너뜀 수(서버 skips_used_before). 이전 서버·모의 세션은 null
+  final int? skipsUsedThisWeek;
 
   bool get monthly => kind == 'monthly';
 

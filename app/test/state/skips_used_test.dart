@@ -1,6 +1,7 @@
 // 이번 주 건너뜀 사용 수: 서버 모드는 프로토타입 값(1)이 아니라 내 장부의 건너뜀 끼니로 센다.
 // 서버 skips_used_before 와 같은 규칙(D3): 같은 주(월~일, KST)의 오늘 전 날짜 · 간식 제외 · 하루 최대 skip_per_day · 주 상한 skip_per_week.
 import 'package:challory/core/engine/engine.dart';
+import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/data/models.dart';
 import 'package:challory/router.dart';
 import 'package:challory/services/api/challory_api.dart' show ApiException;
@@ -31,6 +32,17 @@ class _Remote extends MockChalloryApi {
     if (fail) throw const ApiException(0, 'offline');
     return rows;
   }
+}
+
+/// 세션이 서버 계산값(challenge_session.skips_used_this_week)을 주는 서버
+class _SessionSkips extends _Remote {
+  _SessionSkips(super.rows, this.skips);
+  final int? skips;
+  @override
+  Future<List<ChallengeSession>> fetchSessions() async => [
+        ChallengeSession(challenge: mockChallenge, me: mockMe, rules: EngineRules.defaults, status: 'running', challengeId: 'c-1',
+            participantId: 'p-1', skipsUsedThisWeek: skips),
+      ];
 }
 
 void main() {
@@ -112,6 +124,22 @@ void main() {
       }
       expect(c.read(ledgerProvider).hasError, isTrue);
       expect(c.read(skipsUsedProvider), 0);
+    });
+
+    test('서버 모드: 세션이 이번 주 건너뜀 수를 주면 장부를 세지 않고 그 값을 쓴다', () async {
+      final c = remote(_SessionSkips([_row('2026-10-12', [_skip(MealSlot.dinner)])], 2));
+      c.listen(skipsUsedProvider, (_, _) {});
+      await c.read(sessionProvider.future);
+      await c.read(ledgerProvider.future);
+      expect(c.read(skipsUsedProvider), 2);
+    });
+
+    test('서버 모드: 이전 서버(세션에 값 없음)는 장부로 센다', () async {
+      final c = remote(_SessionSkips([_row('2026-10-12', [_skip(MealSlot.dinner)])], null));
+      c.listen(skipsUsedProvider, (_, _) {});
+      await c.read(sessionProvider.future);
+      await c.read(ledgerProvider.future);
+      expect(c.read(skipsUsedProvider), 1);
     });
 
     test('모의 모드: 프로토타입 시나리오(이번 주 1회 사용)', () {
