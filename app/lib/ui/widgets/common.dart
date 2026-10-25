@@ -646,15 +646,19 @@ Future<R?> showChDialog<R>(BuildContext context, {required String title, Color? 
   );
 }
 
+/// 아래에서 올라오는 창. 루트 내비게이터에 띄워 셸의 탭 바·촬영 버튼 위에 오고,
+/// 아래 여백에 시스템 내비게이션 바(안전 영역)와 키보드 높이를 더해 마지막 버튼이 가리지 않게 한다.
 Future<R?> showChSheet<R>(BuildContext context, {required WidgetBuilder builder}) {
   return showModalBottomSheet<R>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    useRootNavigator: true,
     backgroundColor: context.c.bg,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: (ctx) => Padding(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+      // 키보드가 올라오면 padding.bottom 은 0 이 되고 viewInsets 가 그 자리를 채운다
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 24 + MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom),
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: ctx.c.borderStrong, borderRadius: BorderRadius.circular(2)))),
