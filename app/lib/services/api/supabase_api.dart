@@ -147,6 +147,16 @@ class SupabaseChalloryApi implements ChalloryApi {
   }
 
   @override
+  Future<MySettings> fetchSettings() async {
+    if (_client.auth.currentUser == null) return const MySettings(aiConsent: false);
+    return MySettings.fromJson(Map<String, dynamic>.from(await _rpc('my_settings', const {}) as Map));
+  }
+
+  @override
+  Future<MySettings> updateSettings(MySettings patch, {required Set<SettingKey> keys}) async =>
+      MySettings.fromJson(Map<String, dynamic>.from(await _rpc('set_my_settings', {'p': patch.patchJson(keys)}) as Map));
+
+  @override
   Future<List<Notice>> fetchNotices() async {
     try {
       final rows = await _client.from('notifications').select('id, title, body, scheduled_at, read_at')

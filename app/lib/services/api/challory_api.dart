@@ -38,6 +38,12 @@ abstract class ChalloryApi {
   /// 다음 달 자동 참가 설정을 바꾼다(본인 프로필 행).
   Future<void> setAutoContinue(bool on);
 
+  /// 설정 화면 토글(my_settings, D75): 알림 3종 · 순위 공개 · 측정 등급 배지 · AI 사진 분석 동의. 로그인 전이면 기본값.
+  Future<MySettings> fetchSettings();
+
+  /// 설정 토글 바꾸기(set_my_settings): [patch] 의 항목만 바꾸고 바뀐 뒤 전체 값을 돌려준다.
+  Future<MySettings> updateSettings(MySettings patch, {required Set<SettingKey> keys});
+
   /// 공지 목록(N-03, 최신순). 예약 발송 시각이 지난 것만.
   Future<List<Notice>> fetchNotices();
 
@@ -118,6 +124,74 @@ abstract class ChalloryApi {
 
   /// 로그아웃 때 이 기기 행을 지워 더는 이 계정 알림이 오지 않게 한다(RLS: 본인 행)
   Future<void> unregisterDevice(String deviceId);
+}
+
+/// 설정 토글 이름(서버 my_settings 키)
+enum SettingKey {
+  notifyYesterday('notify_yesterday'),
+  notifyReminder('notify_reminder'),
+  notifyAnalysis('notify_analysis'),
+  leaderboardVisible('leaderboard_visible'),
+  gradeBadgePublic('grade_badge_public'),
+  aiConsent('ai_consent');
+
+  const SettingKey(this.wire);
+  final String wire;
+}
+
+/// 설정 화면 토글(서버 저장, D75). 알림을 끄면 서버가 그 종류 푸시를 보내지 않고, 순위 공개·배지는 순위표에,
+/// AI 동의는 사진 분석(국외 AI 전송)에 쓰인다.
+class MySettings {
+  const MySettings({this.notifyYesterday = true, this.notifyReminder = true, this.notifyAnalysis = true, this.leaderboardVisible = true,
+      this.gradeBadgePublic = false, this.aiConsent = true});
+
+  /// 어제 결과(N-01, 09:30)
+  final bool notifyYesterday;
+
+  /// 저녁 리마인드(N-02, 21:00)
+  final bool notifyReminder;
+
+  /// 분석 완료(N-04)
+  final bool notifyAnalysis;
+
+  /// 순위에 내 행 보이기(participants.leaderboard_visible)
+  final bool leaderboardVisible;
+
+  /// 측정 등급 배지 공개(participants.grade_badge_public)
+  final bool gradeBadgePublic;
+
+  /// 국외 AI 사진 분석 동의(consents overseas_ai)
+  final bool aiConsent;
+
+  bool operator [](SettingKey k) => switch (k) {
+        SettingKey.notifyYesterday => notifyYesterday,
+        SettingKey.notifyReminder => notifyReminder,
+        SettingKey.notifyAnalysis => notifyAnalysis,
+        SettingKey.leaderboardVisible => leaderboardVisible,
+        SettingKey.gradeBadgePublic => gradeBadgePublic,
+        SettingKey.aiConsent => aiConsent,
+      };
+
+  MySettings withValue(SettingKey k, bool v) => MySettings(
+        notifyYesterday: k == SettingKey.notifyYesterday ? v : notifyYesterday,
+        notifyReminder: k == SettingKey.notifyReminder ? v : notifyReminder,
+        notifyAnalysis: k == SettingKey.notifyAnalysis ? v : notifyAnalysis,
+        leaderboardVisible: k == SettingKey.leaderboardVisible ? v : leaderboardVisible,
+        gradeBadgePublic: k == SettingKey.gradeBadgePublic ? v : gradeBadgePublic,
+        aiConsent: k == SettingKey.aiConsent ? v : aiConsent,
+      );
+
+  /// 바꿀 항목만 서버 키로
+  Map<String, bool> patchJson(Set<SettingKey> keys) => {for (final k in keys) k.wire: this[k]};
+
+  factory MySettings.fromJson(Map<String, dynamic> j) => MySettings(
+        notifyYesterday: j['notify_yesterday'] as bool? ?? true,
+        notifyReminder: j['notify_reminder'] as bool? ?? true,
+        notifyAnalysis: j['notify_analysis'] as bool? ?? true,
+        leaderboardVisible: j['leaderboard_visible'] as bool? ?? true,
+        gradeBadgePublic: j['grade_badge_public'] as bool? ?? false,
+        aiConsent: j['ai_consent'] as bool? ?? false,
+      );
 }
 
 class InviteSummary {

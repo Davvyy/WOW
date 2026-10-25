@@ -38,7 +38,7 @@ class HealthPackageSource implements HealthSource {
   /// 모든 항목 읽기 전용(권한 시트 항목 = P4 교육 카드 5개)
   static final _access = List<HealthDataAccess>.filled(_types.length, HealthDataAccess.READ);
 
-  /// 체중은 P12 "건강 앱에서 읽기" 최초 탭 시점에 별도 요청한다.
+  /// 체중은 P12 "건강 앱에서 읽기" 최초 탭 시점에 별도 요청한다. 체중 기록 카드를 숨긴 동안(D76)은 부르는 곳이 없다.
   static const weightType = HealthDataType.WEIGHT;
 
   @override
@@ -77,6 +77,7 @@ class HealthPackageSource implements HealthSource {
   }
 
   /// P12 "건강 앱에서 읽기": 체중(bodyMass / WeightRecord) 별도 권한 후 최근 값 1건. 참고용·BMR 미반영.
+  /// 체중 기록 카드(D76)를 저장 기능과 함께 되살릴 때 쓴다. 지금은 부르는 곳이 없다.
   Future<double?> readLatestWeightKg({DateTime? now}) async {
     await _ensureConfigured();
     final ok = await _health.requestAuthorization([weightType], permissions: [HealthDataAccess.READ]);

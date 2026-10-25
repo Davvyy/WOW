@@ -123,6 +123,7 @@ class OnboardingNotifier extends Notifier<OnboardingDraft> {
       if (ref.mounted) {
         state = state.copyWith(join: r);
         ref.invalidate(sessionsProvider); // 새 참가 정보로 세션 다시 읽기
+        ref.invalidate(mySettingsProvider); // 참가 때 저장한 AI 동의 다시 읽기
       }
       return null;
     } catch (e) {
@@ -931,10 +932,38 @@ class NotifAskNotifier extends Notifier<bool> {
 
 final notifAskedProvider = NotifierProvider<NotifAskNotifier, bool>(NotifAskNotifier.new);
 
-/// 국외 AI 분석 동의(P3 선택, P12 철회)
+/// 설정 화면 토글(서버 my_settings, D75). 로그인 사용자가 바뀌면 다시 읽는다. 못 읽으면 기본값으로 그린다.
+class MySettingsNotifier extends AsyncNotifier<MySettings> {
+  @override
+  Future<MySettings> build() {
+    ref.watch(authChangesProvider);
+    return ref.watch(apiProvider).fetchSettings();
+  }
+
+  /// 토글 하나 바꾸기: 화면 먼저 바꾸고 서버에 저장한다. 저장하지 못하면 되돌리고 안내 문구, 성공하면 null.
+  Future<String?> change(SettingKey key, bool value) async {
+    final prev = state.value ?? const MySettings();
+    state = AsyncData(prev.withValue(key, value));
+    try {
+      final saved = await ref.read(apiProvider).updateSettings(prev.withValue(key, value), keys: {key});
+      if (ref.mounted) state = AsyncData(saved);
+      return null;
+    } catch (e) {
+      if (ref.mounted) state = AsyncData(prev);
+      return apiErrorText(e);
+    }
+  }
+}
+
+final mySettingsProvider = AsyncNotifierProvider<MySettingsNotifier, MySettings>(MySettingsNotifier.new);
+
+/// 국외 AI 분석 동의(P3 선택, P12 철회·재동의). 서버 동의 기록(my_settings.ai_consent)을 따른다.
+/// 아직 못 읽었으면 켬으로 본다(서버가 끼니마다 동의를 다시 확인해 분석 여부를 정한다).
 class AiConsentNotifier extends Notifier<bool> {
   @override
-  bool build() => true;
+  bool build() => ref.watch(mySettingsProvider).value?.aiConsent ?? true;
+
+  /// 화면 안에서만 바꾼다(P3 참가 직전). 서버 저장은 참가 요청·[MySettingsNotifier.change] 가 한다.
   void set(bool v) => state = v;
 }
 
@@ -963,10 +992,12 @@ class AutoContinueNotifier extends AsyncNotifier<bool> {
 
 final autoContinueProvider = AsyncNotifierProvider<AutoContinueNotifier, bool>(AutoContinueNotifier.new);
 
-/// P12 "순위에 내 행 보이기" (끄면 내 행만 보인다)
+/// P12 "순위에 내 행 보이기" (끄면 내 행만 보인다). 서버 my_settings.leaderboard_visible 을 따른다.
 class RankVisibleNotifier extends Notifier<bool> {
   @override
-  bool build() => true;
+  bool build() => ref.watch(mySettingsProvider).value?.leaderboardVisible ?? true;
+
+  /// 화면 안에서만 바꾼다. 서버 저장은 [MySettingsNotifier.change].
   void set(bool v) => state = v;
 }
 

@@ -116,6 +116,25 @@ class MockChalloryApi implements ChalloryApi {
     _autoContinue = on;
   }
 
+  /// 설정 토글(서버 my_settings 흉내). 테스트가 확인·바꾼다.
+  MySettings settings = const MySettings();
+
+  @override
+  Future<MySettings> fetchSettings() async {
+    calls.add('my_settings');
+    return settings;
+  }
+
+  @override
+  Future<MySettings> updateSettings(MySettings patch, {required Set<SettingKey> keys}) async {
+    _maybeFail('set_my_settings');
+    var s = settings;
+    for (final k in keys) {
+      s = s.withValue(k, patch[k]);
+    }
+    return settings = s;
+  }
+
   bool participating = false;
 
   @override
