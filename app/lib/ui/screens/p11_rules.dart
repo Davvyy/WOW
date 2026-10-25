@@ -98,7 +98,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
     final (bs, be, le, de) = ss.slotStarts;
     final minRankDays = max(1, min(7, (curChallenge.days - 3) ~/ 2)); // 순위 진입 최소 참여일
     final cards = [
-      ('①', '먹은 걸 찍어요', '세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 $m kcal(전날 같은 끼니가 더 크면 그 값)로, 간식은 찍은 만큼 더해져요.', '대체값 $m · 간식 ${fmtInt(r.snackKcal)} 미만', const Color(0xFF0B6E70)),
+      ('①', '먹은 걸 찍어요', '세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 $m kcal(전날 같은 끼니가 더 크면 그 값)로, 간식은 찍은 만큼 더해져요.', '대체값 $m · ${r.snackKcal > 0 ? '간식 ${fmtInt(r.snackKcal)} 미만' : '간식은 찍은 만큼'}', const Color(0xFF0B6E70)),
       ('②', '움직여요', '걸음·달리기·계단 자동 기록만 인정. 하루 활동 최대 ${fmtInt(r.c)} kcal.', '활동 상한 ${fmtInt(r.c)} · 걸음 ${fmtInt(r.stepsCap)}', const Color(0xFF1F5E8F)),
       ('③', '점수는 이렇게', '(기초대사 + 활동) − 섭취 = 순적자. ${fmtInt(r.t)} kcal면 100점, 최대 ${fmtInt(r.sMax)}점.', 'T ${fmtInt(r.t)} · 최대 ${fmtInt(r.sMax)}점', const Color(0xFF4A3F8A)),
       ('④', '공정하게', '폰이든 워치든 같은 공식. 이상 기록은 조용히 확인하고 설명 기회를 드려요.', '소명 1회 · ${ss.appealHours}시간', const Color(0xFF3E6B3A)),
@@ -227,14 +227,14 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                     Semantics(
                       liveRegion: true,
                       child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                        Expanded(child: Txt.cap('활동 ${fmtK1(s.activity.aD)} · 순적자 ${fmtInt(s.score.dD)}${s.score.floorApplied ? ' · 하한 적용' : ''}')),
+                        Expanded(child: Txt.cap('활동 ${fmtInt(s.activity.aD)} · 순적자 ${fmtInt(s.score.dD)}${s.score.floorApplied ? ' · 하한 적용' : ''}')),
                         const Txt('예상 '),
                         NumText(fmtK1(s.score.sD), size: 26, weight: FontWeight.w700),
                         const Txt('점'),
                       ]),
                     ),
                     ChGauge(value: s.score.ratio, max: r.sMax / 100, label: '예상 점수 게이지'),
-                    Txt.cap('3끼를 확정했다고 가정해요. 달리기는 ${_runKmh.round()} km/h 기준이고 달리기 중 걸음 $_runStepsPerMin보/분은 걸음에서 빼요.\n결과는 P5·P10과 같은 산식으로 계산해요.'),
+                    Txt.cap('3끼를 확정했다고 가정해요. 달리기는 ${_runKmh.round()} km/h 기준이고 달리기 중 걸음 $_runStepsPerMin보/분은 걸음에서 빼요.\n결과는 홈·점수 계산 화면과 같은 산식으로 계산해요.'),
                     ChLink('오늘 실제값과 비교', onTap: () => context.push(R.ledger)),
                   ], gap: 10)),
                 ),
