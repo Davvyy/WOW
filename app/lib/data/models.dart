@@ -318,6 +318,10 @@ class MeInfo {
   final double bmrRaw;
 
   Profile get profile => Profile(sex: sex, weightKg: weightKg, heightCm: heightCm, age: age);
+
+  /// 닉네임만 바꾼 같은 프로필(설정에서 바꾼 뒤, D81)
+  MeInfo withNickname(String n) =>
+      MeInfo(nickname: n, sex: sex, birthYear: birthYear, heightCm: heightCm, weightKg: weightKg, age: age, bmr: bmr, bmrRaw: bmrRaw);
 }
 
 /// 점수 장부 한 줄(P10). 값은 엔진이 계산한다.
@@ -426,6 +430,11 @@ class LeaderRow {
   final double? rate;
   final int? days;
   final int? minDays;
+
+  /// 이름만 바꾼 같은 행(닉네임을 바꾼 뒤 내 행, D81)
+  LeaderRow withName(String n) => LeaderRow(rank: rank, name: n, score: score, fill: fill, watch: watch, me: me, delta: delta, tie: tie,
+      aggregating: aggregating, gapToPrev: gapToPrev, participantId: participantId, underReview: underReview, pending: pending, avg: avg,
+      rate: rate, days: days, minDays: minDays);
 }
 
 /// 운영자 공지(N-03). 서버 notifications(type N-03, 본인 행) 한 건.

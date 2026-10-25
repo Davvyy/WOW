@@ -125,6 +125,24 @@ class MockChalloryApi implements ChalloryApi {
     return settings;
   }
 
+  /// 마지막으로 저장한 닉네임(없으면 null). 테스트가 확인한다.
+  String? nickname;
+
+  /// 서버 set_my_nickname 과 같은 규칙: 2~12자(422) · 모의 순위표의 다른 참가자와 겹치면(대소문자 무시) 409.
+  /// 저장하면 참가 중인 모의 세션의 내 닉네임도 바꾼다(다음에 다시 읽어도 같은 이름).
+  @override
+  Future<String> setNickname(String value) async {
+    _maybeFail('set_my_nickname');
+    final n = value.trim();
+    if (!nicknameValid(n)) throw const ApiException(422, '닉네임은 2~12자로 정해 주세요');
+    final others = [...mockLeaderboard.cumulative, ...mockLeaderboard.today].where((r) => !r.me && !r.aggregating);
+    if (others.any((r) => r.name.toLowerCase() == n.toLowerCase())) throw const ApiException(409, '이미 같은 챌린지에 있는 닉네임이에요');
+    for (var i = 0; i < sessions.length; i++) {
+      sessions[i] = sessions[i].withNickname(n);
+    }
+    return nickname = n;
+  }
+
   @override
   Future<MySettings> updateSettings(MySettings patch, {required Set<SettingKey> keys}) async {
     _maybeFail('set_my_settings');

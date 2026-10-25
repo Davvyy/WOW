@@ -67,6 +67,28 @@ class ChallengeSession {
 
   bool get monthly => kind == 'monthly';
 
+  /// 내 닉네임만 바꾼 같은 세션(설정에서 바꾼 뒤 다시 읽지 않고 바로 보이게, D81)
+  ChallengeSession withNickname(String nickname) => ChallengeSession(
+        challenge: challenge,
+        me: me.withNickname(nickname),
+        rules: rules,
+        status: status,
+        participantId: participantId,
+        challengeId: challengeId,
+        rulesMd: rulesMd,
+        slotStarts: slotStarts,
+        finalizeTime: finalizeTime,
+        editWindowHours: editWindowHours,
+        appealHours: appealHours,
+        stepsSpikeRatio: stepsSpikeRatio,
+        rankEligible: rankEligible,
+        kind: kind,
+        checkStart: checkStart,
+        stats: stats,
+        joinOpen: joinOpen,
+        skipsUsedThisWeek: skipsUsedThisWeek,
+      );
+
   ChalloryEngine get engine => ChalloryEngine(rules);
 
   static final mock = ChallengeSession(

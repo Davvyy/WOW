@@ -277,6 +277,15 @@ class Leaderboard {
   /// 마지막으로 확정된 날(서버 확정 누적 스냅샷의 local_date). 그 다음 날 확정 시각에 누적이 확정됐다. 모르면 null
   final DateTime? cumulativeFinalDate;
 
+  /// 내 행 이름을 [nickname] 으로(닉네임을 바꾼 뒤: 스냅샷은 매시 다시 만들어져 그 전까지 옛 이름이다, D81). 같으면 그대로.
+  Leaderboard withMyName(String nickname) {
+    bool stale(List<LeaderRow> l) => l.any((r) => r.me && !r.aggregating && r.name != nickname);
+    if (!stale(today) && !stale(cumulative)) return this;
+    List<LeaderRow> fix(List<LeaderRow> l) => [for (final r in l) r.me && !r.aggregating ? r.withName(nickname) : r];
+    return Leaderboard(total: total, cumulative: fix(cumulative), today: fix(today), todayFinal: todayFinal, asOf: asOf,
+        cumulativeFinalDate: cumulativeFinalDate);
+  }
+
   /// 내 행이 없으면 null(기록 모드·순위 비공개 등)
   LeaderRow? meIn(List<LeaderRow> list) {
     for (final r in list) {

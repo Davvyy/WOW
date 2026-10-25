@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/format.dart';
 import '../../data/models.dart';
 import '../../router.dart';
-import '../../services/api/challory_api.dart' show MySettings, SettingKey;
+import '../../services/api/challory_api.dart' show MySettings, SettingKey, nicknameLength, nicknameMax, nicknameMin, nicknameValid;
 import '../../state/app_state.dart';
 import '../../state/app_version.dart';
 import '../../services/push/push_service.dart' show PushPermission;
@@ -14,7 +14,7 @@ import '../widgets/common.dart';
 import '../../state/session.dart';
 
 /// P12 설정: 프로필(잠금) · 연결 진단 · 알림 · 공지 · 공개 · 동의/데이터 · 계정.
-/// 알림·공개·AI 동의 토글은 서버에 저장한다(D75). 체중 기록(참고용)은 저장 기능이 없어 숨겼다(D76).
+/// 알림·공개·AI 동의 토글은 서버에 저장한다(D75). 체중 기록(참고용)은 저장 기능이 없어 숨겼다(D76). 닉네임은 바꿀 수 있다(D81).
 /// variant(검수용): disconnected | push-off | notices | delete
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.variant});
@@ -108,6 +108,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) context.go(R.p1);
   }
 
+  /// 닉네임 바꾸기 창. 저장은 창 안에서 하고(서버 거절 문구는 창 안에), 바꾸면 새 닉네임으로 닫힌다.
+  Future<void> _openNickname() async {
+    // 입력 칸 컨트롤러는 창 안의 위젯이 가진다 — 닫히는 애니메이션 동안에도 살아 있어야 해서(계정 삭제·P7 직접 입력 창과 같은 방식)
+    final saved = await showChSheet<String>(context, builder: (_) => _NicknameSheet(current: curMe.nickname));
+    if (saved != null && mounted) showToast(context, '닉네임을 바꿨어요');
+  }
+
   Future<void> _openDelete() async {
     // 입력 칸 컨트롤러는 창 안의 위젯이 가진다 — 닫히는 애니메이션 동안에도 살아 있어야 해서(P7 직접 입력 창과 같은 방식)
     final ok = await showDialog<bool>(context: context, builder: (_) => const _DeleteConfirm());
@@ -130,6 +137,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    ref.watch(sessionProvider); // 아래 curChallenge·curMe 는 선택한 챌린지 값: 닉네임을 바꾸면 바로 다시 그린다(D81)
     final ch = curChallenge;
     final notices = ref.watch(noticesProvider).value ?? const <Notice>[];
     final unread = notices.where((n) => !n.read).length;
@@ -177,8 +185,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ChCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const SectionTitle('프로필'),
-            // 닉네임 바꾸기 API 가 없어 눌리지 않는 줄로 둔다(#24)
-            li(Icons.person_rounded, curMe.nickname, sub: '닉네임 · 순위에는 닉네임만 보여요'),
+            // 닉네임 바꾸기(D81): 서버 set_my_nickname
+            li(Icons.person_rounded, curMe.nickname, sub: '닉네임 · 순위에는 닉네임만 보여요', onTap: _openNickname),
             li(Icons.lock_rounded, '체중 ${curMe.weightKg.round()} kg · 키 ${curMe.heightCm.round()} cm', sub: '시작 시 잠금 · 변경은 운영자 문의', trailing: const ChChip('잠금', icon: Icons.lock_rounded)),
           ]),
         ),
@@ -245,6 +253,73 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         Disclaimer('챌로리${switch (ref.watch(appVersionProvider)) { final v? => ' $v', _ => '' }} · 모든 수치는 추정이에요'),
       ],
     );
+  }
+}
+
+/// 닉네임 바꾸기 창(D81): 지금 닉네임으로 시작 · 글자 수 · 2~12자이고 바뀌었을 때만 저장. 저장하면 새 닉네임으로 닫힌다.
+class _NicknameSheet extends ConsumerStatefulWidget {
+  const _NicknameSheet({required this.current});
+  final String current;
+
+  @override
+  ConsumerState<_NicknameSheet> createState() => _NicknameSheetState();
+}
+
+class _NicknameSheetState extends ConsumerState<_NicknameSheet> {
+  late final _ctrl = TextEditingController(text: widget.current);
+  String? _error;
+  var _saving = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  bool get _canSave => !_saving && nicknameValid(_ctrl.text) && _ctrl.text.trim() != widget.current;
+
+  Future<void> _save() async {
+    final name = _ctrl.text.trim();
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final err = await ref.read(challengesActionsProvider).setNickname(name);
+    if (!mounted) return;
+    if (err == null) {
+      Navigator.of(context).pop(name);
+    } else {
+      setState(() {
+        _saving = false;
+        _error = err;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final n = nicknameLength(_ctrl.text);
+    final tooShortOrLong = _ctrl.text.isNotEmpty && !nicknameValid(_ctrl.text);
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: spaced([
+      const Txt.title('닉네임 바꾸기'),
+      const Txt.cap('순위에는 닉네임만 보여요. 같은 챌린지 안에서는 겹칠 수 없어요.'),
+      ChInput(label: '닉네임 ($nicknameMin~$nicknameMax자)', controller: _ctrl, numeric: false, hint: widget.current, maxLength: nicknameMax,
+          enabled: !_saving, onChanged: (_) => setState(() => _error = null)),
+      Row(children: [
+        Expanded(
+          child: _error != null
+              ? Txt.cap(_error!, color: c.critical)
+              : Txt.cap(tooShortOrLong ? '닉네임은 $nicknameMin~$nicknameMax자로 정해 주세요' : '', color: c.warn),
+        ),
+        Txt.cap('$n/$nicknameMax', color: tooShortOrLong ? c.warn : null),
+      ]),
+      Row(children: [
+        Expanded(child: ChButton('취소', kind: BtnKind.quiet, onPressed: _saving ? null : () => Navigator.of(context).pop())),
+        const SizedBox(width: 8),
+        Expanded(child: ChButton('저장', onPressed: _canSave ? _save : null)),
+      ]),
+    ], gap: 12));
   }
 }
 

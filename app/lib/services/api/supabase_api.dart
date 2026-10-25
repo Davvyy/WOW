@@ -166,6 +166,12 @@ class SupabaseChalloryApi implements ChalloryApi {
       MySettings.fromJson(Map<String, dynamic>.from(await _rpc('set_my_settings', {'p': patch.patchJson(keys)}) as Map));
 
   @override
+  Future<String> setNickname(String nickname) async {
+    final j = Map<String, dynamic>.from(await _rpc('set_my_nickname', {'p_nickname': nickname}) as Map);
+    return j['nickname'] as String;
+  }
+
+  @override
   Future<List<Notice>> fetchNotices() async {
     try {
       final rows = await _client.from('notifications').select('id, title, body, scheduled_at, read_at')

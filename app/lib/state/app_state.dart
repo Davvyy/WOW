@@ -145,9 +145,13 @@ final ledgerProvider = FutureProvider<List<LedgerRow>>((ref) async {
   return ref.watch(apiProvider).fetchLedger();
 });
 
-/// 화면용: 값이 아직 없으면 모의 모드는 프로토타입 값으로 바로 그리고, 서버 모드는 null(로딩·오류 표시)
-Leaderboard? watchLeaderboard(WidgetRef ref) =>
-    ref.watch(leaderboardProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLeaderboard);
+/// 화면용: 값이 아직 없으면 모의 모드는 프로토타입 값으로 바로 그리고, 서버 모드는 null(로딩·오류 표시).
+/// 내 행 이름은 세션의 지금 닉네임: 닉네임을 바꾼 뒤 스냅샷(매시)이 다시 만들어지기 전에도 새 이름이 보인다(D81).
+Leaderboard? watchLeaderboard(WidgetRef ref) {
+  final lb = ref.watch(leaderboardProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLeaderboard);
+  final nick = ref.watch(sessionProvider).value?.me.nickname;
+  return nick == null || lb == null ? lb : lb.withMyName(nick);
+}
 List<LedgerRow>? watchLedger(WidgetRef ref) => ref.watch(ledgerProvider).value ?? (ref.read(apiProvider).isRemote ? null : mockLedger);
 
 /// 공지 목록(N-03). 열면 [markAllRead] 로 읽음 처리(서버 read_at).
@@ -327,12 +331,27 @@ ChallengePhase phaseOfStatus(String status) => switch (status) {
 final authChangesProvider = StreamProvider<bool>((ref) => ref.watch(authServiceProvider).changes);
 
 /// 참가 중인 챌린지 세션 목록(최근 참가 순). 서버 모드는 my_challenges + challenge_session, 모의 모드는 월간 + 운영자 2개.
-final sessionsProvider = FutureProvider<List<ChallengeSession>>((ref) async {
-  ref.watch(authChangesProvider);
-  final api = ref.watch(apiProvider);
-  if (api.isRemote && !ref.read(authServiceProvider).isSignedIn) return const [];
-  return api.fetchSessions();
-});
+class SessionsNotifier extends AsyncNotifier<List<ChallengeSession>> {
+  @override
+  Future<List<ChallengeSession>> build() async {
+    ref.watch(authChangesProvider);
+    final api = ref.watch(apiProvider);
+    if (api.isRemote && !ref.read(authServiceProvider).isSignedIn) return const [];
+    return api.fetchSessions();
+  }
+
+  /// 닉네임을 바꾼 뒤(D81): 다시 읽지 않고 모든 세션의 내 닉네임만 바꾼다. 서버도 진행 중 챌린지의 참가 행을 모두 바꿨다.
+  void renameMe(String nickname) {
+    final list = state.value;
+    if (list == null) {
+      ref.invalidateSelf(); // 아직 못 읽었으면(읽는 중·오류) 서버 값을 새로 읽는다
+      return;
+    }
+    state = AsyncData([for (final s in list) s.withNickname(nickname)]);
+  }
+}
+
+final sessionsProvider = AsyncNotifierProvider<SessionsNotifier, List<ChallengeSession>>(SessionsNotifier.new);
 
 /// 지금 보고 있는 챌린지(null = 가장 최근 참가)
 class SelectedChallengeNotifier extends Notifier<String?> {
@@ -374,6 +393,17 @@ class ChallengesActions {
       final r = await _ref.read(apiProvider).joinChallenge(req);
       _ref.invalidate(sessionsProvider);
       _ref.read(selectedChallengeProvider.notifier).select(r.challengeId);
+      return null;
+    } catch (e) {
+      return apiErrorText(e);
+    }
+  }
+
+  /// 닉네임 바꾸기(D81). 성공하면 세션(홈·순위·설정이 읽는 내 닉네임)을 바로 바꾼다. 성공 null, 아니면 서버 문구.
+  Future<String?> setNickname(String nickname) async {
+    try {
+      final saved = await _ref.read(apiProvider).setNickname(nickname.trim());
+      _ref.read(sessionsProvider.notifier).renameMe(saved);
       return null;
     } catch (e) {
       return apiErrorText(e);

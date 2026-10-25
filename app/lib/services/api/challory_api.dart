@@ -44,6 +44,10 @@ abstract class ChalloryApi {
   /// 설정 토글 바꾸기(set_my_settings): [patch] 의 항목만 바꾸고 바뀐 뒤 전체 값을 돌려준다.
   Future<MySettings> updateSettings(MySettings patch, {required Set<SettingKey> keys});
 
+  /// 닉네임 바꾸기(set_my_nickname, D81). 서버가 앞뒤 공백을 지우고 2~12자(422) · 내가 있는 챌린지 안의 중복(409, 대소문자 무시)을
+  /// 확인한 뒤 users 와 진행 중 챌린지의 내 참가 행을 바꾼다. 저장된 닉네임을 돌려준다.
+  Future<String> setNickname(String nickname);
+
   /// 공지 목록(N-03, 최신순). 예약 발송 시각이 지난 것만.
   Future<List<Notice>> fetchNotices();
 
@@ -130,6 +134,12 @@ abstract class ChalloryApi {
   /// 로그아웃 때 이 기기 행을 지워 더는 이 계정 알림이 오지 않게 한다(RLS: 본인 행)
   Future<void> unregisterDevice(String deviceId);
 }
+
+/// 닉네임 길이 규칙(서버 nickname_normalize 와 같음): 앞뒤 공백을 뺀 2~12자. 글자 수는 서버 char_length 처럼 코드 포인트로 센다.
+const nicknameMin = 2;
+const nicknameMax = 12;
+int nicknameLength(String s) => s.trim().runes.length;
+bool nicknameValid(String s) => nicknameLength(s) >= nicknameMin && nicknameLength(s) <= nicknameMax;
 
 /// 설정 토글 이름(서버 my_settings 키)
 enum SettingKey {

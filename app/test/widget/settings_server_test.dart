@@ -117,7 +117,7 @@ void main() {
     expect(api.settings.aiConsent, isTrue);
   });
 
-  testWidgets('체중 기록(참고용) 카드·처리방침 줄은 없다 · 닉네임 줄은 눌리지 않는다', (tester) async {
+  testWidgets('체중 기록(참고용) 카드·처리방침 줄은 없다', (tester) async {
     await _open(tester, _Remote(const MySettings()));
     expect(find.text('체중 기록 (참고용)'), findsNothing);
     expect(find.textContaining('69.4'), findsNothing);
@@ -125,8 +125,7 @@ void main() {
     expect(find.text('건강 앱에서 읽기'), findsNothing);
     expect(find.textContaining(RegExp(r'시작 \d')), findsNothing);
     expect(find.text('개인정보 처리방침 · 이용약관'), findsNothing);
-    final nick = find.ancestor(of: find.text('닉네임 · 순위에는 닉네임만 보여요'), matching: find.byType(InkWell));
-    expect(nick.evaluate().every((e) => (e.widget as InkWell).onTap == null), isTrue);
+    // 닉네임 줄은 이제 눌러서 바꾼다(D81): settings_nickname_test.dart
   });
 
   testWidgets('모의 모드도 같은 화면으로 동작한다(기본값)', (tester) async {
