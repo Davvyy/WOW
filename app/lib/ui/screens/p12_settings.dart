@@ -38,10 +38,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      // 실제 OS 알림 권한: 거부 상태면 상단 배너(06 P12). 검수용 variant 는 그대로 둔다.
+      // 실제 OS 알림 권한: 허용 전(거부·아직 안 물어봄 — 재설치 직후 등)이면 상단 배너(06 P12).
+      // 푸시를 쓸 수 없는 기기(platform 없음)는 제외. 검수용 variant 는 그대로 둔다.
       if (widget.variant == null) {
-        final p = await ref.read(pushServiceProvider).permission();
-        if (mounted && p == PushPermission.denied) setState(() => _osNotifOff = true);
+        final push = ref.read(pushServiceProvider);
+        if (push.platform != null) {
+          final p = await push.permission();
+          if (mounted && p != PushPermission.granted) setState(() => _osNotifOff = true);
+        }
       }
       if (!mounted) return;
       switch (widget.variant) {
