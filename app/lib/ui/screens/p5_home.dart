@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -305,7 +306,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       statusChip = ChChip('잠정 점수 · ${act.syncTime} 동기화', icon: Icons.schedule_rounded);
     }
 
-    final dayStart = (day - 4).clamp(1, 4);
+    // 7칸 창: 고른 날이 5번째 칸에 오되, 오늘(마지막 날을 넘지 않게)에서 끝난다 — 고를 수 없는 미래 칸은 넣지 않는다
+    final int dayStart = (day - 4).clamp(1, math.max(1, math.min(ch.days, ch.dayIndex) - 6));
     final strip = Row(children: [
       for (var i = 0; i < 7; i++)
         Expanded(
