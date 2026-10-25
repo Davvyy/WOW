@@ -36,9 +36,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     final src = act.source;
     final ios = act.stepsManual > 0;
     final manualSource = act.hasManualSource && !ios;
-    final reviewing = steps > AppConfig.stepsSpikeAbs;
     final zero = steps == 0;
     final remote = ref.read(apiProvider).isRemote;
+    // 검토 중: 서버 모드는 홈·순위와 같은 서버 값(오늘 순위표 내 행), 모의 모드는 걸음 급증 시나리오
+    final lb = watchLeaderboard(ref);
+    final reviewing = remote ? (lb?.meIn(lb.today)?.underReview ?? false) : steps > AppConfig.stepsSpikeAbs;
     final reviewBanner = reviewBannerText(
       remote: remote,
       review: remote && reviewing ? openReviewOn(ref.watch(myReviewsProvider).value, ch.today) : null,
