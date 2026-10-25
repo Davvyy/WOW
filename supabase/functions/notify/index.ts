@@ -1,7 +1,7 @@
 // POST /functions/v1/notify — 알림 발송 워커. pg_cron(pg_net) 또는 외부 스케줄러가 1~5분마다 호출.
 // 헤더 x-cron-secret = CRON_SECRET. claim_due_notifications 가 권한 없음(no_push)·하루 4건 상한(daily_cap)을 거른다.
 import { handle, HttpError, json, fromDbError } from '../_shared/http.ts';
-import { dispatch, selectPushSender, type ClaimedNotification } from '../_shared/push.ts';
+import { dispatch, forgetDeadTokens, selectPushSender, type ClaimedNotification } from '../_shared/push.ts';
 import { env, serviceClient } from '../_shared/supabase.ts';
 
 Deno.serve((req) =>
@@ -11,7 +11,9 @@ Deno.serve((req) =>
     const db = serviceClient();
     const { data, error } = await db.rpc('claim_due_notifications', { p_limit: 200 });
     if (error) throw fromDbError(error);
-    const sent = await dispatch((data ?? []) as ClaimedNotification[], selectPushSender(env));
+    const push = selectPushSender(env);
+    const sent = await dispatch((data ?? []) as ClaimedNotification[], push);
+    await forgetDeadTokens(db, push); // 앱을 지운 기기의 토큰은 기기 행째 지운다
     return json({ claimed: data?.length ?? 0, sent });
   })
 );

@@ -1,6 +1,7 @@
 import { assertEquals } from '@std/assert';
 import {
   dispatch,
+  forgetDeadTokens,
   FcmPushSender,
   GoogleTokenSource,
   LogPushSender,
@@ -141,4 +142,58 @@ Deno.test('바로 보내기: 한 건씩 집고, 집기 오류는 건너뜀(워�
   assertEquals(claimed, ['n1', 'bad']);
   assertEquals(sent, 1);
   assertEquals(push.sent[0].data, { review_id: 'r1', verdict: 'approve', type: 'N-06', id: 'n1' });
+});
+
+// 더는 없는 토큰(앱 삭제·재설치): FCM v1 이 404 UNREGISTERED 로 답하면 그 토큰을 모아 두고, 기기 행을 지운다
+const unregistered = () =>
+  new Response(JSON.stringify({ error: { code: 404, status: 'NOT_FOUND', details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode: 'UNREGISTERED' }] } }), { status: 404 });
+
+Deno.test('FCM 발송: 404 UNREGISTERED 토큰은 실패로 돌려주고 unregistered 에 모은다(다른 오류는 모으지 않음)', async () => {
+  const replies: Record<string, () => Response> = {
+    dead: unregistered,
+    busy: () => new Response('{"error":{"code":503,"status":"UNAVAILABLE"}}', { status: 503 }),
+    live: () => new Response('{}', { status: 200 }),
+  };
+  const fake = ((_u: string, init: RequestInit) => {
+    const t = JSON.parse(init.body as string).message.token as string;
+    return Promise.resolve(replies[t]());
+  }) as unknown as typeof fetch;
+  const s = new FcmPushSender('p', { token: () => Promise.resolve('t') }, fake);
+  assertEquals(await s.send({ token: 'dead', body: 'b' }), false);
+  assertEquals(await s.send({ token: 'busy', body: 'b' }), false);
+  assertEquals(await s.send({ token: 'live', body: 'b' }), true);
+  assertEquals(s.unregistered, ['dead']);
+});
+
+Deno.test('없는 토큰 정리: 모인 토큰이 있으면 forget_push_tokens 한 번, 없으면 부르지 않음 · 오류는 삼킨다', async () => {
+  const calls: unknown[] = [];
+  const db = {
+    rpc(fn: string, args: Record<string, unknown>) {
+      calls.push([fn, args]);
+      return Promise.resolve({ data: 1, error: fn === 'boom' ? { message: 'x' } : null });
+    },
+  };
+  await forgetDeadTokens(db, new LogPushSender());
+  assertEquals(calls, []);
+  const push = new LogPushSender();
+  push.unregistered.push('dead1', 'dead2');
+  await forgetDeadTokens(db, push);
+  assertEquals(calls, [['forget_push_tokens', { p_tokens: ['dead1', 'dead2'] }]]);
+});
+
+Deno.test('바로 보내기: 보낸 뒤 없는 토큰을 정리한다', async () => {
+  const calls: string[] = [];
+  const db = {
+    rpc(fn: string, args: Record<string, unknown>) {
+      calls.push(fn);
+      if (fn === 'claim_notification') {
+        return Promise.resolve({ data: [{ id: args.p_id, type: 'N-04', title: null, body: 'b', payload: {}, push_tokens: ['dead'] }], error: null });
+      }
+      return Promise.resolve({ data: 1, error: null });
+    },
+  };
+  const fake = (() => Promise.resolve(unregistered())) as unknown as typeof fetch;
+  const sent = await sendNow(db, ['n1'], new FcmPushSender('p', { token: () => Promise.resolve('t') }, fake));
+  assertEquals(sent, 0);
+  assertEquals(calls, ['claim_notification', 'forget_push_tokens']);
 });

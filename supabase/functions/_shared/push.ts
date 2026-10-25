@@ -7,10 +7,13 @@ export interface PushMessage {
 }
 export interface PushSender {
   send(m: PushMessage): Promise<boolean>;
+  /** 보내다가 '더는 없는 토큰'(앱 삭제·재설치)으로 판명된 토큰. [forgetDeadTokens] 가 기기 행을 지운다. */
+  readonly unregistered: string[];
 }
 
 export class LogPushSender implements PushSender {
   sent: PushMessage[] = [];
+  readonly unregistered: string[] = [];
   async send(m: PushMessage) {
     this.sent.push(m);
     console.log('[push:mock]', m.token.slice(0, 8), m.body);
@@ -78,6 +81,7 @@ export class GoogleTokenSource implements TokenSource {
 }
 
 export class FcmPushSender implements PushSender {
+  readonly unregistered: string[] = [];
   constructor(private projectId: string, private tokens: TokenSource, private fetchImpl: typeof fetch = fetch) {}
   async send(m: PushMessage) {
     let accessToken: string;
@@ -100,8 +104,23 @@ export class FcmPushSender implements PushSender {
         },
       }),
     });
+    // 404 UNREGISTERED: 앱이 지워졌거나 토큰이 바뀌었다 → 이 토큰으로는 다시 보내지 않게 모아 둔다
+    if (res.status === 404 && (await res.text()).includes('UNREGISTERED')) this.unregistered.push(m.token);
     return res.ok;
   }
+}
+
+/** forget_push_tokens 만 부를 수 있으면 되는 최소 DB 모양 */
+export interface ForgetRpc {
+  rpc(fn: 'forget_push_tokens', args: { p_tokens: string[] }): PromiseLike<{ error: unknown }>;
+}
+
+/** 보내다가 모인 '더는 없는 토큰'의 기기 행을 지운다. 실패해도 발송 결과에는 영향 없음(다음 발송 때 다시 모인다). */
+export async function forgetDeadTokens(db: ForgetRpc, push: PushSender): Promise<void> {
+  const tokens = [...new Set(push.unregistered)];
+  if (tokens.length === 0) return;
+  const { error } = await db.rpc('forget_push_tokens', { p_tokens: tokens });
+  if (error) console.error('[push] 없는 토큰 정리 실패', error);
 }
 
 // 함수 인스턴스가 살아 있는 동안 서비스 계정별 토큰을 재사용한다(selectPushSender 는 요청마다 불린다)
@@ -161,9 +180,9 @@ export async function dispatch(rows: ClaimedNotification[], push: PushSender): P
   return sent;
 }
 
-/** claim_notification 만 부를 수 있으면 되는 최소 DB 모양(테스트에서 가짜로 대신) */
+/** claim_notification · forget_push_tokens 를 부를 수 있으면 되는 최소 DB 모양(테스트에서 가짜로 대신) */
 export interface ClaimRpc {
-  rpc(fn: 'claim_notification', args: { p_id: string }): PromiseLike<{ data: unknown; error: unknown }>;
+  rpc(fn: 'claim_notification' | 'forget_push_tokens', args: { p_id: string } | { p_tokens: string[] }): PromiseLike<{ data: unknown; error: unknown }>;
 }
 
 /**
@@ -177,5 +196,6 @@ export async function sendNow(db: ClaimRpc, ids: string[], push: PushSender): Pr
     if (error) continue; // 남은 건 워커가 보낸다
     sent += await dispatch((data ?? []) as ClaimedNotification[], push);
   }
+  await forgetDeadTokens(db, push);
   return sent;
 }
