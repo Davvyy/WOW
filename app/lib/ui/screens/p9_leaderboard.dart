@@ -340,9 +340,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             addBox(Txt('${r.name} · 참여 ${r.days ?? 0}/${r.minDays ?? 7}일'), bottom: 4);
           }
         }
-        // '전체 N명'은 보이는 행이 있을 때만, '더 보기'는 보이는 행보다 더 있을 때만
+        // '전체 N명'은 보이는 행이 있을 때만(더 보기·페이지 나눔은 없다)
         final visibleRows = top3.isNotEmpty || rest.isNotEmpty || pending.isNotEmpty || pinMe;
-        if (visibleRows) addBox(Center(child: Txt.cap('전체 ${lb.total}명${lb.total > list.length ? ' · 20명씩 더 보기' : ''}')), bottom: 10);
+        if (visibleRows) addBox(Center(child: Txt.cap('전체 ${lb.total}명')), bottom: 10);
         if (weekly != null) {
           addBox(ChCard(
             outline: true,

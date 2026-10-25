@@ -1,4 +1,4 @@
-// P9 표시: 잠정 행이 있으면 '확정된 점수가 없어요' 빈 화면 대신 한 줄 안내 · '더 보기'는 더 있을 때만 · 잠정 안내 문장
+// P9 표시: 잠정 행이 있으면 '확정된 점수가 없어요' 빈 화면 대신 한 줄 안내 · '더 보기' 문구 없음 · 잠정 안내 문장
 import 'package:challory/data/mock/mock_data.dart';
 import 'package:challory/data/models.dart';
 import 'package:challory/router.dart';
@@ -38,9 +38,10 @@ void main() {
     expect(find.text(_note), findsNothing);
   });
 
-  testWidgets('A8 더 있으면 "20명씩 더 보기"', (tester) async {
+  testWidgets('A8 보이는 행보다 더 있어도 "더 보기" 문구는 없다(버튼이 없음, 전수 점검 #14)', (tester) async {
     await pumpApp(tester, location: R.rank);
-    expect(find.textContaining('20명씩 더 보기'), findsOneWidget, reason: '모의 전체 42명');
+    expect(find.text('전체 42명'), findsOneWidget, reason: '모의 전체 42명');
+    expect(find.textContaining('더 보기'), findsNothing);
   });
 
   testWidgets('B3 잠정 안내는 한 문장씩', (tester) async {
