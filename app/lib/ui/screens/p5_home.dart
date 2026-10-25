@@ -205,6 +205,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? round1(ledgerNow.where((x) => !x.check && !x.provisional).fold(0.0, (a, x) => a + x.s))
         : (lb?.meIn(lb.cumulative)?.score ?? 0);
     final cumMe = lb?.meIn(lb.cumulative) ?? LeaderRow(rank: 0, name: curMe.nickname, me: true, score: 0);
+    // 순위는 순위 점수(일평균 × (1 + 참여율), D49)로 매긴다 — 누적 합계와 다르면 함께 보여 두 숫자가 헷갈리지 않게
+    final rankScore = cumMe.score;
+    final rankScoreText = rankScore != null && round1(rankScore) != round1(cumulative) ? '순위 점수 ${fmtK1(rankScore)} · ' : '';
     final todayMe = lb?.meIn(lb.today);
     final reviewing = isToday && (remote ? (todayMe?.underReview ?? false) : steps > AppConfig.stepsSpikeAbs);
     final provisional = isToday;
@@ -433,7 +436,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       scoreLine('누적 ', cumulative),
                       Row(children: [
                         Flexible(
-                          child: Txt.cap(cumMe.rank == 0 ? '순위에는 들어가지 않아요' : '잠정 ${cumMe.rank}위${reviewing ? ' · 검토 중' : ''}', maxLines: 1),
+                          child: Txt.cap(cumMe.rank == 0 ? '순위에는 들어가지 않아요' : '$rankScoreText잠정 ${cumMe.rank}위${reviewing ? ' · 검토 중' : ''}', maxLines: 1),
                         ),
                         if (cumMe.delta > 0) ...[
                           const SizedBox(width: 4),

@@ -142,10 +142,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       final mine = r.me;
       final isHearted = hearted == (r.participantId ?? r.name);
       final locked = hearted != null && !isHearted;
-      // 오늘 탭의 내 줄은 홈과 같은 반영률(D69). 검토 중이면 서버 행이 '집계 중'이라 앱이 내 줄을 만들기 때문.
-      final fill = mine && today ? coverageCount(myTodayCells) : r.fill;
+      // 내 줄은 두 탭 모두 홈과 같은 반영률(D69). 검토 중이면 서버 행이 '집계 중'이라 앱이 내 줄을 만들기 때문.
+      final fill = mine ? coverageCount(myTodayCells) : r.fill;
       final fillPct = fill * 25;
-      final cells = mine && today ? myTodayCells : [for (var i = 0; i < 4; i++) i < fill];
+      final cells = mine ? myTodayCells : [for (var i = 0; i < 4; i++) i < fill];
       final semantics = '${r.rank == 0 ? '순위 제외' : '${r.rank}위'}${r.tie ? '(공동)' : ''} ${r.name}${mine ? '(나)' : ''} ${r.score == null ? '' : '${fmtK1(r.score!)}점'} 반영률 $fillPct%';
       return Semantics(
         label: semantics,
