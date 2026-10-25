@@ -24,16 +24,22 @@ LedgerRow _row(int d, {bool provisional = false, double s = 20}) {
 }
 
 class _Remote extends MockChalloryApi {
-  _Remote({this.withToday = true});
+  _Remote({this.withToday = true, this.ascending = false});
   final bool withToday;
+
+  /// 서버 응답 순서: 기본은 최신순, true 면 날짜 순(첫날 → 오늘)
+  final bool ascending;
   @override
   bool get isRemote => true;
   @override
-  Future<List<LedgerRow>> fetchLedger() async => [
-        // 최신순(서버 응답 그대로)
-        if (withToday) _row(8, provisional: true, s: 33.3),
-        for (var d = 7; d >= 1; d--) _row(d, s: 10.0 + d),
-      ];
+  Future<List<LedgerRow>> fetchLedger() async {
+    final rows = [
+      // 최신순(서버 응답 그대로)
+      if (withToday) _row(8, provisional: true, s: 33.3),
+      for (var d = 7; d >= 1; d--) _row(d, s: 10.0 + d),
+    ];
+    return ascending ? rows.reversed.toList() : rows;
+  }
 }
 
 Future<ProviderContainer> _pump(WidgetTester tester, String location, _Remote api) async {
@@ -80,10 +86,16 @@ void main() {
     expect(find.textContaining('17.0점'), findsWidgets);
   });
 
-  testWidgets('P10 일별 표: 날짜 순(첫날 → 오늘)', (tester) async {
-    await _pump(tester, R.ledger, _Remote());
-    final first = tester.getTopLeft(find.bySemanticsLabel(RegExp(r'^10\.6 점수'))).dy;
-    final today = tester.getTopLeft(find.bySemanticsLabel(RegExp(r'^10\.13 점수'))).dy;
-    expect(first, lessThan(today));
-  });
+  for (final ascending in [false, true]) {
+    testWidgets('P10 일별 표: 최신순(오늘이 맨 위 → 첫날) · 서버 ${ascending ? '날짜 순' : '최신순'} 응답', (tester) async {
+      await _pump(tester, R.ledger, _Remote(ascending: ascending));
+      const dates = ['10.13', '10.12', '10.11', '10.10', '10.9', '10.8', '10.7', '10.6'];
+      final ys = [for (final d in dates) tester.getTopLeft(find.bySemanticsLabel(RegExp('^${RegExp.escape(d)} 점수'))).dy];
+      for (var i = 1; i < ys.length; i++) {
+        expect(ys[i - 1], lessThan(ys[i]), reason: '${dates[i - 1]} 이 ${dates[i]} 보다 위');
+      }
+      // 오늘 산식 카드는 그대로 오늘
+      expect(find.textContaining('10.13 · 잠정'), findsOneWidget);
+    });
+  }
 }

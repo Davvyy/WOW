@@ -299,7 +299,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     final remote = ref.read(apiProvider).isRemote;
     final loaded = watchLedger(ref);
     if (loaded == null) return _loading(context);
-    // 서버 장부는 최신순으로 올 수 있다: 날짜 순(첫날 → 오늘)으로 맞춘다
+    // 서버 장부는 어느 순서로든 올 수 있다: 날짜 순(첫날 → 오늘)으로 맞춘다. 일별 표만 최신순으로 그린다
     final ledger = [...loaded]..sort((x, y) => x.d.compareTo(y.d));
     final cumulative = round1(ledger.where((x) => !x.check && !x.provisional).fold(0.0, (a, x) => a + x.s));
 
@@ -475,7 +475,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               ]),
             ),
             if (ledger.isEmpty) const Txt.cap('아직 기록된 날이 없어요'),
-            for (final r in ledger) tableRow(live(r)),
+            for (final r in ledger.reversed) tableRow(live(r)), // 표는 최신순(오늘이 맨 위)
             const SizedBox(height: 6),
             Txt.cap('${checkNote()} ${tapNote()}'),
           ]),
