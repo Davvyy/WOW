@@ -214,7 +214,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const SectionTitle('공개'),
             toggle('순위에 내 행 보이기', '끄면 내 행만 보여요', visible, (v) => _set(SettingKey.leaderboardVisible, v)),
-            toggle('측정 등급 배지 보이기', '기본 꺼짐 · 폰/워치 표시', settings.gradeBadgePublic, (v) => _set(SettingKey.gradeBadgePublic, v)),
+            // 측정 등급 배지 공개 토글은 서버가 등급(폰/워치)을 채울 때까지 숨긴다 — 켜도 보이는 게 없어서(D80). 저장 경로는 그대로 둔다.
           ]),
         ),
         ChCard(

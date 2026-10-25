@@ -48,7 +48,8 @@ void main() {
     expect(_on(tester, '저녁 리마인드'), isTrue);
     expect(_on(tester, '분석 완료'), isFalse);
     expect(_on(tester, '순위에 내 행 보이기'), isFalse);
-    expect(_on(tester, '측정 등급 배지 보이기'), isTrue);
+    // 측정 등급 배지는 서버가 등급을 채울 때까지 설정에서 숨긴다(D80)
+    expect(find.text('측정 등급 배지 보이기'), findsNothing);
     expect(find.text('AI 사진 분석 동의 철회됨'), findsOneWidget);
     // 다른 화면도 같은 값을 쓴다
     expect(c.read(rankVisibleProvider), isFalse);
@@ -62,12 +63,10 @@ void main() {
     await _tapSwitch(tester, '저녁 리마인드');
     await _tapSwitch(tester, '어제 결과');
     await _tapSwitch(tester, '순위에 내 행 보이기');
-    await _tapSwitch(tester, '측정 등급 배지 보이기');
     expect(api.settings.notifyAnalysis, isFalse);
     expect(api.settings.notifyReminder, isFalse);
     expect(api.settings.notifyYesterday, isFalse);
     expect(api.settings.leaderboardVisible, isFalse);
-    expect(api.settings.gradeBadgePublic, isTrue);
     expect(c.read(rankVisibleProvider), isFalse);
     expect(_on(tester, '분석 완료'), isFalse);
   });
