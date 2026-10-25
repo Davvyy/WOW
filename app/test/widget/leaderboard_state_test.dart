@@ -65,6 +65,13 @@ void main() {
     expect(find.textContaining('전체 '), findsOneWidget);
   });
 
+  testWidgets('참가자가 나 혼자여도 내 누적 점수가 있으면 내 행을 보여 준다(검토 중이라도)', (tester) async {
+    await _openCumulative(tester, _Api(const [LeaderRow(rank: 1, name: '지수', score: 13.9, me: true, underReview: true, participantId: 'p-1')]));
+    expect(_stateCards(), 0);
+    expect(find.textContaining('지수(나)'), findsOneWidget);
+    expect(find.textContaining('13.9'), findsWidgets);
+  });
+
   testWidgets('아무도 누적 행이 없고 점검 기간도 아니면 "아직 확정된 점수가 없어요" 하나만', (tester) async {
     await _openCumulative(tester, _Api(const []));
     expect(find.text('아직 확정된 점수가 없어요'), findsOneWidget);

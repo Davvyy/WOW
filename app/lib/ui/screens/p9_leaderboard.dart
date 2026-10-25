@@ -310,7 +310,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             ? centerCard(Icons.hourglass_top_rounded, '점검 기간이에요', '${fmtMd(first)}부터 누적 순위에 들어가요.')
             : me.pending
             ? centerCard(Icons.hourglass_top_rounded, '순위 대기', '참여 $days/$minDays일 · $minDays일 채우면 순위에 들어가요.')
-            : list.isEmpty || list.every((r) => r.me)
+            // 나 혼자 참가해도 내 누적 점수가 있으면 내 행을 보인다 — 점수 있는 행이 하나도 없을 때만 빈 화면
+            : !list.any((r) => r.score != null && !r.pending)
             ? centerCard(Icons.hourglass_empty_rounded, '아직 확정된 점수가 없어요', '점검 기간이 끝나고 첫 확정(다음 날 09:00) 뒤에 순위가 보여요.')
             : null;
         // 내 행: 순위 대기·점검 기간(누적 탭)에는 고정하지 않는다
