@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/engine/engine.dart';
 import '../../core/format.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models.dart';
 import '../../router.dart';
 import '../../state/app_state.dart';
@@ -102,8 +101,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
       _items = const [];
       _aiTotal = 0;
     } else {
+      // 항목이 없으면(업로드 대기·분석 불가·AI 끔·분석 없이 연 끼니·지난 날) 검색으로 확정한다
       _setDraft(_origin);
-      if (past && _items.isEmpty) _searchFallback = true;
     }
     _loadPhoto();
   }
@@ -120,10 +119,11 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     }
   }
 
+  /// 끼니의 항목으로 화면을 채운다. 예시(프로토타입) 항목으로 채우지 않는다: 비어 있으면 '음식을 찾지 못했어요' 검색 화면.
   void _setDraft(MealRecord m) {
-    // 지난 날 서버 끼니는 예시 항목으로 채우지 않는다
-    _items = m.items.isNotEmpty || widget.date != null ? m.items : mockDraftItems(widget.slot);
+    _items = m.items;
     _aiTotal = m.aiKcal ?? _items.fold(0.0, (a, i) => a + i.rawKcal);
+    if (_items.isEmpty) _searchFallback = true;
   }
 
   /// 기다리는 동안 끼니가 초안·분석 불가로 바뀌면 화면을 바꾼다
