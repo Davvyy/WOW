@@ -1,6 +1,15 @@
 // 식사 분석 파이프라인(05 §6): 사진 → LLM JSON(타임아웃 8초·재시도 1회) → 스키마 검증 → 식약처 DB 매핑 → 초안 저장 → N-04.
 // I/O는 모두 deps 로 주입한다(단위 테스트는 모의 deps, 운영은 analyze-meal/index.ts 의 Supabase 구현).
-import { type MealAnalysis, type MealImage, type MealVisionAdapter, parseMealAnalysis, type PortionBucket } from './ai/types.ts';
+import {
+  bucketOf,
+  type MealAnalysis,
+  type MealImage,
+  type MealVisionAdapter,
+  parseMealAnalysis,
+  type PortionBucket,
+  SERVINGS_MAX,
+  SERVINGS_MIN,
+} from './ai/types.ts';
 
 export { PORTION_MULTIPLIER } from './ai/types.ts';
 
@@ -36,6 +45,7 @@ export interface DraftItem {
   candidate_kcal: number[]; // 후보별 1인분 kcal(매칭 실패 후보는 선택 항목 값)
   candidate_food_codes: (string | null)[];
   single_piece: boolean; // 포장 상품이 낱개 포장 하나로 보임(D67) → meal_items.ai_single_piece
+  piece_guard: boolean; // 조각 수를 그릇 수로 낸 것으로 보고 인분으로 바꿈(D73) → meal_items.ai_piece_guard, 앱 P7 배너
 }
 
 export interface AnalyzeDeps {
@@ -57,6 +67,19 @@ export type AnalyzeOutcome =
   | { status: 'failed'; reason: 'not_food' | 'timeout_or_error' | 'schema'; attempts: number };
 
 const round1 = (x: number) => Math.floor(x * 10 + 0.5) / 10;
+
+/** 조각 수 가드(D73): 음식(포장 상품 아님) 항목인데 개수 ≥ 3 이고 항목 kcal(1인분 × 배수 × 개수) > 1,500 이면 */
+export const PIECE_GUARD_MIN_COUNT = 3;
+export const PIECE_GUARD_KCAL = 1500;
+/** 1인분 ≈ 10조각으로 보고 개수를 인분으로 바꾼다 */
+export const PIECES_PER_SERVING = 10;
+
+/** 조각 수를 그릇·접시 수로 낸 것으로 보이면 count 1 · 배수 = count × 배수 ÷ 10(0.1~3.0, 0.1 단위)로. 아니면 null */
+export function pieceGuard(serving: number, mult: number, count: number, packaged: boolean): { count: 1; mult: number } | null {
+  if (packaged || count < PIECE_GUARD_MIN_COUNT || serving * mult * count <= PIECE_GUARD_KCAL) return null;
+  const m = Math.min(SERVINGS_MAX, Math.max(SERVINGS_MIN, Math.round((count * mult) / PIECES_PER_SERVING * 10) / 10));
+  return { count: 1, mult: m };
+}
 
 export async function callWithRetry(adapter: MealVisionAdapter, image: MealImage, timeoutMs: number, attempts: number) {
   let lastErr: unknown;
@@ -104,7 +127,16 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
       serving = deps.unmatchedKcal ?? 200; // 미매칭 → 임시값 + 확인 필요
       needsCheck = true;
     }
-    const mult = it.servings; // AI 가 사진으로 본 인분(0.1 단위, 포장 상품은 한 포장당 양) — P7 먹은 양 기본값
+    let mult = it.servings; // AI 가 사진으로 본 인분(0.1 단위, 포장 상품은 한 포장당 양) — P7 먹은 양 기본값
+    let count = it.count;
+    let bucket = it.portion_bucket;
+    // 초밥 12점 → 1인분 × 11 처럼 조각 수가 그릇 수로 오면 인분으로 바꾸고 확인을 받는다(D73)
+    const guard = pieceGuard(serving, mult, count, it.packaged);
+    if (guard) {
+      ({ count, mult } = guard);
+      bucket = bucketOf(mult);
+      needsCheck = true;
+    }
     // 후보 칩: 선택 이름을 맨 앞에, 나머지 LLM 후보는 각자 DB 매칭 kcal(실패 시 선택 항목 값)
     const candidates = [chosen];
     const candidate_kcal = [serving];
@@ -125,16 +157,17 @@ export async function buildDraftItems(analysis: MealAnalysis, deps: Pick<Analyze
       name_candidates: it.name_candidates as string[],
       chosen_name: chosen,
       food_code,
-      count: it.count,
-      portion_bucket: it.portion_bucket,
+      count,
+      portion_bucket: bucket,
       portion_multiplier: mult,
       has_broth: it.has_broth,
       confidence: it.confidence,
       match_score: m.score,
       needs_check: needsCheck,
       serving_kcal: serving,
-      ai_kcal: round1(serving * mult * it.count),
+      ai_kcal: round1(serving * mult * count),
       single_piece: it.single_piece,
+      piece_guard: guard != null,
     });
   }
   await applyProductPieces(analysis, out, deps);

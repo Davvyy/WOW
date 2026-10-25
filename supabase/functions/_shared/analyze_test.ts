@@ -346,3 +346,47 @@ Deno.test('프롬프트: 달걀·과일·빵처럼 1개 단위로 세는 음식�
   // 포장 상품 규칙(D63·D67)은 그대로
   assertEquals(MEAL_PROMPT.includes('포장 상품의 count 는 따로 보이는 봉지·포장 수'), true);
 });
+
+// 조각 수 가드(D73): 음식 항목인데 count ≥ 3 이고 항목 kcal 이 1,500 을 넘으면 조각 수를 그릇 수로 낸 것으로 보고
+// count 1 · 배수 = count × 배수 ÷ 10(1인분 ≈ 10조각, 0.1~3.0, 0.1 단위)로 바꾸고 확인 필요 + piece_guard
+const PIECE_DB: Record<string, [string, number]> = { 초밥_광어: ['D000700', 453], 삶은달걀: ['D000710', 80], 갈비찜: ['D000720', 900] };
+function pieceDeps(items: unknown[], saved: { items: Record<string, unknown>[] }[] = []): AnalyzeDeps {
+  return {
+    ...deps(new MockAdapter({ is_food: true, items })),
+    mapFood: (cands: string[]): Promise<FoodMatch> => {
+      const hit = cands.find((c) => PIECE_DB[c]);
+      if (!hit) return mapFood(cands);
+      const [code, kcal] = PIECE_DB[hit];
+      return Promise.resolve({ match: 'auto', food_code: code, kcal, score: 0.9, chips: [{ food_code: code, name: hit, kcal, score: 0.9 }] });
+    },
+    saveDraft: (_id, r) => { saved.push(r as unknown as { items: Record<string, unknown>[] }); return Promise.resolve(); },
+  };
+}
+const dish = (name: string, count: number, extra: Record<string, unknown> = {}) =>
+  ({ name_candidates: [name], count, servings: 1, has_broth: false, confidence: 'high', packaged: false, single_piece: false, ...extra });
+
+Deno.test('조각 수 가드: 모둠초밥 count 11 × 453 → count 1 · 1.1인분 498.3, 확인 필요, piece_guard', async () => {
+  const saved: { items: Record<string, unknown>[] }[] = [];
+  const out = await analyzeMeal('m1', pieceDeps([dish('초밥_광어', 11)], saved));
+  if (out.status !== 'draft') throw new Error('expected draft');
+  const it = out.items[0];
+  assertEquals([it.count, it.portion_multiplier, it.ai_kcal, it.needs_check, it.piece_guard], [1, 1.1, 498.3, true, true]);
+  assertEquals(it.portion_bucket, 'one');
+  assertEquals(out.ai_kcal, 498.3, '끼니 AI 합계도 바뀐 값');
+  assertEquals(saved[0].items[0].piece_guard, true, '초안 저장에 함께');
+});
+
+Deno.test('조각 수 가드: 달걀 3개(80) · 큰 음식 2접시(900)는 그대로, piece_guard false', async () => {
+  const out = await analyzeMeal('m1', pieceDeps([dish('삶은달걀', 3), dish('갈비찜', 2)]));
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals(out.items.map((i) => [i.count, i.portion_multiplier, i.ai_kcal, i.needs_check, i.piece_guard]), [
+    [3, 1, 240, false, false],
+    [2, 1, 1800, false, false],
+  ]);
+});
+
+Deno.test('조각 수 가드: 배수는 0.1~3.0 으로(40조각 → 3.0), 포장 상품은 건드리지 않는다', async () => {
+  const out = await analyzeMeal('m1', pieceDeps([dish('초밥_광어', 40), dish('초밥_광어', 5, { packaged: true })]));
+  if (out.status !== 'draft') throw new Error('expected draft');
+  assertEquals(out.items.map((i) => [i.count, i.portion_multiplier, i.ai_kcal, i.piece_guard]), [[1, 3, 1359, true], [5, 1, 2265, false]]);
+});
