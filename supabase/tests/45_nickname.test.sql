@@ -60,6 +60,11 @@ set local role authenticated;
 do $$
 declare r jsonb;
 begin
+  -- 앱이 화면에 쓰는 표시 문구는 닉네임으로 못 쓴다(순위에서 다른 참가자·상태로 헷갈리지 않게)
+  perform tests.throws($q$select set_my_nickname('집계 중')$q$, 'PT422', '예약어: 집계 중');
+  perform tests.throws($q$select set_my_nickname(' 탈퇴 참가자 ')$q$, 'PT422', '예약어: 탈퇴 참가자(앞뒤 공백 무시)');
+  perform tests.throws($q$select set_my_nickname('집계중')$q$, 'PT422', '예약어: 띄어쓰기만 다른 것도');
+  perform tests.throws($q$select set_my_nickname('운영자')$q$, 'PT422', '예약어: 운영자');
   r := set_my_nickname('  새이름  ');
   perform tests.eq(r, '{"nickname": "새이름"}'::jsonb, '성공하면 {nickname} (앞뒤 공백 지움)');
   perform tests.throws($q$update participants set nickname = '직접' where user_id = auth.uid()$q$, '42501', '참가 행 닉네임을 직접 바꿀 수 없음(서버 함수로만)');

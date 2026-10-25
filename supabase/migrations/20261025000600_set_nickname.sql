@@ -13,6 +13,10 @@ begin
   if char_length(v) not between 2 and 12 then
     raise exception '닉네임은 2~12자로 정해 주세요' using errcode = 'PT422';
   end if;
+  -- 앱이 화면에 쓰는 표시 문구(순위의 '집계 중', 탈퇴 행의 '탈퇴 참가자' 등)는 쓰지 못한다. 띄어쓰기·대소문자 무시
+  if lower(regexp_replace(v, '\s', '', 'g')) in ('집계중', '탈퇴참가자', '운영자', '챌로리', '관리자', 'challory') then
+    raise exception '쓸 수 없는 닉네임이에요' using errcode = 'PT422';
+  end if;
   return v;
 end $$;
 
