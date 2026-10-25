@@ -575,7 +575,8 @@ class MealsNotifier extends Notifier<List<MealRecord>> {
   /// 서버가 거절하면 이전 상태로 되돌리고 오류 문구를 돌려준다(성공 시 null).
   Future<String?> confirm(MealSlot slot, List<MealItem> items, double total, {required String? key, double? aiKcal}) async {
     final found = key == null ? null : byKey(key);
-    final prev = found ?? MealRecord(slot: slot, localKey: key ?? _newKey());
+    // 목록에 없는 끼니를 확정하면(사진 없이 기록·검색·직접 입력) 사진 없는 새 기록
+    final prev = found ?? MealRecord(slot: slot, localKey: key ?? _newKey(), photoless: true);
     final local = prev.localKey!;
     final wasConfirmed = isCountedStatus(prev.status);
     final names = items.where((i) => i.checked).map((i) => i.name).take(2).join(' · ');
@@ -828,6 +829,7 @@ List<MealRecord> mealRecordsFromServer(List<ServerMeal> rows, {Map<String, Strin
       noAnalysis: m.engine == 'none',
       lateUpload: m.lateUpload,
       corrected: m.status == MealStatus.corrected,
+      photoless: m.hasPhoto == false,
     ));
   }
   return next;

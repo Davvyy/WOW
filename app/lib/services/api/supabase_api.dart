@@ -384,7 +384,7 @@ class SupabaseChalloryApi implements ChalloryApi {
       CreatedMeal.fromJson(await _fn('meals', {'photo_id': photoId, 'queued': queued, 'slot': ?slot?.name},
           headers: {'Idempotency-Key': idempotencyKey}));
 
-  static const _mealCols = 'id, slot, status, version, engine, ai_kcal, confirmed_kcal, captured_at, late_upload, '
+  static const _mealCols = 'id, slot, status, version, engine, ai_kcal, confirmed_kcal, captured_at, late_upload, photo_id, '
       'meal_items(chosen_name, name_candidates, food_code, count, portion_multiplier, has_broth, needs_check, ai_kcal, serving_kcal, '
       'candidate_kcal, candidate_food_codes, confirmed_kcal, eaten, broth_off, bite_fraction, ai_single_piece, ai_piece_guard, '
       'food_db_cache(unit_label, kcal, serving_g, package_g, user_product_pieces(pieces)))';

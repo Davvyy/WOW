@@ -82,7 +82,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     _inited = true;
     final key = widget.mealKey;
     final past = widget.date != null;
-    _origin = found ?? MealRecord(slot: widget.slot, localKey: 'local-${newUuidV4()}');
+    // 목록에 없는 끼니를 새로 기록하는 경우는 사진이 없다(카메라의 '사진 없이 기록'·빈 칸에서 검색)
+    _origin = found ?? MealRecord(slot: widget.slot, localKey: 'local-${newUuidV4()}', photoless: true);
     _key = _origin.key;
     // 연 끼니가 없음(그새 지워짐 등): 예시 항목을 띄우지 않고 홈으로 돌아가 알린다. 키 없이 연 새 기록은 그대로.
     // 지난 날은 새로 기록하지 않으므로 키가 없어도 홈으로.
@@ -445,6 +446,8 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
         );
     // 사진이 있으면 잘리지 않게 제 비율(세로 4:5 ~ 가로 16:9)로, 없으면 150 높이 띠
     Widget photo() => _photo == null ? photoBox() : AspectRatio(aspectRatio: _photoAspect, child: photoBox());
+    // 사진 없는 기록(사진 없이 기록·검색·직접 입력): 사진 자리와 촬영 표시를 그리지 않는다
+    final noPhoto = _origin.photoless && _photo == null;
 
     // 없는 끼니: 첫 프레임 뒤 홈으로 돌아가므로 빈 화면만(확정 버튼 없음)
     if (_missing) return ChScaffold(title: '$label 확인', backFallback: R.home, children: const []);
@@ -473,17 +476,24 @@ class _MealEditScreenState extends ConsumerState<MealEditScreen> {
     }
 
     final children = <Widget>[
-      photo(),
+      if (!noPhoto) photo(),
       if (readOnlyNote) InlineNote(Icons.lock_rounded, '수정 기한(확정 후 ${currentEditWindow.inHours}시간)이 지나 볼 수만 있어요'),
       if (ledgerError) const InlineNote(Icons.info_rounded, '점수 정보를 불러오지 못했어요. 당겨서 새로고침해 주세요'),
       if (searchMode && readOnlyNote)
         const InlineNote(Icons.info_rounded, '확정된 음식 항목이 없어요')
       else if (searchMode && canEdit) ...[
-        InfoBanner(
-          tone: Tone.warn,
-          icon: Icons.search_rounded,
-          child: boldThen(context, '음식을 찾지 못했어요.', ' 이름으로 검색해 주세요. 사진은 저장됐고, 확정하기 전까지는 $sub kcal로 잠정 계산돼요.', color: c.warn),
-        ),
+        if (noPhoto)
+          InfoBanner(
+            tone: Tone.brand,
+            icon: Icons.search_rounded,
+            child: boldThen(context, '사진 없이 기록해요.', ' 음식 이름으로 검색하거나 직접 입력해 주세요.', color: c.brand),
+          )
+        else
+          InfoBanner(
+            tone: Tone.warn,
+            icon: Icons.search_rounded,
+            child: boldThen(context, '음식을 찾지 못했어요.', ' 이름으로 검색해 주세요. 사진은 저장됐고, 확정하기 전까지는 $sub kcal로 잠정 계산돼요.', color: c.warn),
+          ),
         ChButton('음식 이름 검색 · 최근 음식', kind: BtnKind.secondary, icon: Icons.search_rounded, onPressed: _openSearch),
         ChButton('직접 입력 (이름·kcal)', kind: BtnKind.quiet, icon: Icons.edit_rounded, onPressed: _manualEntry),
       ] else ...[

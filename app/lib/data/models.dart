@@ -176,9 +176,13 @@ class MealRecord {
     this.lateUpload = false,
     this.pendingUpload = false,
     this.localKey,
+    this.photoless = false,
   });
 
   final MealSlot slot;
+
+  /// 사진 없이 만든 기록(카메라의 '사진 없이 기록'·검색·직접 입력, 서버 photo_id 없음). P7 은 사진 자리를 보이지 않는다.
+  final bool photoless;
 
   /// 이 폰에서 끼니를 가리키는 키. 아직 서버 id 가 없는 촬영(업로드 중·대기)도 이 키로 찾는다.
   /// 서버에서 읽은 끼니는 서버 id 를 쓰고, 촬영으로 만든 끼니는 서버 id 가 생겨도 이 키를 유지한다.
@@ -223,6 +227,7 @@ class MealRecord {
     bool? lateUpload,
     bool? pendingUpload,
     String? localKey,
+    bool? photoless,
   }) =>
       MealRecord(
         slot: slot ?? this.slot,
@@ -239,6 +244,7 @@ class MealRecord {
         lateUpload: lateUpload ?? this.lateUpload,
         pendingUpload: pendingUpload ?? this.pendingUpload,
         localKey: localKey ?? this.localKey,
+        photoless: photoless ?? this.photoless,
       );
 }
 

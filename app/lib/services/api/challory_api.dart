@@ -422,8 +422,11 @@ class ServerMealItem {
 
 class ServerMeal {
   const ServerMeal({required this.id, required this.status, required this.version, this.aiKcal, this.confirmedKcal, this.items = const [],
-      this.slot, this.capturedAt, this.lateUpload = false, this.engine});
+      this.slot, this.capturedAt, this.lateUpload = false, this.engine, this.hasPhoto});
   final String id;
+
+  /// 사진이 붙은 끼니인지(meals.photo_id). 검색·직접 입력 끼니는 false. 응답에 열이 없으면 null(모름)
+  final bool? hasPhoto;
   final MealSlot? slot;
   final DateTime? capturedAt;
   final bool lateUpload;
@@ -445,6 +448,7 @@ class ServerMeal {
         capturedAt: j['captured_at'] == null ? null : DateTime.parse(j['captured_at'] as String),
         lateUpload: j['late_upload'] as bool? ?? false,
         engine: j['engine'] as String?,
+        hasPhoto: j.containsKey('photo_id') ? j['photo_id'] != null : null,
       );
 }
 
