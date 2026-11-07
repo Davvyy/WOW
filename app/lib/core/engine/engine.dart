@@ -316,7 +316,7 @@ class ChalloryEngine {
       if (satisfied) continue;
       final sub = math.max(mP, prevSlots[slot] ?? 0);
       if (hasSkip) {
-        // 건너뜀 한도: 1일 1회 · 주 3회, 초과분은 대체값
+        // 건너뜀 한도: 규칙값(기본 1일 2회 · 주 3회), 초과분은 대체값
         if (skipsToday < rules.skipPerDay && skipsUsedThisWeek + skipsToday < rules.skipPerWeek) {
           skipsToday++;
           continue;
