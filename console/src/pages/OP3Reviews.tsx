@@ -40,7 +40,7 @@ function Evidence({ r, now }: { r: ReviewItem; now: string }) {
               <div key={d.label} className={`bar ${d.steps === max ? 'hi' : i < 3 ? 'base' : ''}`}><span className="v">{fmt.int(d.steps)}</span><i style={{ height: `${(d.steps / max * H).toFixed(0)}px` }} /><span className="d">{d.label}</span></div>
             ))}
           </div>
-          {base && last ? <p className="cap">{r.dateLabel} {fmt.int(last.steps)}보 = 기준선 ×{(last.steps / base).toFixed(1)} → 플래그 조건(25,000 초과 또는 중앙값 ×2.5) · 첫 3일이 기준선</p> : null}
+          {base && last ? <p className="cap">{r.dateLabel} {fmt.int(last.steps)}보 = 기준선 ×{(last.steps / base).toFixed(1)} → 플래그 조건(25,000 초과, 또는 15,000 초과이면서 중앙값 ×2.5) · 첫 3일이 기준선</p> : null}
           <div className="kv"><span className="k">세션 기록</span><span className="v">{ev.sessionNote ?? '없음 · 걸음만 동기화'}</span></div>
           <div className="kv"><span className="k">출처</span><span className="v">{ev.stepsSource ?? '—'} · 수동 입력 없음</span></div>
         </div>
