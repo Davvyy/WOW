@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ConsoleApi } from '../data/api';
 import { supabase } from '../data/supabaseClient';
+import { Loading } from '../components/ui';
 
 /** Supabase 연결 시 운영자 이메일 로그인. 모의 데이터에서는 바로 통과한다. */
 export function AuthGate({ api, children }: { api: ConsoleApi; children: ReactNode }) {
@@ -18,7 +19,7 @@ export function AuthGate({ api, children }: { api: ConsoleApi; children: ReactNo
   }, [api]);
 
   if (state === 'in') return <>{children}</>;
-  if (state === 'loading') return null;
+  if (state === 'loading') return <main className="content"><Loading label="로그인을 확인하고 있어요" /></main>;
   return (
     <main className="content" style={{ maxWidth: 420, marginTop: 80 }}>
       <form className="card" onSubmit={async (e) => {

@@ -4,7 +4,7 @@ export interface ChallengeBasics {
   name: string;
   startDate: string; // YYYY-MM-DD
   endDate: string;
-  capacity: number;
+  capacity: number | null;
 }
 
 /**
@@ -17,9 +17,20 @@ export function challengeBasicsError(b: ChallengeBasics, opts: { today?: string;
   if (opts.today && b.startDate < opts.today) return '시작일은 오늘 이후로 정해 주세요';
   const days = daysBetween(b.startDate, b.endDate) + 1;
   if (!(days >= 7 && days <= 30)) return '기간은 7~30일로 정해 주세요';
+  if (b.capacity == null) return null; // 월간 챌린지는 정원이 없다
   if (!(b.capacity >= 30 && b.capacity <= 100)) return '정원은 30~100명으로 정해 주세요';
   if (opts.joined && b.capacity < opts.joined) return `현재 참가자 ${opts.joined}명보다 적게 줄일 수 없어요`;
   return null;
+}
+
+/** 참가 인원 표기: 정원이 있으면 "N/정원", 없으면(월간) "N명" */
+export function joinedLabel(c: { joined: number; capacity: number | null }): string {
+  return c.capacity == null ? `${c.joined}명` : `${c.joined}/${c.capacity}`;
+}
+
+/** 간식 임계 설명. 0 이면 기록이 있는 끼니는 모두 슬롯을 채운다(D59) */
+export function snackRuleNote(snackKcal: number): string {
+  return snackKcal > 0 ? 'kcal 미만은 간식(슬롯 미충족)' : '기록이 있으면 끼니로 인정';
 }
 
 /** 새 챌린지 폼 기본값: 내일 시작 · 28일(4주) · 정원 60명 */

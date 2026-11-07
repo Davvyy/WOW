@@ -22,7 +22,8 @@ export interface Challenge {
   status: ChallengeStatus;
   startDate: string; // YYYY-MM-DD
   endDate: string;
-  capacity: number;
+  /** 정원. 월간 챌린지는 없음(null) */
+  capacity: number | null;
   inviteCode: string;
   rulesMd: string;
   photosPurgedAt: string | null;

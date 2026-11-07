@@ -40,7 +40,7 @@ const num = (v: unknown, d = 0) => (v == null || Number.isNaN(Number(v)) ? d : N
 
 function mapChallenge(r: Row, joined: number): Challenge {
   return {
-    id: r.id, name: r.name, status: r.status, startDate: r.start_date, endDate: r.end_date, capacity: num(r.capacity),
+    id: r.id, name: r.name, status: r.status, startDate: r.start_date, endDate: r.end_date, capacity: r.capacity == null ? null : num(r.capacity),
     inviteCode: r.invite_code ?? '', rulesMd: r.rules_md ?? '', photosPurgedAt: r.photos_purged_at ?? null, publishedAt: r.published_at ?? null, joined,
   };
 }

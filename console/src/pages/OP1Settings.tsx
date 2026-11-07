@@ -3,7 +3,7 @@ import { Banner, Chip, ErrorBox, Loading, Modal, Ms, PageHead } from '../compone
 import { useChallenge } from '../components/Shell';
 import { useConsole, useLoad } from '../context';
 import type { ChallengeRules, ChallengeStatus, SimResult } from '../data/types';
-import { challengeBasicsError } from '../lib/challengeForm';
+import { challengeBasicsError, snackRuleNote } from '../lib/challengeForm';
 import { daysBetween, fmt, mdDate } from '../lib/format';
 import { FLOW, isLocked, manualTransitions, STATUS } from '../lib/lifecycle';
 import { parseMd, splitBold } from '../lib/markdown';
@@ -19,7 +19,7 @@ function constCards(r: ChallengeRules) {
     { k: '활동 상한 C', v: fmt.int(r.c), s: 'kcal/일 (= 2T)' },
     { k: '섭취 하한 F', v: `max(${fmt.int(r.fMin)}, ${r.fRatio}×BMR)`, s: '운영자 조정 미결 · v1 기본값', long: true },
     { k: '대체값 M', v: `max(${fmt.int(r.mMin)}, ${r.mRatio}×BMR)`, s: '미기록 끼니 · 운영자 조정 미결', long: true },
-    { k: '간식 임계', v: fmt.int(r.snackKcal), s: 'kcal 미만은 간식(슬롯 미충족)' },
+    { k: '간식 임계', v: fmt.int(r.snackKcal), s: snackRuleNote(r.snackKcal) },
     { k: '걸음 상한', v: fmt.int(r.stepsCap), s: '보/일 · 세션 창 밖 걸음' },
     { k: '층수 상한', v: fmt.int(r.floorsCap), s: '층/일 · 17.5초/층' },
     { k: '건너뜀', v: `${r.skipPerDay}/일 · ${r.skipPerWeek}/주`, s: '운영자 조정 미결 · v1 기본값' },
@@ -44,7 +44,7 @@ function MdView({ md }: { md: string }) {
 function P11Preview({ md, rules, mP, name, operator }: { md: string; rules: ChallengeRules; mP: number; name: string; operator: string }) {
   const M = fmt.int(mP);
   const cards: [string, string, string, string][] = [
-    ['①', '먹은 걸 찍어요', `세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 약 ${M} kcal로, 간식은 찍은 만큼 더해져요.`, `대체값 ${M} · 간식 ${rules.snackKcal} 미만`],
+    ['①', '먹은 걸 찍어요', `세 끼를 찍고 확정하면 끝. 안 찍은 끼니는 약 ${M} kcal로, 간식은 찍은 만큼 더해져요.`, `대체값 ${M} · ${rules.snackKcal > 0 ? `간식 ${rules.snackKcal} 미만` : '간식은 찍은 만큼'}`],
     ['②', '움직여요', `걸음·달리기·계단 자동 기록만 인정. 하루 활동 최대 약 ${fmt.int(rules.c)} kcal.`, `활동 상한 ${fmt.int(rules.c)} · 걸음 ${fmt.int(rules.stepsCap)}`],
     ['③', '점수는 이렇게', `(기초대사 + 활동) − 섭취 = 순적자. ${rules.t} kcal면 100점, 최대 150점.`, `T ${rules.t} · 최대 150점`],
     ['④', '공정하게', '폰이든 워치든 같은 공식. 이상 기록은 조용히 확인하고 설명 기회를 드려요.', '소명 1회 · 72시간'],
@@ -112,8 +112,8 @@ export function OP1Settings() {
   const readOnly = locked || cancelled;
   const { data: rules, error: rulesErr, reload } = useLoad(() => api.getRules(ch.id), [ch.id, ch.status]);
 
-  const [form, setForm] = useState({ name: ch.name, startDate: ch.startDate, endDate: ch.endDate, capacity: String(ch.capacity) });
-  useEffect(() => { setForm({ name: ch.name, startDate: ch.startDate, endDate: ch.endDate, capacity: String(ch.capacity) }); }, [ch.name, ch.startDate, ch.endDate, ch.capacity]);
+  const [form, setForm] = useState({ name: ch.name, startDate: ch.startDate, endDate: ch.endDate, capacity: String(ch.capacity ?? '') });
+  useEffect(() => { setForm({ name: ch.name, startDate: ch.startDate, endDate: ch.endDate, capacity: String(ch.capacity ?? '') }); }, [ch.name, ch.startDate, ch.endDate, ch.capacity]);
   const [md, setMd] = useState(ch.rulesMd);
   useEffect(() => { setMd(ch.rulesMd); }, [ch.id, ch.rulesMd]);
   const [kakao, setKakao] = useState(false);
@@ -137,16 +137,17 @@ export function OP1Settings() {
 
   const days = useMemo(() => daysBetween(form.startDate, form.endDate) + 1, [form.startDate, form.endDate]);
   const link = `${INVITE_BASE}${ch.inviteCode}`;
+  const monthly = !ch.inviteCode && ch.status !== 'draft' && ch.status !== 'cancelled'; // 초대코드 없이 앱에서 바로 참가
   const draft = ch.status === 'draft';
   const trans = manualTransitions(ch.status, ch.joined);
 
   async function saveBasic() {
-    const cap = Number(form.capacity);
+    const cap = ch.capacity == null ? null : Number(form.capacity);
     const err = challengeBasicsError({ name: form.name, startDate: form.startDate, endDate: form.endDate, capacity: cap }, { joined: ch.joined });
     if (err) { setFormErr(err); return; }
     setFormErr(null);
     try {
-      await api.updateChallenge(ch.id, { name: form.name.trim(), startDate: form.startDate, endDate: form.endDate, capacity: cap });
+      await api.updateChallenge(ch.id, { name: form.name.trim(), startDate: form.startDate, endDate: form.endDate, ...(cap == null ? {} : { capacity: cap }) });
       toast('기본 정보를 저장했어요 · 감사 로그 기록');
     } catch (e) { toast((e as Error).message, 'error'); }
   }
@@ -167,7 +168,7 @@ export function OP1Settings() {
 
   const lockTxt = locked ? <span className="lock"><Ms name="lock" />🔒 잠금</span> : null;
   const ro = readOnly ? 'ro' : '';
-  const kakaoText = `[${ch.name}] 함께 걸어요\n${mdDate(ch.startDate)}~${mdDate(ch.endDate)} · ${days}일 · 정원 ${ch.capacity}명\n세 끼 사진 + 걸음만 있으면 돼요. 폰이든 워치든 같은 공식이에요.\n코드 ${ch.inviteCode} 또는 링크로 참가: ${link}`;
+  const kakaoText = `[${ch.name}] 함께 걸어요\n${mdDate(ch.startDate)}~${mdDate(ch.endDate)} · ${days}일${ch.capacity == null ? '' : ` · 정원 ${ch.capacity}명`}\n세 끼 사진 + 걸음만 있으면 돼요. 폰이든 워치든 같은 공식이에요.\n코드 ${ch.inviteCode} 또는 링크로 참가: ${link}`;
 
   return (
     <>
@@ -184,7 +185,7 @@ export function OP1Settings() {
             <div className="grid fields3">
               <div className="field"><label htmlFor="f-start">시작일 {lockTxt}</label><div className={`input ${ro}`}><input id="f-start" type="date" value={form.startDate} readOnly={readOnly} aria-readonly={readOnly} onChange={(e) => setForm({ ...form, startDate: e.target.value })} /></div></div>
               <div className="field"><label htmlFor="f-end">종료일 {lockTxt}</label><div className={`input ${ro}`}><input id="f-end" type="date" value={form.endDate} readOnly={readOnly} aria-readonly={readOnly} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></div></div>
-              <div className="field"><label htmlFor="f-cap">정원 {lockTxt}</label><div className={`input ${ro}`}><input id="f-cap" className="num" inputMode="numeric" value={form.capacity} readOnly={readOnly} aria-readonly={readOnly} onChange={(e) => setForm({ ...form, capacity: e.target.value.replace(/\D/g, '') })} /><span className="unit">명{ch.joined ? ` · 참가 ${ch.joined}` : ''}</span></div></div>
+              <div className="field"><label htmlFor="f-cap">정원 {lockTxt}</label><div className={`input ${ro}`}><input id="f-cap" className="num" inputMode="numeric" value={ch.capacity == null ? '제한 없음' : form.capacity} readOnly={readOnly || ch.capacity == null} aria-readonly={readOnly} onChange={(e) => setForm({ ...form, capacity: e.target.value.replace(/\D/g, '') })} /><span className="unit">명{ch.joined ? ` · 참가 ${ch.joined}` : ''}</span></div></div>
             </div>
             <p className="cap">{days}일 · 점검 기간 {rules?.checkDays ?? 3}일(누적 미반영) · 확정 배치 매일 09:00</p>
             {formErr ? <p className="cap" role="alert" style={{ color: 'var(--critical)' }}>{formErr}</p> : null}
@@ -231,7 +232,8 @@ export function OP1Settings() {
 
       <div className="card" id="inviteCard">
         <div className="card-head"><p className="title"><Ms name="key" cls="sm" />초대코드</p>
-          {draft ? <Chip icon="schedule">모집을 시작하면 활성화돼요</Chip> : cancelled ? <Chip kind="critical" icon="cancel">취소됨 · 비활성</Chip> : <Chip kind="good" icon="group">참가 {ch.joined}/{ch.capacity}명 · 활성</Chip>}</div>
+          {draft ? <Chip icon="schedule">모집을 시작하면 활성화돼요</Chip> : cancelled ? <Chip kind="critical" icon="cancel">취소됨 · 비활성</Chip> : <Chip kind="good" icon="group">참가 {ch.capacity == null ? `${ch.joined}명` : `${ch.joined}/${ch.capacity}명`} · 활성</Chip>}</div>
+        {monthly ? <p className="body">월간 챌린지는 초대코드가 없어요. 참가자는 앱 첫 화면의 이번 달 챌린지에서 바로 참가해요.</p> : (<>
         <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className={`codes ${draft || cancelled ? 'inactive' : ''}`} role="img" aria-label={`초대코드 ${ch.inviteCode}`}>{[...ch.inviteCode].map((c, i) => <span key={i}>{c}</span>)}</div>
           <div className="stack" style={{ gap: 8, flex: 1, minWidth: 240 }}>
@@ -246,6 +248,7 @@ export function OP1Settings() {
           <textarea className="ta" aria-label="카카오톡 공유 문구" rows={4} readOnly value={kakaoText} />
           <div className="btn-row"><button className="btn sm quiet" onClick={() => copy(kakaoText, '공유 문구를 복사했어요')}><Ms name="content_copy" />문구 복사</button></div>
         </>) : null}
+        </>)}
       </div>
 
       <div className="transbar" id="transBar" aria-label="상태 전환">
@@ -262,7 +265,10 @@ export function OP1Settings() {
           <p className="cap">
             {ch.status === 'draft' ? '허용 전환: 초안 → 모집 중. 취소(참가자에게 공지)는 초안·모집 중에만 가능해요.'
               : ch.status === 'recruiting' ? `모집 중 · 시작일 ${mdDate(ch.startDate)} 00:00에 점검 기간으로 자동 전환되고 프로필·상수가 잠겨요.`
-              : cancelled ? '취소된 챌린지는 바꿀 수 없어요.' : '진행 중에는 수동 전환이 없어요 · 배치가 자동으로 전환해요.'}
+              : cancelled ? '취소된 챌린지는 바꿀 수 없어요.'
+              : ch.status === 'closing' ? '집계 마감 · 미결을 모두 판정한 뒤 OP4에서 최종 확정해요.'
+              : ch.status === 'published' || ch.status === 'archived' ? '결과를 확정한 챌린지예요 · 수동 전환이 없어요.'
+              : '진행 중에는 수동 전환이 없어요 · 배치가 자동으로 전환해요.'}
           </p>
         </div>
         <div className="btn-row">

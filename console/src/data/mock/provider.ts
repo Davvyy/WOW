@@ -53,6 +53,7 @@ interface MockReview {
 }
 
 const OTHER_CHALLENGES: Challenge[] = [
+  { id: 'ch-monthly', name: '11월 챌린지', status: 'closing', startDate: '2026-11-01', endDate: '2026-11-30', capacity: null, inviteCode: '', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 3 },
   { id: 'ch-winter', name: '겨울 저녁 산책 챌린지', status: 'draft', startDate: '2026-12-07', endDate: '2027-01-03', capacity: 50, inviteCode: 'W3N7QA', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 0 },
   { id: 'ch-summer', name: '여름 계단 챌린지', status: 'archived', startDate: '2026-07-06', endDate: '2026-08-02', capacity: 40, inviteCode: 'S5T9XP', rulesMd: '', photosPurgedAt: '2026-08-17T10:00:00+09:00', publishedAt: '2026-08-03T09:30:00+09:00', joined: 36 },
 ];

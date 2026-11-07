@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ConsoleApi } from './data/api';
 import type { OpsInfo } from './data/types';
-import { Ms } from './components/ui';
+import { ErrorBox, Loading, Ms } from './components/ui';
 
 interface Ctx { api: ConsoleApi; ops: OpsInfo; version: number; toast: (msg: string, icon?: string) => void }
 const ConsoleContext = createContext<Ctx | null>(null);
@@ -9,11 +9,17 @@ const ConsoleContext = createContext<Ctx | null>(null);
 export function ConsoleProvider({ api, children }: { api: ConsoleApi; children: ReactNode }) {
   const [version, setVersion] = useState(0);
   const [ops, setOps] = useState<OpsInfo | null>(null);
+  const [opsErr, setOpsErr] = useState<Error | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [toastState, setToast] = useState<{ msg: string; icon: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => api.subscribe(() => setVersion((v) => v + 1)), [api]);
-  useEffect(() => { let on = true; api.ops().then((o) => { if (on) setOps(o); }); return () => { on = false; }; }, [api, version]);
+  useEffect(() => {
+    let on = true;
+    api.ops().then((o) => { if (on) { setOps(o); setOpsErr(null); } }, (e: Error) => { if (on) setOpsErr(e); });
+    return () => { on = false; };
+  }, [api, version, attempt]);
 
   const toast = useCallback((msg: string, icon = 'check_circle') => {
     setToast({ msg, icon });
@@ -21,7 +27,8 @@ export function ConsoleProvider({ api, children }: { api: ConsoleApi; children: 
     timer.current = setTimeout(() => setToast(null), 2600);
   }, []);
 
-  if (!ops) return null;
+  // 첫 요청이 느린 동안(운영자 확인) 빈 화면으로 두지 않는다
+  if (!ops) return <main className="content">{opsErr ? <ErrorBox error={opsErr} retry={() => { setOpsErr(null); setAttempt((a) => a + 1); }} /> : <Loading />}</main>;
   return (
     <ConsoleContext.Provider value={{ api, ops, version, toast }}>
       {children}

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router';
 import { Chip, ErrorBox, Loading, Ms, PageHead } from '../components/ui';
+import { joinedLabel } from '../lib/challengeForm';
 import { useConsole, useLoad } from '../context';
 import { ddayInfo, STATUS } from '../lib/lifecycle';
 import { mdDate } from '../lib/format';
@@ -28,12 +29,12 @@ export function OP0Challenges() {
                 </div>
                 <div className="chips">
                   <Chip icon="calendar_today">{d.head} · {mdDate(c.startDate)}~{mdDate(c.endDate)}</Chip>
-                  <Chip icon="group">참가 {c.joined}/{c.capacity}</Chip>
+                  <Chip icon="group">참가 {joinedLabel(c)}</Chip>
                   <Chip kind={openReviews ? 'critical' : 'good'} icon="gavel">미결 {openReviews}건</Chip>
                   {todaySyncRate != null ? <Chip kind="good" icon="sync">오늘 동기화 {todaySyncRate}%</Chip> : null}
                 </div>
                 <div className="grid kpi" style={{ gap: 10 }}>
-                  <div><span className="cap">정원</span><div className="num" style={{ fontSize: 22, fontWeight: 700 }}>{c.joined}<span className="cap">/{c.capacity}</span></div></div>
+                  <div><span className="cap">정원</span><div className="num" style={{ fontSize: 22, fontWeight: 700 }}>{c.joined}{c.capacity == null ? null : <span className="cap">/{c.capacity}</span>}</div></div>
                   <div><span className="cap">동기화율</span><div className="num" style={{ fontSize: 22, fontWeight: 700 }}>{todaySyncRate != null ? `${todaySyncRate}%` : '—'}</div></div>
                   <div><span className="cap">미확정 끼니</span><div className="num" style={{ fontSize: 22, fontWeight: 700 }}>{unconfirmedMeals}</div></div>
                   <div><span className="cap">미결 검토</span><div className="num" style={{ fontSize: 22, fontWeight: 700 }}>{openReviews}</div></div>
