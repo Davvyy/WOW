@@ -45,8 +45,14 @@
       "expect": {"i_d": 1942.5, "d_d": 63.5, "s_d": 12.7, "main_meal_count": 2}
     },
     {
-      "id": "SKIP", "desc": "건너뜀 초과: 저녁 600 확정 + 아침·점심 건너뜀(1일 1회 한도) → 두 번째 건너뜀은 대체값 → 120.3",
+      "id": "SKIP2", "desc": "건너뜀 하루 2회는 한도 안(D84): 저녁 600 확정 + 아침·점심 건너뜀 → 대체값 없음, 섭취 하한 1,320 적용 → 124.8",
       "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0,
+        "meals": [{"slot": "breakfast", "status": "skipped"}, {"slot": "lunch", "status": "skipped"}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
+      "expect": {"i_d": 600.0, "d_d": 624.0, "s_d": 124.8, "main_meal_count": 1, "skip_over": false}
+    },
+    {
+      "id": "SKIP", "desc": "건너뜀 초과: 주 한도 1회 남음 + 아침·점심 건너뜀, 저녁 600 확정 → 두 번째 건너뜀은 대체값 → 120.3",
+      "input": {"sex": "M", "weight_kg": 70, "height_cm": 175, "age": 30, "steps_total": 9000, "sessions": [], "floors": 0, "skips_used_this_week": 2,
         "meals": [{"slot": "breakfast", "status": "skipped"}, {"slot": "lunch", "status": "skipped"}, {"slot": "dinner", "status": "confirmed", "kcal": 600}]},
       "expect": {"i_d": 1342.5, "d_d": 601.5, "s_d": 120.3, "main_meal_count": 1, "skip_over": true}
     },

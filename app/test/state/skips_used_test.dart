@@ -64,8 +64,8 @@ void main() {
       final rows = [
         _row('2026-10-12', [_skip(MealSlot.breakfast), _skip(MealSlot.lunch), _skip(MealSlot.dinner)]),
       ];
-      expect(skipsUsedThisWeek(rows, today: tue, rules: rules), 1);
-      expect(skipsUsedThisWeek(rows, today: tue, rules: const EngineRules(skipPerDay: 2)), 2);
+      expect(skipsUsedThisWeek(rows, today: tue, rules: const EngineRules(skipPerDay: 1)), 1);
+      expect(skipsUsedThisWeek(rows, today: tue, rules: rules), 2, reason: '기본 규칙은 하루 2회(D84)');
     });
 
     test('주 상한 skip_per_week 를 넘지 않는다', () {

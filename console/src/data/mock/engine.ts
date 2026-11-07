@@ -7,7 +7,7 @@ import type { SimInput, SimResult, Slot } from '../types';
 
 export const RULES = {
   T: 500, C: 1000, S_MAX: 150, F_MIN: 1200, F_RATIO: 0.8, M_MIN: 700, M_RATIO: 0.45, AUTO_CONFIRM: 1.3,
-  SNACK_KCAL: 150, STEPS_CAP: 30000, FLOORS_CAP: 50, SKIP_PER_DAY: 1, SKIP_PER_WEEK: 3,
+  SNACK_KCAL: 150, STEPS_CAP: 30000, FLOORS_CAP: 50, SKIP_PER_DAY: 2, SKIP_PER_WEEK: 3,
   MET_WALK: 3.8, MET_STAIR: 6.8, SEC_PER_FLOOR: 17.5, CHECK_DAYS: 3,
   RUN_MET_TIERS: [
     { minKmh: 12.9, met: 12.0 },

@@ -17,7 +17,7 @@ class EngineRules {
     this.stepMet = 3.8,
     this.stairMet = 6.8,
     this.secPerFloor = 17.5,
-    this.skipPerDay = 1,
+    this.skipPerDay = 2,
     this.skipPerWeek = 3,
     this.checkDays = 3,
     this.brothFactor = 0.6,

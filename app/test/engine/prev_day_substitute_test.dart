@@ -36,7 +36,8 @@ void main() {
       expect(pending.pendingSlots, [MealSlot.lunch]);
       expect(pending.iD, closeTo(mP * 2 + 900, 1e-9));
 
-      final skips = engine.intake(bmr: bmr, meals: const [
+      // 한도 초과를 보려고 규칙을 하루 1회로 둔다(기본값은 2, D84)
+      final skips = const ChalloryEngine(EngineRules(skipPerDay: 1)).intake(bmr: bmr, meals: const [
         MealInput(slot: MealSlot.breakfast, status: MealStatus.skipped),
         MealInput(slot: MealSlot.lunch, status: MealStatus.skipped),
       ], prevSlots: const {MealSlot.breakfast: 1000, MealSlot.lunch: 900});

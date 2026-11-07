@@ -50,7 +50,8 @@ begin
   perform tests.eq(d15.i_d, r1(2 * v_m + 900), '분석 중 칸 I_d');
   delete from meals where participant_id = ji and local_date = '2026-10-15';
 
-  -- 건너뜀: 한도 안(아침)은 0, 한도 초과(점심)는 max(M_p, 전날)
+  -- 건너뜀: 한도 안(아침)은 0, 한도 초과(점심)는 max(M_p, 전날). 규칙을 하루 1회로 두고 본다(기본값은 2, D84)
+  update challenge_rules set skip_per_day = 1 where challenge_id = ch;
   insert into meals (participant_id, challenge_id, local_date, slot, status) values
     (ji, ch, '2026-10-15', 'breakfast', 'skipped'), (ji, ch, '2026-10-15', 'lunch', 'skipped');
   d15 := recompute_day(ji, '2026-10-15');

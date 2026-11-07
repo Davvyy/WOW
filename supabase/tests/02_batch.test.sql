@@ -177,6 +177,8 @@ begin;
 do $$
 declare ji uuid := tests.pid('지수'); uid uuid := tests.uid('지수'); r jsonb;
 begin
+  -- 한도 초과 동작을 보는 시험이라 규칙을 하루 1회로 둔다(기본값은 2, D84)
+  update challenge_rules set skip_per_day = 1 where challenge_id = (select challenge_id from participants where id = ji);
   delete from meals where participant_id = ji and local_date = '2026-10-13' and slot in ('breakfast', 'lunch');
   r := skip_meal(uid, ji, '2026-10-13', 'breakfast');
   perform tests.ok(not (r ->> 'over_limit')::boolean, '첫 건너뜀 허용');

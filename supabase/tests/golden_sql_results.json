@@ -343,6 +343,25 @@
             "main_meal_count": 3,
             "sessions_net_kcal": 0.0
         },
+        "SKIP2": {
+            "a_d": 294.0,
+            "bmr": 1650,
+            "d_d": 624.0,
+            "f_p": 1320.0,
+            "i_d": 600.0,
+            "m_p": 742.50,
+            "s_d": 124.8,
+            "a_raw": 294.0,
+            "a_capped": false,
+            "skip_over": false,
+            "steps_out": 9000,
+            "floors_kcal": 0.0,
+            "snack_count": 0,
+            "floor_applied": true,
+            "steps_net_kcal": 294.0,
+            "main_meal_count": 1,
+            "sessions_net_kcal": 0.0
+        },
         "SKIPW": {
             "a_d": 294.0,
             "bmr": 1650,
