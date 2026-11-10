@@ -190,7 +190,7 @@ export function OP2Participants() {
   const kpis = (
     <div className="grid kpi">
       <div className="card"><span className="k"><Ms name="group" cls="xs" />참가자</span><span className="v">{ch.joined}{ch.capacity == null ? null : <small>/ {ch.capacity}</small>}</span>
-        <span className="s">{empty ? `모집 중 · 초대코드 ${ch.inviteCode}` : <><Chip icon="watch">워치 {(people ?? []).filter((p) => p.watch).length}</Chip> <Chip>기록 모드 {(people ?? []).filter((p) => p.state === 'record').length}</Chip></>}</span></div>
+        <span className="s">{empty ? (ch.inviteCode ? `모집 중 · 초대코드 ${ch.inviteCode}` : '모집 중 · 앱에서 바로 참가') : <><Chip icon="watch">워치 {(people ?? []).filter((p) => p.watch).length}</Chip> <Chip>기록 모드 {(people ?? []).filter((p) => p.state === 'record').length}</Chip></>}</span></div>
       <div className="card"><span className="k"><Ms name="sync" cls="xs" />오늘 동기화율</span><span className="v">{summary?.todaySyncRate ?? 0}<small>%</small></span>
         <span className="s">{empty ? '—' : `미동기화 ${unsyncedN}명`}</span></div>
       <div className="card"><span className="k"><Ms name="restaurant" cls="xs" />미확정 끼니</span><span className="v">{summary?.unconfirmedMeals ?? 0}</span><span className="s">{empty ? '—' : '내일 09:00 자동 확정'}</span></div>

@@ -16,8 +16,9 @@ export function challengeBasicsError(b: ChallengeBasics, opts: { today?: string;
   if (!b.startDate || !b.endDate) return '기간을 입력해 주세요';
   if (opts.today && b.startDate < opts.today) return '시작일은 오늘 이후로 정해 주세요';
   const days = daysBetween(b.startDate, b.endDate) + 1;
+  // 월간 챌린지(정원 없음)는 그 달 전체라 28~31일이고, 기간·정원 규칙은 운영자가 만드는 챌린지에만 건다
+  if (b.capacity == null) return null;
   if (!(days >= 7 && days <= 30)) return '기간은 7~30일로 정해 주세요';
-  if (b.capacity == null) return null; // 월간 챌린지는 정원이 없다
   if (!(b.capacity >= 30 && b.capacity <= 100)) return '정원은 30~100명으로 정해 주세요';
   if (opts.joined && b.capacity < opts.joined) return `현재 참가자 ${opts.joined}명보다 적게 줄일 수 없어요`;
   return null;

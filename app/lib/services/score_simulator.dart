@@ -17,17 +17,26 @@ class LocalScoreSimulator implements ScoreSimulator {
   Future<SimulateResult> simulate(SimulateInput input) async => engine.simulate(input);
 }
 
+/// RPC 입력. 챌린지 id 를 함께 보내야 미리보기가 그 챌린지 규칙(간식 기준 등)으로 계산돼 실제 점수와 같아진다.
+Map<String, dynamic> simulateRpcParams(SimulateInput input, String? challengeId) => {
+      ...simulateInputToJson(input),
+      if (challengeId != null && challengeId.isNotEmpty) 'challenge_id': challengeId,
+    };
+
 /// Supabase RPC 구현. 호출이 끝내 안 되면(오프라인 등) [fallback] 으로 로컬 계산한다.
 class SupabaseScoreSimulator implements ScoreSimulator {
-  SupabaseScoreSimulator(this._client, {this.fallback = const LocalScoreSimulator()});
+  SupabaseScoreSimulator(this._client, {this.fallback = const LocalScoreSimulator(), this.challengeId});
 
   final SupabaseClient _client;
   final ScoreSimulator fallback;
 
+  /// 지금 보고 있는 챌린지. 주면 서버가 그 챌린지의 규칙으로 계산한다(없으면 서버 기본 규칙).
+  final String? Function()? challengeId;
+
   @override
   Future<SimulateResult> simulate(SimulateInput input) async {
     try {
-      final res = await _client.rpc('score_simulate_from_inputs', params: {'p': simulateInputToJson(input)});
+      final res = await _client.rpc('score_simulate_from_inputs', params: {'p': simulateRpcParams(input, challengeId?.call())});
       return simulateResultFromRpc(Map<String, dynamic>.from(res as Map));
     } catch (_) {
       return fallback.simulate(input);

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import App from './App';
 import { ConsoleProvider } from './context';
 import type { ConsoleApi } from './data/api';
-import { joinedLabel, snackRuleNote } from './lib/challengeForm';
+import { challengeBasicsError, joinedLabel, snackRuleNote } from './lib/challengeForm';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -55,6 +55,18 @@ describe('월간 챌린지(정원·초대코드 없음)', () => {
     expect(t).toContain('월간 챌린지는 초대코드가 없어요');
     expect(t).not.toContain('초대 링크 복사');
     expect(t).not.toContain('정원 0명');
+  });
+
+  it('OP1 정원 칸: 단위 "명"을 붙이지 않고 읽기 전용으로 알린다', async () => {
+    await visit('/c/ch-monthly/settings');
+    const cap = host.querySelector('#f-cap') as HTMLInputElement;
+    expect(cap.getAttribute('aria-readonly')).toBe('true');
+    expect(cap.parentElement!.querySelector('.unit')!.textContent).toBe('참가 3명');
+  });
+
+  it('기본 정보 검사: 31일짜리 달의 월간 챌린지도 통과한다', () => {
+    expect(challengeBasicsError({ name: '12월 챌린지', startDate: '2026-12-01', endDate: '2026-12-31', capacity: null })).toBeNull();
+    expect(challengeBasicsError({ name: '긴 챌린지', startDate: '2026-12-01', endDate: '2026-12-31', capacity: 60 })).toBe('기간은 7~30일로 정해 주세요');
   });
 
   it('OP1 전환 안내: 집계 마감이면 OP4 에서 최종 확정한다고 말한다', async () => {

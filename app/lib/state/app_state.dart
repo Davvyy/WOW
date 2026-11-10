@@ -309,7 +309,7 @@ final healthSourceProvider = Provider<HealthSource>((_) => createHealthSource())
 final scoreSimulatorProvider = Provider<ScoreSimulator>((_) {
   if (AppConfig.hasSupabase) {
     try {
-      return SupabaseScoreSimulator(Supabase.instance.client);
+      return SupabaseScoreSimulator(Supabase.instance.client, challengeId: () => curChallengeId);
     } catch (_) {
       // Supabase.initialize 전이면 로컬 계산
     }

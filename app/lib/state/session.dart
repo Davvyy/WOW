@@ -128,6 +128,7 @@ MeInfo get curMe => _current.me;
 
 /// 현재 챌린지 규칙으로 계산하는 엔진(서버 challenge_rules 와 같은 상수)
 ChalloryEngine get engine => _current.engine;
+String? get curChallengeId => _current.challengeId;
 
 /// 내 대체값 M_p · 섭취 하한 F_p (잠긴 BMR 기준)
 double get meM => engine.m(curMe.bmr);

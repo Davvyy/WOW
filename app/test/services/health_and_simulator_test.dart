@@ -91,6 +91,14 @@ void main() {
       expect(engine.simulate(back).score.sD, engine.simulate(input).score.sD);
     });
 
+    test('RPC 입력: 챌린지 id 를 함께 보내 그 챌린지 규칙으로 계산하게 한다', () {
+      final input = SimulateInput(profile: mockMe.profile, stepsTotal: 9000, meals: const []);
+      expect(simulateRpcParams(input, 'ch-1'), containsPair('challenge_id', 'ch-1'));
+      expect(simulateRpcParams(input, 'ch-1')['sex'], simulateInputToJson(input)['sex']);
+      expect(simulateRpcParams(input, null).containsKey('challenge_id'), isFalse);
+      expect(simulateRpcParams(input, '').containsKey('challenge_id'), isFalse);
+    });
+
     test('RPC 응답(중첩 JSON) 파싱', () {
       final local = engine.simulate(SimulateInput(profile: mockMe.profile, stepsTotal: 9000, meals: buildTodayMeals().map((m) => m.toInput()).toList()));
       final res = simulateResultFromRpc({
