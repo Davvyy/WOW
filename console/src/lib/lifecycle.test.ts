@@ -3,7 +3,7 @@ import type { Challenge } from '../data/types';
 import { ddayInfo, isLocked, manualTransitions, objectionDaysLeft } from './lifecycle';
 
 const base: Challenge = {
-  id: 'c1', name: '가을 걷기 챌린지', status: 'running', startDate: '2026-10-06', endDate: '2026-11-02', capacity: 60,
+  id: 'c1', name: '가을 걷기 챌린지', status: 'running', kind: 'operator', startDate: '2026-10-06', endDate: '2026-11-02', capacity: 60,
   inviteCode: 'K7Q2MD', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 42,
 };
 

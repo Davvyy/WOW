@@ -40,7 +40,7 @@ const num = (v: unknown, d = 0) => (v == null || Number.isNaN(Number(v)) ? d : N
 
 function mapChallenge(r: Row, joined: number): Challenge {
   return {
-    id: r.id, name: r.name, status: r.status, startDate: r.start_date, endDate: r.end_date, capacity: r.capacity == null ? null : num(r.capacity),
+    id: r.id, name: r.name, status: r.status, kind: r.kind === 'monthly' ? 'monthly' : 'operator', startDate: r.start_date, endDate: r.end_date, capacity: r.capacity == null ? null : num(r.capacity),
     inviteCode: r.invite_code ?? '', rulesMd: r.rules_md ?? '', photosPurgedAt: r.photos_purged_at ?? null, publishedAt: r.published_at ?? null, joined,
   };
 }
@@ -48,9 +48,10 @@ function mapChallenge(r: Row, joined: number): Challenge {
 function mapRules(r: Row): ChallengeRules {
   return {
     t: num(r.t, 500), c: num(r.c, 1000), mMin: num(r.m_min, 700), mRatio: num(r.m_ratio, 0.45), fMin: num(r.f_min, 1200), fRatio: num(r.f_ratio, 0.8),
-    snackKcal: num(r.snack_kcal, 150), stepsCap: num(r.steps_cap, 30000), floorsCap: num(r.floors_cap, 50), stepMet: num(r.step_met, 3.8),
-    skipPerDay: num(r.skip_per_day, 1), skipPerWeek: num(r.skip_per_week, 3), checkDays: num(r.check_days, 3),
-    nudgeMinM: num(r.nudge_min_m, 1500), nudgeMinF: num(r.nudge_min_f, 1200), lockedAt: r.locked_at ?? null,
+    snackKcal: num(r.snack_kcal, 0), stepsCap: num(r.steps_cap, 30000), floorsCap: num(r.floors_cap, 50), stepMet: num(r.step_met, 3.8),
+    skipPerDay: num(r.skip_per_day, 2), skipPerWeek: num(r.skip_per_week, 3), checkDays: num(r.check_days, 3),
+    nudgeMinM: num(r.nudge_min_m, 1500), nudgeMinF: num(r.nudge_min_f, 1200),
+    stepsSpikeAbs: num(r.steps_spike_abs, 25000), stepsSpikeMin: num(r.steps_spike_min, 15000), stepsSpikeRatio: num(r.steps_spike_ratio, 2.5), lockedAt: r.locked_at ?? null,
   };
 }
 

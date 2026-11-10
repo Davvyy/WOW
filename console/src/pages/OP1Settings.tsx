@@ -3,7 +3,7 @@ import { Banner, Chip, ErrorBox, Loading, Modal, Ms, PageHead } from '../compone
 import { useChallenge } from '../components/Shell';
 import { useConsole, useLoad } from '../context';
 import type { ChallengeRules, ChallengeStatus, SimResult } from '../data/types';
-import { challengeBasicsError, snackRuleNote } from '../lib/challengeForm';
+import { challengeBasicsError, joinedLabel, snackRuleNote } from '../lib/challengeForm';
 import { daysBetween, fmt, mdDate } from '../lib/format';
 import { FLOW, isLocked, manualTransitions, STATUS } from '../lib/lifecycle';
 import { parseMd, splitBold } from '../lib/markdown';
@@ -137,7 +137,7 @@ export function OP1Settings() {
 
   const days = useMemo(() => daysBetween(form.startDate, form.endDate) + 1, [form.startDate, form.endDate]);
   const link = `${INVITE_BASE}${ch.inviteCode}`;
-  const monthly = !ch.inviteCode && ch.status !== 'draft' && ch.status !== 'cancelled'; // 초대코드 없이 앱에서 바로 참가
+  const monthly = ch.kind === 'monthly'; // 초대코드 없이 앱에서 바로 참가
   const draft = ch.status === 'draft';
   const trans = manualTransitions(ch.status, ch.joined);
 
@@ -232,7 +232,7 @@ export function OP1Settings() {
 
       <div className="card" id="inviteCard">
         <div className="card-head"><p className="title"><Ms name="key" cls="sm" />초대코드</p>
-          {draft ? <Chip icon="schedule">모집을 시작하면 활성화돼요</Chip> : cancelled ? <Chip kind="critical" icon="cancel">취소됨 · 비활성</Chip> : <Chip kind="good" icon="group">참가 {ch.capacity == null ? `${ch.joined}명` : `${ch.joined}/${ch.capacity}명`} · 활성</Chip>}</div>
+          {draft ? <Chip icon="schedule">모집을 시작하면 활성화돼요</Chip> : cancelled ? <Chip kind="critical" icon="cancel">취소됨 · 비활성</Chip> : <Chip kind="good" icon="group">참가 {joinedLabel(ch)}{ch.capacity == null ? '' : '명'} · 활성</Chip>}</div>
         {monthly ? <p className="body">월간 챌린지는 초대코드가 없어요. 참가자는 앱 첫 화면의 이번 달 챌린지에서 바로 참가해요.</p> : (<>
         <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className={`codes ${draft || cancelled ? 'inactive' : ''}`} role="img" aria-label={`초대코드 ${ch.inviteCode}`}>{[...ch.inviteCode].map((c, i) => <span key={i}>{c}</span>)}</div>

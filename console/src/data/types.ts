@@ -20,6 +20,8 @@ export interface Challenge {
   id: string;
   name: string;
   status: ChallengeStatus;
+  /** 운영자가 만든 챌린지 / 매달 자동으로 열리는 월간 챌린지(정원·초대코드 없음) */
+  kind: 'operator' | 'monthly';
   startDate: string; // YYYY-MM-DD
   endDate: string;
   /** 정원. 월간 챌린지는 없음(null) */
@@ -37,6 +39,8 @@ export interface ChallengeRules {
   snackKcal: number; stepsCap: number; floorsCap: number; stepMet: number;
   skipPerDay: number; skipPerWeek: number; checkDays: number;
   nudgeMinM: number; nudgeMinF: number;
+  /** 걸음 급증 검토: 절대 상한 / 배율 규칙을 거는 최소 걸음 / 기준선 배율 */
+  stepsSpikeAbs: number; stepsSpikeMin: number; stepsSpikeRatio: number;
   lockedAt: string | null;
 }
 

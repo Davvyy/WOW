@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { Avatar, Banner, Chip, ErrorBox, Loading, Ms, PageHead } from '../components/ui';
 import { useChallenge } from '../components/Shell';
 import { useConsole, useLoad } from '../context';
-import type { ReasonTemplate, ReviewItem, Slot, Verdict, VerdictImpact } from '../data/types';
+import type { ChallengeRules, ReasonTemplate, ReviewItem, Slot, Verdict, VerdictImpact } from '../data/types';
+import { spikeRuleNote } from '../lib/challengeForm';
 import { fmt, mdTime } from '../lib/format';
 import { hoursLeft, slaLevel, slaText } from '../lib/sla';
 import { composeNotification, REASON, REASON_KEYS, VERDICT, VERDICT_KEYS } from '../lib/verdictCopy';
@@ -23,7 +24,7 @@ function StateChip({ r }: { r: ReviewItem }) {
   return <Chip icon="hourglass_top">검토 중 · 소명 대기</Chip>;
 }
 
-function Evidence({ r, now }: { r: ReviewItem; now: string }) {
+function Evidence({ r, now, rules }: { r: ReviewItem; now: string; rules: ChallengeRules | null }) {
   const ev = r.evidence;
   if (r.type === 'steps_spike' && ev.steps7) {
     const max = Math.max(1, ...ev.steps7.map((d) => d.steps));
@@ -40,7 +41,7 @@ function Evidence({ r, now }: { r: ReviewItem; now: string }) {
               <div key={d.label} className={`bar ${d.steps === max ? 'hi' : i < 3 ? 'base' : ''}`}><span className="v">{fmt.int(d.steps)}</span><i style={{ height: `${(d.steps / max * H).toFixed(0)}px` }} /><span className="d">{d.label}</span></div>
             ))}
           </div>
-          {base && last ? <p className="cap">{r.dateLabel} {fmt.int(last.steps)}보 = 기준선 ×{(last.steps / base).toFixed(1)} → 플래그 조건(25,000 초과, 또는 15,000 초과이면서 중앙값 ×2.5) · 첫 3일이 기준선</p> : null}
+          {base && last ? <p className="cap">{r.dateLabel} {fmt.int(last.steps)}보 = 기준선 ×{(last.steps / base).toFixed(1)} {rules ? ` → 플래그 조건(${spikeRuleNote(rules)})` : ''} · 첫 3일이 기준선</p> : null}
           <div className="kv"><span className="k">세션 기록</span><span className="v">{ev.sessionNote ?? '없음 · 걸음만 동기화'}</span></div>
           <div className="kv"><span className="k">출처</span><span className="v">{ev.stepsSource ?? '—'} · 수동 입력 없음</span></div>
         </div>
@@ -225,6 +226,7 @@ export function OP3Reviews() {
   const [sp, setSp] = useSearchParams();
   const { data: list, error, reload } = useLoad(() => api.listReviews(ch.id), [ch.id]);
   const { data: audit } = useLoad(() => api.auditLog(ch.id), [ch.id]);
+  const { data: rules } = useLoad(() => api.getRules(ch.id), [ch.id]);
   const { data: doneCount } = useLoad(() => api.completedReviewCount(ch.id), [ch.id]);
 
   const sorted = useMemo(() => [...(list ?? [])].sort((a, b) => (a.status === 'decided' ? 1 : 0) - (b.status === 'decided' ? 1 : 0) || Date.parse(a.slaDueAt) - Date.parse(b.slaDueAt)), [list]);
@@ -288,7 +290,7 @@ export function OP3Reviews() {
           {sel.status !== 'decided' && hoursLeft(sel.slaDueAt, ops.nowIso) < 0 ? <Banner kind="critical" icon="alarm" role="alert"><b>SLA +{Math.abs(hoursLeft(sel.slaDueAt, ops.nowIso))}h 초과</b> · 소명 기간이 지났어요. 알림 문구에 &quot;설명 기간이 지나 기록으로만 확인했어요&quot;가 덧붙여져요.</Banner>
             : sel.status !== 'decided' && hoursLeft(sel.slaDueAt, ops.nowIso) < 24 ? <Banner kind="warn" icon="timer" role="status"><b>SLA 임박 · 남은 {hoursLeft(sel.slaDueAt, ops.nowIso)}h</b> · 72시간 안에 판정해 주세요.{sel.appealText ? ' 소명이 도착했어요.' : ''}</Banner> : null}
           <div className="grid two">
-            <div className="stack" id="evidence"><Evidence r={sel} now={ops.nowIso} /></div>
+            <div className="stack" id="evidence"><Evidence r={sel} now={ops.nowIso} rules={rules ?? null} /></div>
             <VerdictForm key={sel.id} r={sel} now={ops.nowIso} />
           </div>
         </>

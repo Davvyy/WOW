@@ -34,6 +34,12 @@ export function snackRuleNote(snackKcal: number): string {
   return snackKcal > 0 ? 'kcal 미만은 간식(슬롯 미충족)' : '기록이 있으면 끼니로 인정';
 }
 
+/** 걸음 급증 검토가 걸리는 조건(D82). 숫자는 챌린지 규칙에서 읽는다 */
+export function spikeRuleNote(r: { stepsSpikeAbs: number; stepsSpikeMin: number; stepsSpikeRatio: number }): string {
+  const n = (v: number) => v.toLocaleString('ko-KR');
+  return `${n(r.stepsSpikeAbs)} 초과, 또는 ${n(r.stepsSpikeMin)} 초과이면서 중앙값 ×${r.stepsSpikeRatio}`;
+}
+
 /** 새 챌린지 폼 기본값: 내일 시작 · 28일(4주) · 정원 60명 */
 export function newChallengeDefaults(today: string): ChallengeBasics {
   const startDate = addDays(today, 1);

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import App from './App';
 import { ConsoleProvider } from './context';
 import type { ConsoleApi } from './data/api';
-import { challengeBasicsError, joinedLabel, snackRuleNote } from './lib/challengeForm';
+import { challengeBasicsError, joinedLabel, snackRuleNote, spikeRuleNote } from './lib/challengeForm';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -100,5 +100,30 @@ describe('첫 요청이 느리거나 오류가 날 때', () => {
     await act(async () => { retry!.click(); });
     await settle();
     expect(calls).toBe(2);
+  });
+});
+
+describe('걸음 급증 검토 조건 문구', () => {
+  it('숫자를 챌린지 규칙에서 읽는다', () => {
+    expect(spikeRuleNote({ stepsSpikeAbs: 25000, stepsSpikeMin: 15000, stepsSpikeRatio: 2.5 })).toBe('25,000 초과, 또는 15,000 초과이면서 중앙값 ×2.5');
+    expect(spikeRuleNote({ stepsSpikeAbs: 30000, stepsSpikeMin: 10000, stepsSpikeRatio: 3 })).toBe('30,000 초과, 또는 10,000 초과이면서 중앙값 ×3');
+  });
+});
+
+describe('운영자 정보를 다시 확인하지 못할 때', () => {
+  it('처음엔 받았다가 다음 확인이 안 되면 화면은 두고 알림을 띄운다', async () => {
+    let calls = 0; let bump = () => {};
+    const api = {
+      kind: 'mock',
+      ops: () => (++calls === 1 ? Promise.resolve({ today: '2026-11-10', nowIso: '2026-11-10T09:00:00+09:00' }) : Promise.reject(new Error('network'))),
+      subscribe: (fn: () => void) => { bump = fn; return () => {}; },
+    } as unknown as ConsoleApi;
+    const h = await mount(<ConsoleProvider api={api}><p>본문</p></ConsoleProvider>);
+    expect(h.textContent).toContain('본문');
+    expect(h.querySelector('[role="alert"]')).toBeNull();
+    await act(async () => { bump(); });
+    await settle();
+    expect(h.textContent).toContain('본문');
+    expect(h.querySelector('[role="alert"]')!.textContent).toContain('새로 확인하지 못했어요');
   });
 });

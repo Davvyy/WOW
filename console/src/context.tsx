@@ -32,6 +32,7 @@ export function ConsoleProvider({ api, children }: { api: ConsoleApi; children: 
   return (
     <ConsoleContext.Provider value={{ api, ops, version, toast }}>
       {children}
+      {opsErr ? <div className="toast" role="alert"><Ms name="error" /><span>운영자 정보를 새로 확인하지 못했어요 · 화면 값이 최신이 아닐 수 있어요</span><button className="btn sm quiet" onClick={() => setAttempt((a) => a + 1)}>다시 시도</button></div> : null}
       {toastState ? <div className="toast" role="status"><Ms name={toastState.icon} /><span>{toastState.msg}</span></div> : null}
     </ConsoleContext.Provider>
   );

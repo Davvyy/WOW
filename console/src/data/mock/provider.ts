@@ -53,9 +53,9 @@ interface MockReview {
 }
 
 const OTHER_CHALLENGES: Challenge[] = [
-  { id: 'ch-monthly', name: '11월 챌린지', status: 'closing', startDate: '2026-11-01', endDate: '2026-11-30', capacity: null, inviteCode: '', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 3 },
-  { id: 'ch-winter', name: '겨울 저녁 산책 챌린지', status: 'draft', startDate: '2026-12-07', endDate: '2027-01-03', capacity: 50, inviteCode: 'W3N7QA', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 0 },
-  { id: 'ch-summer', name: '여름 계단 챌린지', status: 'archived', startDate: '2026-07-06', endDate: '2026-08-02', capacity: 40, inviteCode: 'S5T9XP', rulesMd: '', photosPurgedAt: '2026-08-17T10:00:00+09:00', publishedAt: '2026-08-03T09:30:00+09:00', joined: 36 },
+  { id: 'ch-monthly', name: '11월 챌린지', status: 'closing', kind: 'monthly', startDate: '2026-11-01', endDate: '2026-11-30', capacity: null, inviteCode: '', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 3 },
+  { id: 'ch-winter', name: '겨울 저녁 산책 챌린지', status: 'draft', kind: 'operator', startDate: '2026-12-07', endDate: '2027-01-03', capacity: 50, inviteCode: 'W3N7QA', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 0 },
+  { id: 'ch-summer', name: '여름 계단 챌린지', status: 'archived', kind: 'operator', startDate: '2026-07-06', endDate: '2026-08-02', capacity: 40, inviteCode: 'S5T9XP', rulesMd: '', photosPurgedAt: '2026-08-17T10:00:00+09:00', publishedAt: '2026-08-03T09:30:00+09:00', joined: 36 },
 ];
 
 const DEFAULT_MD = '## 운영자 추가 규칙\n- 회식 날(10.17)은 저녁 자동 확정 대신 대체값 적용을 요청할 수 있어요(운영자에게 메시지).\n- 상품은 상위 3명 + 반영률 100% 달성자 추첨 2명.';
@@ -63,7 +63,8 @@ const DEFAULT_MD = '## 운영자 추가 규칙\n- 회식 날(10.17)은 저녁 �
 const DEFAULT_RULES: ChallengeRules = {
   t: RULES.T, c: RULES.C, mMin: RULES.M_MIN, mRatio: RULES.M_RATIO, fMin: RULES.F_MIN, fRatio: RULES.F_RATIO,
   snackKcal: RULES.SNACK_KCAL, stepsCap: RULES.STEPS_CAP, floorsCap: RULES.FLOORS_CAP, stepMet: RULES.MET_WALK,
-  skipPerDay: RULES.SKIP_PER_DAY, skipPerWeek: RULES.SKIP_PER_WEEK, checkDays: RULES.CHECK_DAYS, nudgeMinM: 1500, nudgeMinF: 1200, lockedAt: null,
+  skipPerDay: RULES.SKIP_PER_DAY, skipPerWeek: RULES.SKIP_PER_WEEK, checkDays: RULES.CHECK_DAYS, nudgeMinM: 1500, nudgeMinF: 1200,
+  stepsSpikeAbs: 25000, stepsSpikeMin: 15000, stepsSpikeRatio: 2.5, lockedAt: null,
 };
 
 export function createMockApi(initialScenario?: string): ConsoleApi {
@@ -87,7 +88,7 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
   function seed() {
     const s = scenario;
     primary = {
-      id: PRIMARY, name: '가을 걷기 챌린지', status: s.status, startDate: START, endDate: '2026-11-02', capacity: 60,
+      id: PRIMARY, name: '가을 걷기 챌린지', status: s.status, kind: 'operator', startDate: START, endDate: '2026-11-02', capacity: 60,
       inviteCode: 'K7Q2MD', rulesMd: md, photosPurgedAt: s.purged ? nowIso() : null, publishedAt: s.publishedAt ?? null, joined: s.joined,
     };
     people = s.joined === 0 ? [] : PEOPLE_SEED.map((seedP, idx) => {
@@ -293,7 +294,7 @@ export function createMockApi(initialScenario?: string): ConsoleApi {
       const err = challengeBasicsError(input, { today: scenario.today });
       if (err) throw new Error(err);
       const c: Challenge = {
-        id: `ch-new-${created.length + 1}`, name: input.name.trim(), status: 'draft', startDate: input.startDate, endDate: input.endDate,
+        id: `ch-new-${created.length + 1}`, name: input.name.trim(), status: 'draft', kind: 'operator', startDate: input.startDate, endDate: input.endDate,
         capacity: input.capacity, inviteCode: '', rulesMd: '', photosPurgedAt: null, publishedAt: null, joined: 0,
       };
       created = [c, ...created];
