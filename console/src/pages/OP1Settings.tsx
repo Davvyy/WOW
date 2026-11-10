@@ -17,12 +17,12 @@ function constCards(r: ChallengeRules) {
   return [
     { k: 'T 목표 순적자', v: fmt.int(r.t), s: 'kcal/일 → 100점 · 최대 150점' },
     { k: '활동 상한 C', v: fmt.int(r.c), s: 'kcal/일 (= 2T)' },
-    { k: '섭취 하한 F', v: `max(${fmt.int(r.fMin)}, ${r.fRatio}×BMR)`, s: '운영자 조정 미결 · v1 기본값', long: true },
-    { k: '대체값 M', v: `max(${fmt.int(r.mMin)}, ${r.mRatio}×BMR)`, s: '미기록 끼니 · 운영자 조정 미결', long: true },
+    { k: '섭취 하한 F', v: `max(${fmt.int(r.fMin)}, ${r.fRatio}×BMR)`, s: '이보다 적게 먹어도 이 값으로 계산', long: true },
+    { k: '대체값 M', v: `max(${fmt.int(r.mMin)}, ${r.mRatio}×BMR)`, s: '기록이 없는 끼니에 넣는 값(전날 같은 끼니가 더 크면 그 값)', long: true },
     { k: '간식 임계', v: fmt.int(r.snackKcal), s: snackRuleNote(r.snackKcal) },
     { k: '걸음 상한', v: fmt.int(r.stepsCap), s: '보/일 · 세션 창 밖 걸음' },
     { k: '층수 상한', v: fmt.int(r.floorsCap), s: '층/일 · 17.5초/층' },
-    { k: '건너뜀', v: `${r.skipPerDay}/일 · ${r.skipPerWeek}/주`, s: '운영자 조정 미결 · v1 기본값' },
+    { k: '건너뜀', v: `${r.skipPerDay}/일 · ${r.skipPerWeek}/주`, s: '한도 안에서는 대체값 없이 건너뜀' },
     { k: '점검 기간', v: `${r.checkDays}일`, s: '누적 미반영 · 플래그 기준선' },
   ];
 }
@@ -218,7 +218,7 @@ export function OP1Settings() {
 
         <div className="stack">
           <div className="card-head"><p className="title"><Ms name="smartphone" cls="sm" />P11 미리보기</p></div>
-          <p className="cap" style={{ marginTop: -10 }}>참가자가 보는 규칙 화면과 같아요 · 390px · Markdown 입력 즉시 갱신</p>
+          <p className="cap" style={{ marginTop: -10 }}>참가자가 보는 규칙 화면과 같아요 · 390px · Markdown 입력 즉시 갱신 · 대체값 {fmt.int(mP)}은 예시 참가자({SAMPLES[0].label}) 기준이라 사람마다 달라요</p>
           {rules ? <P11Preview md={md} rules={rules} mP={mP} name={ch.name} operator={ops.operatorName} /> : <Loading />}
         </div>
       </div>
